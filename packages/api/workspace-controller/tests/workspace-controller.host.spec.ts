@@ -478,3 +478,52 @@ describe('first-use Remote', () => {
       .rejects.toThrow('permission denied')
   })
 })
+
+describe('Research catalog', () => {
+  async function researchFixture() {
+    const fixture = await harness()
+    const { workspace } = await fixture.controller.create({ path: fixture.root })
+    const owner = fixture.ctx.workspaceRegistry.get(workspace.workspaceId)!
+    for (const id of ['topic-agent', 'paper-a', 'paper-b']) {
+      fixture.ctx.sessions.create(SessionId(id), { meta: { cwd: fixture.root } })
+      await owner.attachSession(SessionId(id))
+    }
+    const catalog = await fixture.controller.researchCreateTopic({ title: 'Robot VLA', workspaceId: workspace.workspaceId, sessionId: SessionId('topic-agent') })
+    return { ...fixture, topic: catalog.topics[0]!, workspace }
+  }
+
+  it('keeps topic and paper sessions independent and rejects reusing another entity session', async () => {
+    const { controller, topic } = await researchFixture()
+    await expect(controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: topic.sessionId }))
+      .rejects.toMatchObject({ code: 'research/invalid' })
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    expect(catalog.papers[0]!.sessionId).not.toBe(topic.sessionId)
+    expect(catalog.papers[0]).toMatchObject({ topicIds: [topic.id], ai: { text: '', revision: 0 }, learning: { text: '', revision: 0 } })
+    const retry = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    expect(retry).toEqual(catalog)
+  })
+
+  it('saves AI and learning notebooks separately and rejects stale concurrent writes without losing saved data', async () => {
+    const { controller, topic } = await researchFixture()
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paperId = catalog.papers[0]!.id
+    const concurrent = await Promise.allSettled([
+      controller.researchSaveNote({ paperId, kind: 'learning', text: '# My reading notes', expectedRevision: 0 }),
+      controller.researchSaveNote({ paperId, kind: 'learning', text: 'Stale edit', expectedRevision: 0 }),
+    ])
+    expect(concurrent.map(result => result.status)).toEqual(['fulfilled', 'rejected'])
+    expect(concurrent[1]).toMatchObject({ reason: { code: 'research/note-conflict' } })
+    await controller.researchSaveNote({ paperId, kind: 'ai', text: 'Agent explanation', expectedRevision: 0 })
+    expect((await controller.researchList()).papers[0]).toMatchObject({ learning: { text: '# My reading notes', revision: 1 }, ai: { text: 'Agent explanation', revision: 1 } })
+  })
+
+  it('returns canonical references to paper sessions and rejects missing papers and unsafe metadata', async () => {
+    const { controller, topic } = await researchFixture()
+    await expect(controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: 'javascript:alert(1)', sessionId: SessionId('paper-a') }))
+      .rejects.toMatchObject({ code: 'research/invalid', details: { field: 'repositoryUrl' } })
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: 'https://github.com/example/vla', sessionId: SessionId('paper-a') })
+    const [mention] = await controller.researchMentions([catalog.papers[0]!.id])
+    expect(mention).toBe('@[A](dsh-session:InBhcGVyLWEi)')
+    await expect(controller.researchMentions(Array(4).fill(catalog.papers[0]!.id))).rejects.toMatchObject({ code: 'research/invalid' })
+  })
+})

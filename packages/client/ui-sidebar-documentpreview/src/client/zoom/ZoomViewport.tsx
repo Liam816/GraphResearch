@@ -29,7 +29,7 @@ function pointerAnchor(clientX: number, clientY: number): PointerAnchor | undefi
 
 /** @returns an actual-size scale that only shrinks content wider than the viewport. */
 export function fitWidthZoom(viewportWidth: number, intrinsicWidth: number | undefined, horizontalInset = 0): number {
-  if (intrinsicWidth === undefined || intrinsicWidth <= 0) return 1
+  if (viewportWidth <= 0 || intrinsicWidth === undefined || intrinsicWidth <= 0) return 1
   return Math.min(1, Math.max(1, viewportWidth - horizontalInset) / intrinsicWidth)
 }
 
@@ -152,7 +152,9 @@ export function ZoomViewport(props: ZoomViewportProps): ReactNode {
 
   useLayoutEffect(() => {
     const node = scrollport.current as HTMLDivElement
-    const measure = (): void => { setViewportWidth(node.clientWidth) }
+    const measure = (): void => {
+      if (node.clientWidth > 0) setViewportWidth(node.clientWidth)
+    }
     measure()
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)

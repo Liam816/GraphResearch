@@ -1,0 +1,53 @@
+/** Product and accessibility copy for the research workspace. */
+export const zh = {
+  research: '研究目录', search: '搜索 Topic 或论文', createTopic: '新建 Topic', addPaper: '添加论文',
+  empty: '从一个研究主题开始', emptyHint: '创建 Topic，再添加论文、PDF 和阅读笔记。',
+  topic: 'Topic', paper: '论文', title: '名称', workspace: '工作目录', pdfPath: 'PDF 文件路径', repository: '代码仓库',
+  pdfHint: '填写工作目录内的 PDF 路径，例如 papers/rt-2.pdf。', repositoryHint: '可选，填写开源仓库的 HTTP(S) 链接。',
+  cancel: '取消', create: '创建', creating: '创建中…', close: '关闭', loading: '正在读取研究目录…', retry: '重试',
+  failed: '操作未完成，请重试。你的数据已保留。', directoryFailed: '研究目录暂时无法读取。',
+  noWorkspaces: '请先在下方添加一个工作目录。', noResults: '没有匹配的 Topic 或论文',
+  agent: 'Agent 对话', pdf: 'PDF 原文', notes: '阅读笔记', ai: 'AI 笔记', learning: '学习笔记',
+  related: '关联论文', context: '引用其他论文', contextHint: '选择论文，将它的会话引用放入输入框；发送后带入已保存的阅读上下文。每次最多引用 3 篇。',
+  noRelated: '这个 Topic 还没有其他论文。', insert: '插入引用', inserted: '引用已放入输入框',
+  referenceFailed: '无法插入引用，请等待会话加载完成后重试。', referenceLimit: '每次最多选择 3 篇论文。',
+  reset: '恢复三栏', hidden: '所有面板已折叠', hiddenHint: '点击上方的面板按钮，或恢复三栏布局。',
+  collapse: '折叠 {panel}', resize: '调整 {left} 与 {right} 的宽度',
+  save: '保存笔记', saving: '正在保存…', saved: '已保存', unsaved: '有未保存的修改',
+  conflict: '笔记已在其他窗口修改。当前草稿已保留，刷新后可复制草稿并合并最新版本。',
+  refresh: '刷新目录', discard: '放弃草稿', notePlaceholder: '记录方法、实验结论、疑问和你的理解。支持 Markdown。',
+  edit: '编辑', preview: '预览', emptyNote: '还没有笔记。',
+  topicDescription: '围绕这个 Topic 提问、梳理阅读路线，或对比多篇论文。',
+  independent: '独立会话', general: 'Agent 工作区', paperCount: '{count} 篇论文', expand: '展开 {title}', fold: '折叠 {title}',
+  codeMissing: '尚未关联代码仓库', original: '打开原文', invalid: '请检查名称、PDF 路径和仓库链接。',
+  aiHint: '可将 Agent 的解读整理到这里，AI 笔记与个人学习笔记分别保存。',
+  copy: '复制代码', copied: '已复制', footnotes: '脚注',
+} satisfies Record<string, string>
+
+/** Complete research locale key set. */
+export type ResearchKey = keyof typeof zh
+/** English research dictionary. */
+export const en = {
+  research: 'Research library', search: 'Search topics or papers', createTopic: 'New topic', addPaper: 'Add paper',
+  empty: 'Start with a research topic', emptyHint: 'Create a topic, then add papers, PDFs, and reading notes.',
+  topic: 'Topic', paper: 'Paper', title: 'Title', workspace: 'Working directory', pdfPath: 'PDF file path', repository: 'Code repository',
+  pdfHint: 'Enter a PDF path inside the working directory, such as papers/rt-2.pdf.', repositoryHint: 'Optional HTTP(S) link to the open source repository.',
+  cancel: 'Cancel', create: 'Create', creating: 'Creating…', close: 'Close', loading: 'Loading research library…', retry: 'Retry',
+  failed: 'The operation failed. Your data was retained. Please retry.', directoryFailed: 'The research library is unavailable.',
+  noWorkspaces: 'Add a working directory below first.', noResults: 'No matching topics or papers',
+  agent: 'Agent chat', pdf: 'Original PDF', notes: 'Reading notes', ai: 'AI notes', learning: 'Learning notes',
+  related: 'Related papers', context: 'Reference papers', contextHint: 'Choose papers to insert session references into the composer. Sending includes their saved reading context. Up to 3 papers per prompt.',
+  noRelated: 'There are no other papers in this topic yet.', insert: 'Insert references', inserted: 'References added to the composer',
+  referenceFailed: 'Could not insert references. Wait for the session to load and retry.', referenceLimit: 'Choose up to 3 papers per prompt.',
+  reset: 'Restore three panels', hidden: 'All panels are collapsed', hiddenHint: 'Use the panel buttons above or restore the three-panel layout.',
+  collapse: 'Collapse {panel}', resize: 'Resize {left} and {right}',
+  save: 'Save notes', saving: 'Saving…', saved: 'Saved', unsaved: 'Unsaved changes',
+  conflict: 'These notes changed in another window. Your draft was retained. Refresh, copy your draft, and merge with the latest version.',
+  refresh: 'Refresh library', discard: 'Discard draft', notePlaceholder: 'Record methods, findings, questions, and your understanding. Markdown is supported.',
+  edit: 'Edit', preview: 'Preview', emptyNote: 'No notes yet.',
+  topicDescription: 'Ask about this topic, plan your reading, or compare papers.',
+  independent: 'Independent session', general: 'Agent workspace', paperCount: '{count} papers', expand: 'Expand {title}', fold: 'Collapse {title}',
+  codeMissing: 'No code repository linked', original: 'Open original', invalid: 'Check the title, PDF path, and repository URL.',
+  aiHint: 'Collect the Agent’s explanations here. AI notes and personal learning notes are saved separately.',
+  copy: 'Copy code', copied: 'Copied', footnotes: 'Footnotes',
+} satisfies Record<ResearchKey, string>

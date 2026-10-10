@@ -10,16 +10,37 @@
     "src/client/model.ts",
     "src/client/service.ts",
     "src/default-workspace.ts",
-    "src/types.ts"
+    "src/types.ts",
+    "src/research-types.ts",
+    "src/client/research.ts"
   ],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../gateway/tsconfig.client.json" },
-    { "path": "../../client/connection/tsconfig.client.json" },
-    { "path": "../../client/store" },
-    { "path": "../../core/session" },
-    { "path": "../../host/directory-picker" },
-    { "path": "../../typert/protocol" },
-    { "path": "../../workspace/workspace" }
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../gateway/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/connection/tsconfig.client.json"
+    },
+    {
+      "path": "../../client/store"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../host/directory-picker"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../workspace/workspace"
+    },
+    {
+      "path": "../../util/brand"
+    }
   ]
 }

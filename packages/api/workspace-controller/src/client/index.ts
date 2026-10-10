@@ -10,8 +10,12 @@ import type { WorkspaceFollowFrame, WorkspaceFollowIncrement } from '../types.ts
 import type { WorkspaceFollowSink } from './model.ts'
 import { ClientWorkspaceModel } from './model.ts'
 import { WorkspaceController } from './service.ts'
+import { ClientResearchModel } from './research.ts'
 
 export { ClientWorkspaceModel } from './model.ts'
+export { ClientResearchModel } from './research.ts'
+export type { ResearchSnapshot } from './research.ts'
+export type * from '../research-types.ts'
 export type {
   WorkspaceFollowSink, WorkspaceListPhase, WorkspaceRemote, WorkspaceSnapshot,
 } from './model.ts'
@@ -34,6 +38,8 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** React-free Client Workspace state and commands. */
     workspaces: import('./service.ts').IWorkspaces
+    /** Durable research entities and notebook commands. */
+    research: ClientResearchModel
   }
 }
 
@@ -47,6 +53,13 @@ export const inject = ['remote', 'remote.workspace']
 export function apply(ctx: Context): void {
   const model = new ClientWorkspaceModel(ctx.remote.workspace)
   new WorkspaceController(ctx, model)
+  const research = new ClientResearchModel(ctx.remote.workspace)
+  ctx.effect(() => ctx.reflect.provide('research', research))
+  const refreshResearch = (): void => { void research.refresh().catch(() => {
+    // The model publishes the recoverable failure; the directory owns retry.
+  }) }
+  ctx.on('connection/reset', refreshResearch)
+  refreshResearch()
   const control = createWorkspaceStateStream(ctx.remote, {
     accept: model,
     carrierFailed: () => { model.handleCarrierFailure() },

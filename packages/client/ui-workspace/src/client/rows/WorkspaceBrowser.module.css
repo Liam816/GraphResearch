@@ -619,3 +619,8 @@
     transition: none;
   }
 }
+
+.legacyWorkspaces { flex: none; border-top: 1px solid var(--dsw-alias-border-l1); margin-top: 8px; }
+.legacyWorkspaces > summary { padding: 12px 8px; cursor: pointer; color: var(--dsw-alias-label-secondary); }
+.legacyBody { display: flex; flex-direction: column; max-height: 38vh; min-height: 0; }
+.rail .legacyBody { max-height: none; }

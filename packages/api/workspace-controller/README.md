@@ -44,6 +44,12 @@ Documents lookup holds the registry mutation queue, so other Workspace mutations
 
 -----
 
+### Research catalog
+
+The `research` storage domain owns stable Topic and paper identities, their independent Session bindings, PDF paths, repository links, and separately revisioned AI and learning notebooks. `researchList`, `researchCreateTopic`, `researchCreatePaper`, and `researchSaveNote` return complete revisioned catalogs. Entity Sessions must belong to the selected working directory and cannot be shared between entities. Creation retries with the same Session and metadata are idempotent. Notebook writes serialize on the Host and require `expectedRevision`; conflicts reject without modifying the saved notebook. Client `ctx.research` retains confirmed catalog data on read failures and accepts command replies in revision order. Refresh reloads external edits; notebook revision checks prevent another browser from overwriting them silently.
+
+`researchMentions` returns canonical Session references for up to three selected papers. These references remain draft text until the user sends a prompt; the existing Session-reference service owns context capture and logging. Catalog metadata and notebooks are not automatically model-visible, and the Session persistence format is unchanged.
+
 <a id="model-experience"></a>
 ## Model Experience
 

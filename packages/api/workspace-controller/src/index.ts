@@ -2,11 +2,14 @@
 
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
+import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { WorkspaceCommands } from './commands.ts'
 import { DirectoryPickerController } from './directory-picker.ts'
 import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
+import { ResearchCatalogHost } from './research.ts'
+import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
+import type { ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId } from './research-types.ts'
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
@@ -49,7 +52,23 @@ declare module '@deepseek-ai/cordis' {
 
 /** Host service backing the generated `ctx.remote.workspace` namespace. */
 export class WorkspaceController extends TypertRemoteService {
-  static inject = ['typert', 'workspaceRegistry']
+  static inject = ['typert', 'workspaceRegistry', 'storageDomain']
+
+  /**
+   * Prepare canonical references for selected paper sessions.
+   * @param paperIds - up to three paper identities.
+   * @returns canonical prompt references for the selected paper sessions.
+   */
+  @Remote('researchMentions')
+  async researchMentions(paperIds: readonly ResearchPaperId[]): Promise<readonly string[]> {
+    const catalog = await this.research.read()
+    if (paperIds.length > 3) throw new RemoteError('research/invalid', 'Select at most three papers', { field: 'paperIds' })
+    return paperIds.map((id) => {
+      const paper = catalog.papers.find(item => item.id === id)
+      if (paper === undefined) throw new RemoteError('research/not-found', 'Research paper does not exist', { id })
+      return formatSessionReferenceMention({ sessionId: paper.sessionId, label: paper.title })
+    })
+  }
 
   static Config: z<Config, ResolvedConfig> = z.object({
     documentsDirectory: z.string(),
@@ -59,6 +78,7 @@ export class WorkspaceController extends TypertRemoteService {
   private readonly config: ResolvedConfig
   private readonly commands: WorkspaceCommands
   private readonly feed: WorkspaceFeed
+  private readonly research: ResearchCatalogHost
 
   /**
    * @param ctx - Host context containing the Workspace registry.
@@ -70,6 +90,7 @@ export class WorkspaceController extends TypertRemoteService {
     if (this.config.documentsDirectory !== undefined) validateDocumentsDirectory(this.config.documentsDirectory)
     this.commands = new WorkspaceCommands(ctx)
     this.feed = new WorkspaceFeed(ctx)
+    this.research = new ResearchCatalogHost(ctx)
     // This package is the Loader entry for both Remote owners it hosts: the
     // directory-picking seam is abstract and never an entry itself. The child
     // stays pending until a picking backend is composed, so a host without one
@@ -194,6 +215,45 @@ export class WorkspaceController extends TypertRemoteService {
   @Remote({ mode: 'stream' })
   follow(signal: AbortSignal): AsyncIterable<WorkspaceFollowFrame> {
     return this.feed.follow(signal)
+  }
+
+  /**
+   * Read the confirmed research catalog.
+   * @returns the current durable topic, paper and notebook catalog.
+   */
+  @Remote('researchList')
+  researchList(): Promise<ResearchCatalog> {
+    return this.research.read()
+  }
+
+  /**
+   * Apply the requested research operation.
+   * @param request - Topic metadata and its independent Session.
+   * @returns the committed catalog.
+   */
+  @Remote('researchCreateTopic')
+  researchCreateTopic(request: ResearchCreateTopicRequest): Promise<ResearchCatalog> {
+    return this.research.createTopic(request)
+  }
+
+  /**
+   * Apply the requested research operation.
+   * @param request - Paper metadata and its independent Session.
+   * @returns the committed catalog.
+   */
+  @Remote('researchCreatePaper')
+  researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog> {
+    return this.research.createPaper(request)
+  }
+
+  /**
+   * Apply the requested research operation.
+   * @param request - Notebook edit and acknowledged revision.
+   * @returns the committed catalog; conflicts preserve the previous notebook.
+   */
+  @Remote('researchSaveNote')
+  researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog> {
+    return this.research.saveNote(request)
   }
 }
 

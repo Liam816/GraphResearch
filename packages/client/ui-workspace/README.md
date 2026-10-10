@@ -196,6 +196,16 @@ These pages cover the sidebar host, the hero surface, and the picking backends.
 
 -----
 
+### Research workspace
+
+The directory and main panel share a root-scoped view store. The session-scoped workbench receives its snapshot and actions from the main panel.
+
+The sidebar starts with a searchable Topic → Paper → Resource directory. Create a Topic in an existing working directory, then add papers using PDF paths readable from that directory. Each Topic and paper binds a separate Agent Session. Selecting a Topic opens its chat; selecting a paper opens Agent, original PDF, and notes panels. Each panel can be collapsed independently, adjacent widths can be dragged or adjusted with the separator’s arrow keys, and **Restore three panels** restores the layout. Narrow workspaces show one active panel at a time. Ordinary Workspace navigation remains below the research directory.
+
+AI and learning notebooks save separately to the Host. Unsaved drafts, notebook selection, and layout preferences remain local to the browser and survive paper switches and reloads. A stale notebook revision rejects the save and retains the draft; refresh to read the latest saved version before merging. **Reference papers** inserts up to three canonical Session mentions into the current composer. Sending uses the existing Session-reference snapshot behavior; it does not merge or rewrite the source Sessions.
+
+PDF preview does not extract paper text into model context. Repository links open externally; repository download, automatic paper parsing, and automatic notebook generation require additional Agent capabilities.
+
 <a id="model-experience"></a>
 ## Model Experience
 

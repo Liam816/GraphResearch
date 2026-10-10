@@ -1,0 +1,45 @@
+- banner:
+  - button "Robot VLA"
+  - strong: RT-2
+  - text: Independent session
+  - group "Restore three panels":
+    - button "Agent chat" [pressed]
+    - button "Original PDF" [pressed]
+    - button "Reading notes" [pressed]
+  - button "Restore three panels"
+  - button "Reference papers"
+- region "Agent chat":
+  - strong: Agent chat
+  - button "Collapse Agent chat"
+  - button "Choose workspace": {{workspace}}
+  - button "Standard mode"
+  - textbox "Describe what you want to build, / commands, @ files or sessions"
+  - button "Add files or run commands"
+  - 'button "Access mode, current: Workspace Write"': Workspace Write
+  - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
+  - button "Send message" [disabled]
+- separator "Resize Agent chat and Original PDF"
+- region "Original PDF":
+  - strong: Original PDF
+  - button "Collapse Original PDF"
+  - img "PDF page 1"
+  - text: Selectable PDF text
+  - img "PDF page 2"
+  - text: Selectable PDF text
+  - toolbar "Zoom controls":
+    - button "Zoom out"
+    - button "Choose zoom": 100%
+    - button "Zoom in"
+- separator "Resize Original PDF and Reading notes"
+- region "Reading notes":
+  - strong: Reading notes
+  - button "Collapse Reading notes"
+  - group "Reading notes":
+    - button "Learning notes" [pressed]
+    - button "AI notes"
+  - status: Saved
+  - button "Preview"
+  - button "Save notes" [disabled]
+  - textbox "Learning notes":
+    - /placeholder: Record methods, findings, questions, and your understanding. Markdown is supported.
+    - text: "# RT-2 Understand the action token representation."

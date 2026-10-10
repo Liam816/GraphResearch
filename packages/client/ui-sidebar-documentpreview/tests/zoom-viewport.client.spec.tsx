@@ -45,6 +45,10 @@ it('fits without upscaling, follows resize, and leaves fixed zoom unchanged', ()
   const view = render(<View />)
   expect(screen.getByRole('button', { name: 'Choose zoom' }).textContent).toContain('48%')
   expect(onRenderZoom).toHaveBeenLastCalledWith(0.48)
+  width = 0
+  act(() => { resize?.([], {} as ResizeObserver) })
+  expect(onRenderZoom).toHaveBeenLastCalledWith(0.48)
+  expect(screen.getByRole('button', { name: 'Choose zoom' }).textContent).toContain('48%')
   expect(view.container.querySelector('[data-document-zoom-mode]')?.getAttribute('data-document-zoom-mode')).toBe('fit-width')
   width = 320
   act(() => { resize?.([], {} as ResizeObserver) })
@@ -65,6 +69,7 @@ it('fits without upscaling, follows resize, and leaves fixed zoom unchanged', ()
 })
 
 it('resolves missing and small content to 100 percent', () => {
+  expect(fitWidthZoom(0, 1000, 24)).toBe(1)
   expect(fitWidthZoom(200, undefined, 24)).toBe(1)
   expect(fitWidthZoom(200, 0, 24)).toBe(1)
   expect(fitWidthZoom(200, 100, 24)).toBe(1)

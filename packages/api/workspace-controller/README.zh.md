@@ -44,6 +44,12 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 -----
 
+### 研究目录
+
+`research` storage domain 管理稳定的 Topic 和论文身份、各自独立的 Session 绑定、PDF 路径、仓库链接，以及分别记录版本的 AI 笔记和学习笔记。`researchList`、`researchCreateTopic`、`researchCreatePaper` 和 `researchSaveNote` 返回带版本的完整目录。实体 Session 必须归属所选工作目录，实体间不能共用 Session。使用相同 Session 和元数据重试创建是幂等的。笔记写入由 Host 串行处理并要求 `expectedRevision`，版本冲突会拒绝请求而不修改已保存笔记。Client 的 `ctx.research` 在读取失败时保留已确认目录，按版本顺序接收命令响应。刷新读取外部编辑，笔记版本检查防止另一浏览器静默覆盖修改。
+
+`researchMentions` 为最多三篇所选论文返回规范 Session 引用。用户发送提示词之前，引用仅保留在草稿中；上下文捕获和日志记录由已有 Session-reference 服务负责。目录元数据和笔记不会自动对模型可见，Session 持久化格式保持不变。
+
 <a id="model-experience"></a>
 ## 模型体验
 

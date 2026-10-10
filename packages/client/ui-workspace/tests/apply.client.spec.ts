@@ -1,3 +1,4 @@
+import { installEmptyResearch } from './research-fixture.client.ts'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -8,7 +9,7 @@ import { SessionForkError } from '@deepseek-ai/dsh-api-session-controller/client
 import type { WorkspaceId, WorkspaceSnapshot, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type { StoredEntry } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRenderSlots, StoredEntry } from '@deepseek-ai/dsh-client-ui-slots'
 import { RemoteError, TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -53,6 +54,7 @@ const workspaceState = (
 
 async function bench() {
   const ctx = new Context()
+  installEmptyResearch(ctx)
   ctx.provide('shortcuts', { register: () => () => {}, catalog: createSnapshotStore([]) })
   ctx.provide('uiConversation', {})
   await ctx.plugin(SlotRegistry).await()
@@ -200,8 +202,28 @@ describe('ui-workspace apply', () => {
 
   it('declares the services it drives', () => {
     expect(inject).toEqual([
-      'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.directoryPicker', 'layout', 'shortcuts',
+      'slots', 'sessions', 'workspaces', 'locale', 'remote', 'remote.directoryPicker', 'layout', 'shortcuts', 'research', 'remote.workspaceFiles',
     ])
+  })
+
+  it('mounts the research directory and session workbench together with root-owned preferences', async () => {
+    const b = await bench()
+    onTestFinished(() => b.ctx.fiber.dispose())
+    b.slots.register({
+      name: 'root',
+      children: {
+        main: { kind: 'keyed', scope: 'root' },
+        'sidebar.workspaces': { kind: 'single', scope: 'root' },
+      },
+    }, (_props: PropsRenderSlots<'main' | 'sidebar.workspaces'>) => null)
+    await b.ctx.plugin({ apply, inject }).await()
+    const main = b.slots.entries('main').find(item => item.options.key === 'research')
+    const directory = b.slots.entries('sidebar.workspaces.research')[0]
+    const workbench = b.slots.entries('main.research')[0]
+    expect(main?.store).toBeDefined()
+    expect(directory?.store).toBe(main?.store)
+    expect(workbench).toBeDefined()
+    expect(workbench?.store).toBeUndefined()
   })
 
   it('reports a default Workspace creation failure through the shared notice overlay', async () => {

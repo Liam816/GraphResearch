@@ -1,0 +1,2 @@
+.root { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; background: var(--dsw-alias-bg-document-preview); }
+.status { padding: 24px; color: var(--dsw-alias-label-secondary); line-height: 1.6; }
