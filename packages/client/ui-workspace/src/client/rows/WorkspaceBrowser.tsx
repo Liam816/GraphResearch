@@ -1205,7 +1205,7 @@ export function WorkspaceBrowser({
   }
 
   return (
-    <div className={clsx(css.root, !wide && css.rail)}>
+    <div className={clsx(css.root, !wide && css.rail)} data-workspace-browser>
       {wide && renderSlot('sidebar.workspaces.research', {})}
       <details className={css.legacyWorkspaces} open>
         {wide && <summary>{t('section.legacy')}</summary>}

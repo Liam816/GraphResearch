@@ -1,0 +1,23 @@
+- region "Research library":
+  - strong: Research library
+  - button "New topic"
+  - textbox "Search topics or papers"
+  - navigation "Research library":
+    - list:
+      - listitem:
+        - button "Collapse Robot VLA" [expanded]
+        - button "Robot VLA 1"
+        - list:
+          - listitem:
+            - button "Collapse RT-2" [expanded]
+            - button "RT-2"
+            - list:
+              - listitem:
+                - button "Agent chat"
+              - listitem:
+                - button "Original PDF"
+              - listitem:
+                - button "Reading notes"
+              - listitem: Code repository
+          - listitem:
+            - button "Add paper"

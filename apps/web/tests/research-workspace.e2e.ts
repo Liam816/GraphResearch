@@ -9,6 +9,7 @@ import { captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchCons
 import { newEnglishPage, openSettings, saveFailureShot } from './support.ts'
 
 const EXPECTED = fileURLToPath(new URL('./expected/research-workspace/paper.expected.md', import.meta.url))
+const DIRECTORY_EXPECTED = fileURLToPath(new URL('./expected/research-workspace/directory.expected.md', import.meta.url))
 const SHOTS = fileURLToPath(new URL('../../../.artifacts/research-ui', import.meta.url))
 
 it('opens topic and paper sessions, restores folded panels and drafts, and persists notes after reload', async () => {
@@ -28,6 +29,9 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   onTestFailed(() => saveFailureShot(page, 'research-workspace'))
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   const library = page.getByRole('region', { name: 'Research library', exact: true })
+  const legacyWorkspaces = page.locator('[data-workspace-browser] > details')
+  await legacyWorkspaces.waitFor({ state: 'attached' })
+  expect(await legacyWorkspaces.isVisible()).toBe(false)
   await library.getByRole('button', { name: 'New topic', exact: true }).click()
   const topicForm = page.getByRole('dialog', { name: 'New topic', exact: true })
   await topicForm.getByLabel('Title', { exact: true }).fill('Robot VLA')
@@ -52,6 +56,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await workbench.getByRole('status').filter({ hasText: /^Saved$/ }).waitFor()
   await expect.poll(() => workbench.getByRole('button', { name: 'Save notes', exact: true }).isDisabled()).toBe(true)
   await compareOrRefreshGolden(EXPECTED, await captureStableAria(page, '[data-research-workbench]', scaffold.workspaceCwd), webSnapshotMode())
+  await compareOrRefreshGolden(DIRECTORY_EXPECTED, await captureStableAria(page, '[data-workspace-browser]', scaffold.workspaceCwd), webSnapshotMode())
   await mkdir(SHOTS, { recursive: true })
   await page.screenshot({ path: join(SHOTS, 'paper-light.png') })
 
@@ -91,6 +96,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await workbench.waitFor()
   await expect.poll(() => notes.inputValue()).toContain('action token')
   await page.setViewportSize({ width: 760, height: 900 })
+  expect(await legacyWorkspaces.isVisible()).toBe(false)
   await library.getByRole('button', { name: 'Reading notes', exact: true }).first().click()
   await expect.poll(() => notes.isVisible()).toBe(true)
   expect(await workbench.getByRole('region', { name: 'Agent chat', exact: true }).isVisible()).toBe(false)
