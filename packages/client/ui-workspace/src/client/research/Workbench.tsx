@@ -1,11 +1,46 @@
 /** Session-aware paper workspace, composing existing Agent and PDF factories. */
-import { Fragment, useRef, useState } from 'react'
-import { Button, Input, Modal, IconCloseOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useId, useState } from 'react'
+import clsx from 'clsx'
+import {
+  Button, Input, Modal, Pill, Tooltip, ReferenceIconRegular,
+  IconCheckOutlineRegular, IconCloseOutlineRegular, IconListPenOutlineRegular, IconPlusOutlineRegular,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ResearchPaperId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchWorkbenchProps } from './contract.ts'
-import { defaultPaperView, type ResearchPanel } from './store.ts'
-import { ResearchNotes } from './Notes.tsx'
+import { defaultPaperView, resolvePanelOrder, type PaperView } from './store.ts'
+import { ResearchPaperPanels } from './PaperPanels.tsx'
 import css from './Research.module.css'
+
+/** Header controls toggle independent panels on wide screens and select one panel on narrow screens. */
+function PanelControls({ paperId, view, id, navigation = false, t, viewActions }: Pick<ResearchWorkbenchProps, 't' | 'viewActions'> & {
+  paperId: ResearchPaperId
+  view: PaperView
+  id: string
+  navigation?: boolean
+}) {
+  return <div className={clsx(css.panelControls, navigation ? css.panelNavigation : css.panelVisibility)}
+    role="group" aria-label={t(navigation ? 'panelFocus' : 'panels')}>
+    {resolvePanelOrder(view).map((panel) => {
+      const selected = view.panels[panel] && (!navigation || view.active === panel)
+      const hint = t(navigation ? 'viewPanel' : selected ? 'collapse' : 'show', { panel: t(panel) })
+      return <Tooltip key={panel} label={hint} side="bottom" portal>
+        <span className={css.panelControlAnchor}>
+          <Pill active={selected} className={css.panelToggle} aria-pressed={selected} aria-controls={`${id}-${panel}`}
+            onClick={() => {
+              if (navigation) viewActions.focus(paperId, panel)
+              else viewActions.panel(paperId, panel)
+            }}>
+            <span className={css.panelControlIcon} aria-hidden="true">{panel === 'notes' ? <IconListPenOutlineRegular size={16} />
+              : <ReferenceIconRegular kind={panel === 'agent' ? 'session' : 'file'} size={16} />}</span>
+            <span className={css.panelControlLabel}>{t(panel)}</span>
+            <span className={css.panelControlState} aria-hidden="true">{selected ? <IconCheckOutlineRegular size={12} />
+              : !navigation && <IconPlusOutlineRegular size={12} />}</span>
+          </Pill>
+        </span>
+      </Tooltip>
+    })}
+  </div>
+}
 
 /** @param props - current Session seats, catalog, layout store, and factory renderer. @returns a topic chat or paper workspace. */
 export function ResearchWorkbench(props: ResearchWorkbenchProps) {
@@ -18,15 +53,13 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
     : catalog.topics.find(item => item.id === state.topicId && paper.topicIds.includes(item.id))
       ?? catalog.topics.find(item => paper.topicIds.includes(item.id))
   const view = paper === undefined ? defaultPaperView() : state.papers[paper.id] ?? defaultPaperView()
-  const panels = (['agent', 'pdf', 'notes'] as const).filter(panel => view.panels[panel])
+  const panelId = useId()
   const [referencesOpen, setReferencesOpen] = useState(false)
   const [selected, setSelected] = useState<ResearchPaperId[]>([])
   const [query, setQuery] = useState('')
   const [referenceError, setReferenceError] = useState(false)
   const [referenceBusy, setReferenceBusy] = useState(false)
   const [inserted, setInserted] = useState(false)
-  const body = useRef<HTMLDivElement>(null)
-  const drag = useRef<{ x: number; width: number }>()
   const settling = sessionId !== undefined && session?.openState !== 'open' && session?.blank !== true
   const hero = sessionId === undefined || (session?.blank === true && !session.running && !conversationActive && !session.promptAttempted)
   const phase = settling ? 'settling' : hero ? 'hero' : 'active'
@@ -46,9 +79,6 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
       setReferenceError(true)
     } finally { setReferenceBusy(false) }
   }
-  const resize = (left: ResearchPanel, right: ResearchPanel, delta: number): void => {
-    if (paper !== undefined) actions.widths(paper.id, left, right, delta)
-  }
   return <div className={css.workbench} data-research-workbench>
     <header className={css.workbenchHeader}>
       <div className={css.breadcrumb}>{paper !== undefined && topic !== undefined && <button type="button" onClick={() => { props.open(topic.sessionId) }}>{topic.title}</button>}
@@ -56,10 +86,10 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
         {(paper !== undefined || topic !== undefined) && <span className={css.sessionBadge}>{t('independent')}</span>}
       </div>
       <div className={css.workbenchTools}>
-        {paper !== undefined && <><div className={css.panelControls} role="group" aria-label={t('reset')}>
-          {(['agent', 'pdf', 'notes'] as const).map(panel => <button key={panel} type="button" aria-pressed={view.panels[panel]}
-            onClick={() => { actions.panel(paper.id, panel) }}>{t(panel)}</button>)}
-        </div><Button size="sm" onClick={() => { actions.reset(paper.id) }}>{t('reset')}</Button></>}
+        {paper !== undefined && <>
+          <PanelControls paperId={paper.id} view={view} id={panelId} t={t} viewActions={actions} />
+          <PanelControls paperId={paper.id} view={view} id={panelId} t={t} viewActions={actions} navigation />
+        </>}
         {sessionId !== undefined && <Button size="sm" onClick={() => { setSelected([]); setQuery(''); setReferenceError(false); setReferencesOpen(true) }}>{t('context')}</Button>}
       </div>
     </header>
@@ -67,38 +97,8 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
     {paper === undefined ? <div className={css.topicChat}>
       {topic !== undefined && <div className={css.topicIntro}><span>{t('topic')}</span><h1>{topic.title}</h1><p>{t('topicDescription')}</p><small>{t('paperCount', { count: catalog.papers.filter(item => item.topicIds.includes(topic.id)).length })}</small></div>}
       <div className={css.agentContent}>{agent()}</div>
-    </div> : <>
-      {panels.length > 1 && <div className={css.narrowTabs} role="group" aria-label={t('paper')}>
-        {panels.map(panel => <button key={panel} type="button" aria-pressed={view.active === panel} onClick={() => { actions.focus(paper.id, panel) }}>{t(panel)}</button>)}
-      </div>}
-      <div className={css.panels} ref={body}>
-        {panels.length === 0 && <div className={css.allClosed}><h2>{t('hidden')}</h2><p>{t('hiddenHint')}</p><Button onClick={() => { actions.reset(paper.id) }}>{t('reset')}</Button></div>}
-        {(['agent', 'pdf', 'notes'] as const).map((panel) => {
-          const next = panels[panels.indexOf(panel) + 1]
-          const visible = view.panels[panel]
-          return <Fragment key={panel}><section className={css.panel} hidden={!visible} data-active={view.active === panel}
-            style={{ flexGrow: view.widths[panel] }} aria-label={t(panel)}>
-            <div className={css.panelHeader}><strong>{t(panel)}</strong><button type="button" aria-label={t('collapse', { panel: t(panel) })}
-              onClick={() => { actions.panel(paper.id, panel) }}><IconCloseOutlineRegular size={14} /></button></div>
-            <div className={css.panelBody}>
-              {panel === 'agent' ? agent() : panel === 'pdf' ? props.renderFactorySlot('document.pdf', { path: paper.pdfPath })
-                : <ResearchNotes key={paper.id} {...props} actions={actions} paper={paper} view={view} />}
-            </div>
-          </section>{visible && next !== undefined && <div className={css.divider} role="separator" tabIndex={0} aria-orientation="vertical"
-            aria-label={t('resize', { left: t(panel), right: t(next) })} aria-valuenow={Math.round(view.widths[panel])} aria-valuemin={12} aria-valuemax={88}
-            onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resize(panel, next, event.key === 'ArrowLeft' ? -2 : 2) } }}
-            onPointerDown={(event) => {
-              event.currentTarget.setPointerCapture(event.pointerId)
-              drag.current = { x: event.clientX, width: body.current?.clientWidth ?? 1 }
-            }}
-            onPointerMove={(event) => { if (drag.current === undefined || !event.currentTarget.hasPointerCapture(event.pointerId)) return
-              const delta = (event.clientX - drag.current.x) / drag.current.width * panels.reduce((sum, item) => sum + view.widths[item], 0)
-              resize(panel, next, delta); drag.current.x = event.clientX }}
-            onPointerUp={(event) => { event.currentTarget.releasePointerCapture(event.pointerId); drag.current = undefined }}
-            onLostPointerCapture={() => { drag.current = undefined }} />}</Fragment>
-        })}
-      </div>
-    </>}
+    </div> : <ResearchPaperPanels key={paper.id} paper={paper} view={view} id={panelId} phase={phase} hero={hero}
+      t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote} refresh={props.refresh} />}
     <Modal open={referencesOpen} title={t('context')} description={t('contextHint')} closeLabel={t('close')}
       onClose={() => { if (!referenceBusy) setReferencesOpen(false) }} footer={<>
         <Button disabled={referenceBusy} onClick={() => { setReferencesOpen(false) }}>{t('cancel')}</Button>

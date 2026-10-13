@@ -4,15 +4,58 @@ import type { ResearchNoteKind, ResearchPaperId, ResearchTopicId } from '@deepse
 
 /** Independently collapsible paper panels. */
 export type ResearchPanel = 'agent' | 'pdf' | 'notes'
+/** Default reading order, also used by preferences saved before panel sorting. */
+export const DEFAULT_PANEL_ORDER: readonly ResearchPanel[] = ['agent', 'pdf', 'notes']
+/** Placement relative to a neighboring panel. */
+export type PanelPlacement = 'before' | 'after'
 /** Draft retains the revision it started from until a durable save succeeds. */
 export interface NoteDraft { text: string; revision: number }
 /** Paper-local layout and unsaved notebook edits. */
 export interface PaperView {
+  /** Absent in older browser preferences; resolvePanelOrder supplies the reading order. */
+  order?: ResearchPanel[]
   panels: Record<ResearchPanel, boolean>
   widths: Record<ResearchPanel, number>
   active: ResearchPanel
   notebook: ResearchNoteKind
   drafts: Partial<Record<ResearchNoteKind, NoteDraft>>
+}
+
+/**
+ * Recognize a paper-panel identifier from drag events or browser preferences.
+ * @param value - candidate identifier.
+ * @returns whether it identifies one of the three reading panels.
+ */
+export function isResearchPanel(value: unknown): value is ResearchPanel {
+  return value === 'agent' || value === 'pdf' || value === 'notes'
+}
+
+/**
+ * Resolve missing or invalid browser-stored order to the default permutation.
+ * @param view - browser preferences for one paper.
+ * @returns the complete panel order, including folded panels.
+ */
+export function resolvePanelOrder(view: Pick<PaperView, 'order'>): readonly ResearchPanel[] {
+  const stored: unknown = view.order
+  return Array.isArray(stored) && stored.length === 3 && stored.every(isResearchPanel) && new Set(stored).size === 3
+    ? stored : DEFAULT_PANEL_ORDER
+}
+
+/**
+ * Move one panel before or after another while retaining every panel.
+ * @param order - resolved complete panel order.
+ * @param source - panel being moved.
+ * @param target - insertion neighbor.
+ * @param placement - insertion side of the neighbor.
+ * @returns a new order; moving onto the source leaves its order unchanged.
+ */
+export function reorderPanels(
+  order: readonly ResearchPanel[], source: ResearchPanel, target: ResearchPanel, placement: PanelPlacement,
+): ResearchPanel[] {
+  if (source === target) return [...order]
+  const remaining = order.filter(panel => panel !== source)
+  remaining.splice(remaining.indexOf(target) + (placement === 'after' ? 1 : 0), 0, source)
+  return remaining
 }
 
 /**
@@ -36,11 +79,15 @@ function researchViewDefinition() {
     actions: {
       expand: (draft, id: string, value: boolean) => { draft.expanded[id] = value },
       topic: (draft, id: ResearchTopicId) => { draft.topicId = id; draft.expanded[id] = true },
+      place: (draft, id: ResearchPaperId, source: ResearchPanel, target: ResearchPanel, placement: PanelPlacement) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        view.order = reorderPanels(resolvePanelOrder(view), source, target, placement)
+      },
       panel: (draft, id: ResearchPaperId, panel: ResearchPanel) => {
         const view = draft.papers[id] ??= defaultPaperView()
         view.panels[panel] = !view.panels[panel]
         if (view.panels[panel]) view.active = panel
-        else if (view.active === panel) view.active = (['agent', 'pdf', 'notes'] as const).find(item => view.panels[item]) ?? 'agent'
+        else if (view.active === panel) view.active = resolvePanelOrder(view).find(item => view.panels[item]) ?? 'agent'
       },
       focus: (draft, id: ResearchPaperId, panel: ResearchPanel) => {
         const view = draft.papers[id] ??= defaultPaperView()

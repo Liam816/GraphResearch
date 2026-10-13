@@ -2,14 +2,15 @@
   - button "Robot VLA"
   - strong: RT-2
   - text: Independent session
-  - group "Restore three panels":
+  - group "Panel visibility":
     - button "Agent chat" [pressed]
     - button "Original PDF" [pressed]
     - button "Reading notes" [pressed]
-  - button "Restore three panels"
   - button "Reference papers"
 - region "Agent chat":
+  - button "Reorder Agent chat"
   - strong: Agent chat
+  - button "Arrange Agent chat"
   - button "Collapse Agent chat"
   - button "Choose workspace": {{workspace}}
   - button "Standard mode"
@@ -20,7 +21,9 @@
   - button "Send message" [disabled]
 - separator "Resize Agent chat and Original PDF"
 - region "Original PDF":
+  - button "Reorder Original PDF"
   - strong: Original PDF
+  - button "Arrange Original PDF"
   - button "Collapse Original PDF"
   - img "PDF page 1"
   - text: Selectable PDF text
@@ -32,7 +35,9 @@
     - button "Zoom in"
 - separator "Resize Original PDF and Reading notes"
 - region "Reading notes":
+  - button "Reorder Reading notes"
   - strong: Reading notes
+  - button "Arrange Reading notes"
   - button "Collapse Reading notes"
   - group "Reading notes":
     - button "Learning notes" [pressed]

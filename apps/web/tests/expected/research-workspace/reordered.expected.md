@@ -1,0 +1,51 @@
+- banner:
+  - button "Robot VLA"
+  - strong: RT-2
+  - text: Independent session
+  - group "Panel visibility":
+    - button "Reading notes" [pressed]
+    - button "Agent chat" [pressed]
+    - button "Original PDF" [pressed]
+  - button "Reference papers"
+- region "Reading notes":
+  - button "Reorder Reading notes"
+  - strong: Reading notes
+  - button "Arrange Reading notes"
+  - button "Collapse Reading notes"
+  - group "Reading notes":
+    - button "Learning notes" [pressed]
+    - button "AI notes"
+  - status: Unsaved changes
+  - button "Preview"
+  - button "Save notes"
+  - textbox "Learning notes":
+    - /placeholder: Record methods, findings, questions, and your understanding. Markdown is supported.
+    - text: Notebook draft survives pane reordering
+- separator "Resize Reading notes and Agent chat"
+- region "Agent chat":
+  - button "Reorder Agent chat"
+  - strong: Agent chat
+  - button "Arrange Agent chat"
+  - button "Collapse Agent chat"
+  - button "Choose workspace": {{workspace}}
+  - button "Standard mode"
+  - textbox "Describe what you want to build, / commands, @ files or sessions":
+    - paragraph: Composer draft survives pane reordering
+  - button "Add files or run commands"
+  - 'button "Access mode, current: Workspace Write"': Workspace Write
+  - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
+  - button "Send message"
+- separator "Resize Agent chat and Original PDF"
+- region "Original PDF":
+  - button "Reorder Original PDF"
+  - strong: Original PDF
+  - button "Arrange Original PDF"
+  - button "Collapse Original PDF"
+  - img "PDF page 1"
+  - text: Selectable PDF text
+  - img "PDF page 2"
+  - text: Selectable PDF text
+  - toolbar "Zoom controls":
+    - button "Zoom out"
+    - button "Choose zoom": 100%
+    - button "Zoom in"

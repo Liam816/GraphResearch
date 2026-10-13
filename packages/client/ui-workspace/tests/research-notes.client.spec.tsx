@@ -6,7 +6,8 @@ import type { ResearchPaper, ResearchPaperId } from '@deepseek-ai/dsh-api-worksp
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { ResearchNotes } from '../src/client/research/Notes.tsx'
-import { createResearchViewStore, defaultPaperView } from '../src/client/research/store.ts'
+import { createResearchViewStore, defaultPaperView, resolvePanelOrder } from '../src/client/research/store.ts'
+import type { PanelPlacement, ResearchPanel } from '../src/client/research/store.ts'
 import { en } from '../src/client/research/locales.ts'
 import type { ResearchSeats } from '../src/client/research/contract.ts'
 
@@ -37,9 +38,9 @@ it('keeps drafts separate across paper and notebook switches and retains them af
   fireEvent.click(screen.getByRole('button', { name: 'AI notes' }))
   fireEvent.change(screen.getByRole('textbox', { name: 'AI notes' }), { target: { value: 'A AI draft' } })
   view.rerender(<Harness current={b} />)
-  expect((screen.getByRole('textbox', { name: 'Learning notes' }) as HTMLTextAreaElement).value).toBe('')
+  expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Learning notes' }).value).toBe('')
   view.rerender(<Harness current={a} />)
-  expect((screen.getByRole('textbox', { name: 'AI notes' }) as HTMLTextAreaElement).value).toBe('A AI draft')
+  expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'AI notes' }).value).toBe('A AI draft')
   fireEvent.click(screen.getByRole('button', { name: 'Save notes' }))
   await waitFor(() => { expect(screen.getByRole('alert').textContent).toContain('another window') })
   expect(store.getSnapshot().papers[a.id]!.drafts).toMatchObject({ learning: { text: 'A personal draft' }, ai: { text: 'A AI draft' } })
@@ -84,4 +85,49 @@ it.each(['ai', 'learning'] as const)('clears only the %s notebook draft after sa
   store.actions.edit(id, kind, 'Discarded text', 1)
   store.actions.discard(id, kind)
   expect(store.getSnapshot().papers[id]!.drafts).toEqual({ [other]: { text: 'Other notebook draft', revision: 0 } })
+})
+
+const layouts: readonly {
+  name: string
+  moves: readonly [ResearchPanel, ResearchPanel, PanelPlacement][]
+  expected: readonly ResearchPanel[]
+}[] = [
+  { name: 'agent, pdf, notes', moves: [], expected: ['agent', 'pdf', 'notes'] },
+  { name: 'agent, notes, pdf', moves: [['notes', 'pdf', 'before']], expected: ['agent', 'notes', 'pdf'] },
+  { name: 'pdf, agent, notes', moves: [['pdf', 'agent', 'before']], expected: ['pdf', 'agent', 'notes'] },
+  { name: 'pdf, notes, agent', moves: [['agent', 'notes', 'after']], expected: ['pdf', 'notes', 'agent'] },
+  { name: 'notes, agent, pdf', moves: [['notes', 'agent', 'before']], expected: ['notes', 'agent', 'pdf'] },
+  { name: 'notes, pdf, agent', moves: [['agent', 'notes', 'after'], ['notes', 'pdf', 'before']], expected: ['notes', 'pdf', 'agent'] },
+]
+
+it.each(layouts)('persists the $name panel permutation and keeps the other paper independent', ({ moves, expected }) => {
+  const store = createResearchViewStore().create()
+  const a = paper('A').id, b = paper('B').id
+  store.actions.focus(a, 'pdf')
+  store.actions.edit(a, 'learning', 'Retained draft', 4)
+  store.actions.widths(a, 'agent', 'pdf', 5)
+  store.actions.panel(a, 'notes')
+  for (const [source, target, placement] of moves) store.actions.place(a, source, target, placement)
+  store.actions.focus(b, 'agent')
+  expect(store.getSnapshot().papers[a]).toMatchObject({
+    active: 'pdf', panels: { agent: true, pdf: true, notes: false }, widths: { agent: 43, pdf: 33, notes: 24 },
+    drafts: { learning: { text: 'Retained draft', revision: 4 } },
+  })
+  const restored = createResearchViewStore().create().getSnapshot()
+  const first = restored.papers[a], second = restored.papers[b]
+  if (first === undefined || second === undefined) throw new Error('both paper preferences must be restored')
+  expect(resolvePanelOrder(first)).toEqual(expected)
+  expect(resolvePanelOrder(second)).toEqual(['agent', 'pdf', 'notes'])
+})
+
+it.each([undefined, ['agent', 'agent', 'pdf'], ['pdf'], ['notes', 'pdf', 'unknown'], 'pdf,agent,notes'])
+('restores older preferences or invalid panel order without clearing notebook drafts: %j', (order) => {
+  const id = paper('Legacy').id
+  localStorage.setItem('dsh.research.view.v1', JSON.stringify({
+    expanded: {}, papers: { [id]: { ...defaultPaperView(), order, drafts: { learning: { text: 'Legacy draft', revision: 3 } } } },
+  }))
+  const restored = createResearchViewStore().create().getSnapshot().papers[id]
+  if (restored === undefined) throw new Error('legacy paper preferences must remain available')
+  expect(resolvePanelOrder(restored)).toEqual(['agent', 'pdf', 'notes'])
+  expect(restored.drafts.learning).toEqual({ text: 'Legacy draft', revision: 3 })
 })

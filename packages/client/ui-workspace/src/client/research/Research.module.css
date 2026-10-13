@@ -30,15 +30,37 @@
 .breadcrumb button { border: 0; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; cursor: pointer; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sessionBadge { color: var(--dsw-alias-label-secondary); font-size: 11px; white-space: nowrap; }
 .workbenchTools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.panelControls, .noteTabs, .narrowTabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); }
-.panelControls button, .noteTabs button, .narrowTabs button { background: transparent; border: none; color: var(--dsw-alias-label-secondary); font: inherit; padding: 6px 10px; border-radius: var(--dsw-radius-sm); cursor: pointer; }
-.panelControls button[aria-pressed=true], .noteTabs button[aria-pressed=true], .narrowTabs button[aria-pressed=true] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.panelControls { display: flex; align-items: center; gap: 8px; padding-right: 12px; border-right: 1px solid var(--dsw-alias-border-l1); }
+.panelNavigation { display: none; }
+.panelControlAnchor { display: inline-flex; min-width: 0; }
+.panelToggle { box-sizing: border-box; height: 36px; padding: 0 12px; gap: 8px; font-size: 13px; line-height: 20px; font-weight: 500; white-space: nowrap; touch-action: manipulation; transition: background var(--ds-transition-duration) var(--ds-ease-in-out), color var(--ds-transition-duration) var(--ds-ease-in-out), box-shadow var(--ds-transition-duration) var(--ds-ease-in-out), transform var(--ds-transition-duration-fast) var(--ds-ease-in-out); }
+.panelToggle:active { transform: translateY(1px); }
+.panelToggle:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
+.panelControlIcon, .panelControlState { display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.panelControlIcon { width: 16px; height: 16px; }
+.panelControlState { width: 12px; height: 12px; }
+.panelControlLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.noteTabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--dsw-alias-border-l1); border-radius: var(--dsw-radius-sm); }
+.noteTabs button { background: transparent; border: none; color: var(--dsw-alias-label-secondary); font: inherit; padding: 6px 10px; border-radius: var(--dsw-radius-sm); cursor: pointer; }
+.noteTabs button[aria-pressed=true] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
 .panels { display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
-.panel { flex-basis: 0; display: flex; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden; }
+.panel { flex-basis: 0; flex-grow: var(--dsh-paper-panel-width); display: flex; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden; position: relative; }
 .panel[hidden] { display: none; }
 .panelHeader { height: 42px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid var(--dsw-alias-border-l1); font-size: 12px; }
 .panelHeader button, .inlineStatus button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: transparent; border: none; color: var(--dsw-alias-label-secondary); cursor: pointer; border-radius: var(--dsw-radius-sm); }
 .panelHeader button:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.panelHeading { display: inline-flex; align-items: center; gap: 6px; min-width: 0; height: 100%; }
+.panelHeading strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panelHeaderActions { display: flex; align-items: center; gap: 4px; flex: none; }
+.panelHeader .dragHandle { cursor: grab; touch-action: none; }
+.panelHeader .dragHandle:active { cursor: grabbing; }
+.dragHandleIcon { transform: rotate(90deg); }
+.panel[data-drag-source=true] .panelHeading { opacity: 0.4; }
+.panel[data-drop-edge]::after { content: ''; position: absolute; inset-block: 0; width: 2px; z-index: 2; background: var(--dsw-alias-state-business-primary); pointer-events: none; }
+.panel[data-drop-edge=before]::after { left: 0; }
+.panel[data-drop-edge=after]::after { right: 0; }
+.dragOverlay { pointer-events: none; }
+.dragGhost { display: flex; align-items: center; gap: 8px; box-sizing: border-box; height: 100%; padding: 0 12px; border: 0; border-radius: var(--dsw-radius-sm); box-shadow: var(--dsw-elevation-panel); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 20px; font-weight: 500; white-space: nowrap; }
 .panelBody, .agentContent { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; overflow: hidden; position: relative; }
 .divider { flex: none; width: 5px; margin-inline: -2px; z-index: 1; cursor: col-resize; touch-action: none; background: linear-gradient(to right, transparent 2px, var(--dsw-alias-border-l2) 2px, var(--dsw-alias-border-l2) 3px, transparent 3px); }
 .divider:hover, .divider:focus-visible { background: var(--dsw-alias-state-business-primary); }
@@ -62,18 +84,32 @@
 .referenceList { display: flex; flex-direction: column; max-height: 320px; overflow: auto; gap: 8px; margin-top: 16px; }
 .referenceList label { display: flex; align-items: center; gap: 12px; padding: 10px; border-bottom: 1px solid var(--dsw-alias-border-l1); cursor: pointer; }
 .inlineStatus { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
-.narrowTabs { display: none; }
 @container (max-width: 860px) {
-  .narrowTabs { display: flex; flex: none; margin: 10px 16px; }
-  .narrowTabs button { flex: 1; }
+  .panelVisibility { display: none; }
+  .panelNavigation { display: flex; }
   .panels .panel:not([data-active=true]) { display: none; }
   .divider { display: none; }
+  .panelHeader .dragHandle { display: none; }
   .sessionBadge { display: none; }
 }
 @container (max-width: 480px) {
   .workbenchHeader { padding-inline: 12px; gap: 10px; }
   .breadcrumb { flex-basis: 100%; }
   .workbenchTools { width: 100%; }
-  .panelControls button { padding-inline: 7px; font-size: 12px; }
+  .panelControls { flex: 1 0 100%; gap: 8px; padding-right: 0; border-right: 0; }
+  .panelVisibility { display: none; }
+  .panelControlAnchor { flex: 1 1 auto; }
+  .panelToggle { width: 100%; }
+  .panelToggle { min-height: 44px; padding-inline: 6px; font-size: 12px; line-height: 18px; }
+  .panelControlIcon, .panelControlState { display: none; }
   .topicIntro { margin-inline: 20px; }
+}
+@media (pointer: coarse) {
+  .panelToggle { min-height: 44px; }
+  .panelHeader button { width: 44px; height: 44px; }
+  .panelHeader { height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panelToggle { transition: none; }
+  .panelToggle:active { transform: none; }
 }
