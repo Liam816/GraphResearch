@@ -47,10 +47,14 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 <a id="research-catalog"></a>
 ### 研究目录
 
-论文资料库初始位置为 `<启动目录>/data`；`researchDirectory` 配置初始后端绝对路径，之后以界面持久化的目录选择为准。`library.json` 管理 Topic 和论文元数据。稳定的 `papers/<paper-id>/` 子目录包含可选的 `paper.pdf`、`paper.json`、`notes/ai.md`、`notes/learning.md`、`extracted/`、`code/` 和 `assets/`。Markdown 文件保存笔记正文，索引记录版本与内容摘要。Topic 使用 `topics/<topic-id>/notes.md`。首次使用会迁移已有科研 domain 记录，此后 domain 仅保留选中的资料目录。缺失的旧 PDF 不影响笔记读取，可补充到对应的 `paper.pdf` 位置。
+论文资料库初始位置为 `<启动目录>/data`；`researchDirectory` 配置初始后端绝对路径，之后以界面持久化的目录选择为准。`library.json` 管理 Topic 和论文元数据。稳定的 `papers/<paper-id>/` 子目录包含可选的 `paper.pdf` 和生成的 `paper.md`、`paper.json`、`notes/ai.md`、`notes/learning.md`、`extracted/`、`code/` 和 `assets/`。Markdown 文件保存笔记正文，索引记录版本与内容摘要。Topic 使用 `topics/<topic-id>/notes.md`。首次使用会迁移已有科研 domain 记录，此后 domain 仅保留选中的资料目录。缺失的旧 PDF 不影响笔记读取，可补充到对应的 `paper.pdf` 位置。
 
 `researchImportPaper` 可仅凭标题创建论文，也可同时复制本地 PDF 或下载 HTTP(S) 来源。未添加原文时 `pdfPath` 为空。`researchAttachPdf` 为现有论文补充 PDF，保留论文身份、Session 和笔记；相同内容可安全重试，不同的已有 PDF 拒绝覆盖。显式补充 PDF 时，即使另一论文具有相同内容，也保留目标实体。匹配的 arXiv/DOI 身份或相同 PDF 字节复用现有论文并增加 Topic 关联。带版本的 arXiv 标识保留版本。各实体使用独立 Session。`researchReadPaper` 返回有页码的有限原文，并在论文目录下缓存结果；纯图片页面需要 OCR。`researchProgress` 保存续读位置，`researchTopicNote` 保存有版本检查的对比总结。
 
+
+关联 PDF 后，会在创建论文、关联原文、打开资料库和刷新目录时自动生成 `papers/<paper-id>/paper.md`。转换与资料库写入串行执行，命令在转换结束后返回，每篇论文都有可配置的时限。已有资料库会补转换；已成功转换但缺失的文件会重新生成；原文摘要相同且文件仍存在时直接复用。`researchPdfTextBackend` 默认为 `auto`：优先使用 Poppler 的 `pdftotext -layout`，不可用时使用带字符映射和标准字体资源的 PDF.js。两者都提取全部原始页面，包括参考文献和附录，以 `## Page N` 标记页码。这是文字提取，不进行模型改写或公式、表格重建。
+
+`researchMaxMarkdownBytes` 限制完整 UTF-8 文档的大小，包括页码标题，默认 8 MiB；`researchMarkdownTimeoutMs` 限制转换时长，默认 60 秒。超限时报告失败，不截断正文；没有文字层的 PDF 需要 OCR。转换读取导入时的字节快照，完整 Markdown 通过原子写入发布。失败时保留 PDF 和笔记，记录 `paper.markdown.status: failed` 和稳定的原因代码，已有 Markdown 不再被视为确认成功的正文。PDF 面板会显示失败原因，并通过 `researchExtractMarkdown` 提供显式重试；普通刷新不会反复重试同一失败原文。成功元数据记录原文摘要、文件名、页数和提取后端。资料库迁移保留 Markdown 和状态；这些字段可选，旧的未转换资料库仍可读取。
 
 `researchHighlight` 新增或删除一个稳定的文字选区标识。新增时验证颜色、页码和归一化矩形；相同的重复新增和不存在的删除可安全重试，并发编辑保留其他选区。高亮保存于论文的 `paper.json` 和资料库元数据，随资料库迁移，通过已有的科研快照流更新。`researchMaxHighlightBytes` 限制每篇论文完整高亮列表的序列化大小，默认为 4 MiB。保存失败时保留已确认目录，可能留下可恢复的事务日志；重复相同操作可完成恢复而不重复创建高亮。尚无高亮的资料库无需转换。目录响应通过 `capabilities.pdfHighlights` 声明支持高亮；此运行时标志不写入资料库。
 
@@ -69,7 +73,7 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 #### 模型看到的内容
 
-普通 Workspace 组织不贡献提示词或工具。科研实体的 Agent 获得作用域内的 `research_context`、`research_import_paper`、`research_attach_pdf`、`research_read_paper`、`research_write_note`、`research_update_progress` 和 `research_write_topic_note` 工具。必要的运行上下文包含资料库、论文目录、PDF 原文、笔记版本和续读位置。这些信息通过已有提示词上下文准入记录；工具调用和结果使用标准 Session 工具事件。笔记正文通过 `research_context` 显式读取，同时返回已保存高亮的文字、颜色和页面相对矩形。高亮操作本身不启动模型回合。修改学习笔记要求用户明确提出。
+普通 Workspace 组织不贡献提示词或工具。科研实体的 Agent 获得作用域内的 `research_context`、`research_import_paper`、`research_attach_pdf`、`research_read_paper`、`research_write_note`、`research_update_progress` 和 `research_write_topic_note` 工具。必要的运行上下文包含资料库、论文目录、PDF 原文、Markdown 转换状态、笔记版本和续读位置。这些信息通过已有提示词上下文准入记录；工具调用和结果使用标准 Session 工具事件。笔记正文通过 `research_context` 显式读取，同时返回已保存高亮的文字、颜色和页面相对矩形。高亮操作本身不启动模型回合。修改学习笔记要求用户明确提出。
 
 #### Token 影响
 

@@ -99,7 +99,8 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
       <div className={css.agentContent}>{agent()}</div>
     </div> : <ResearchPaperPanels key={paper.id} paper={paper} view={view} id={panelId} phase={phase} hero={hero}
       t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote}
-      highlight={props.highlight} highlightAvailable={catalog.capabilities?.pdfHighlights === true} refresh={props.refresh} />}
+      highlight={props.highlight} extractMarkdown={props.extractMarkdown}
+      highlightAvailable={catalog.capabilities?.pdfHighlights === true} refresh={props.refresh} />}
     <Modal open={referencesOpen} title={t('context')} description={t('contextHint')} closeLabel={t('close')}
       onClose={() => { if (!referenceBusy) setReferencesOpen(false) }} footer={<>
         <Button disabled={referenceBusy} onClick={() => { setReferencesOpen(false) }}>{t('cancel')}</Button>

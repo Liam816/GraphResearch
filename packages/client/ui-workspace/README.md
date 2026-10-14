@@ -209,6 +209,8 @@ Drag a panel’s title handle to insert it before or after another panel. A titl
 
 In the original PDF panel, select text and choose a marker color. Highlights survive panel folding, paper switching, and reload, and travel with the paper library. Double-click a highlight to remove it, or focus its removal control and press Enter. The [PDF renderer](../ui-sidebar-documentpreview/README.md#what-it-registers) owns selection and toolbar behavior; the [research controller](../../api/workspace-controller/README.md#research-catalog) owns persistence.
 
+The PDF panel shows the confirmed full-text Markdown filename and original page count. Conversion failures stay visible beside the PDF with a retry action; the original and notebooks remain available. The [research controller](../../api/workspace-controller/README.md#research-catalog) owns automatic conversion and file publication.
+
 PDF preview remains a viewing surface. The Host supplies paper-scoped Agent tools for PDF download, page-numbered text extraction, notebook updates, continuation points, and Topic comparison summaries. Repository links open externally; the Agent uses its existing shell tools to download code under the owning paper directory/code.
 
 <a id="model-experience"></a>

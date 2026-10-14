@@ -80,7 +80,8 @@
     "chokidar": "^4.0.3",
     "pdfjs-dist": "6.3.289",
     "zod": "^4.4.3",
-    "@deepseek-ai/dsh-atomic-write": "workspace:*"
+    "@deepseek-ai/dsh-atomic-write": "workspace:*",
+    "@deepseek-ai/dsh-subprocess": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

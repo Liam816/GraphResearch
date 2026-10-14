@@ -45,12 +45,14 @@ export function apply(ctx: Context): void {
       const topic = catalog.topics.find(item => item.sessionId === agent.session.id)
       return `Research library: ${catalog.directory ?? ''}\n${JSON.stringify({
         paper: paper === undefined ? null : { id: paper.id, title: paper.title, directory: paper.directory, progress: paper.progress,
-          pdf: paper.pdfPath, repository: paper.repositoryUrl,
+          pdf: paper.pdfPath, markdown: paper.markdown, repository: paper.repositoryUrl,
           aiNoteRevision: paper.ai.revision, learningNoteRevision: paper.learning.revision },
         topic: topic === undefined ? null : { id: topic.id, title: topic.title },
       })}\nStore all paper downloads, extracted text, notes, figures and code in this library. `
         + 'Use research_import_paper to register and reuse papers; a title alone is enough. '
         + 'An empty pdf means the original is not attached. When asked to download the current paper, find its original PDF URL and use research_attach_pdf; preserve its existing identity, session and notes. '
+        + 'Attached PDFs automatically produce paper.md in the paper directory, with original page headings and all extracted text, including references and appendices. '
+        + 'Read paper.md only when markdown.status is ready; a failed conversion retains the original PDF and requires retry or OCR. '
         + 'Use research_read_paper for page-numbered original text. Read existing notes with research_context before writing them. '
         + 'Use research_write_note to publish Markdown to the live AI notebook; update it by section as reading progresses. '
         + 'Edit learning notes only when the user explicitly asks. '

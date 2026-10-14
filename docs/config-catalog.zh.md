@@ -326,6 +326,12 @@ export interface Config {
   researchMaxReadPages?: number
   /** Maximum original characters returned by one reading call. */
   researchMaxReadCharacters?: number
+  /** Whole-paper text backend; auto prefers Poppler and falls back to PDF.js. */
+  researchPdfTextBackend?: 'auto' | 'pdfjs' | 'pdftotext'
+  /** Maximum UTF-8 bytes in complete generated paper.md, including page headings. */
+  researchMaxMarkdownBytes?: number
+  /** Whole-paper conversion deadline in milliseconds. */
+  researchMarkdownTimeoutMs?: number
   /** Maximum wait for another library writer in milliseconds. */
   researchLockTimeoutMs?: number
   /** File must remain stable for this many milliseconds before external edits are published. */

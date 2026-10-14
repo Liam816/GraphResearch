@@ -1,7 +1,7 @@
 /** File-backed research library, serialized mutations, and live notebook observation. */
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import chokidar from 'chokidar'
 import type { FSWatcher } from 'chokidar'
@@ -9,12 +9,14 @@ import type { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { defineDomain, type Domain } from '@deepseek-ai/dsh-storage-domain'
-import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
+import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { digest, missing, ResearchFiles, researchCatalogSchema, researchHighlightSchema } from './research-files.ts'
 import type { ResearchFilePolicy } from './research-files.ts'
 import { importPdf, readPdfText } from './research-pdf.ts'
 import type { ResearchPdfPolicy } from './research-pdf.ts'
+import { extractPaperMarkdown } from './research-markdown.ts'
+import type { ResearchMarkdownPolicy } from './research-markdown.ts'
 import { restoreResearchSessions } from './research-session-backup.ts'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchDirectoryRequest,
@@ -29,7 +31,7 @@ const researchDomain = defineDomain({
 })
 
 /** Validated library deployment choices supplied by the Workspace controller. */
-export interface ResearchPolicy extends ResearchFilePolicy, ResearchPdfPolicy {
+export interface ResearchPolicy extends ResearchFilePolicy, ResearchPdfPolicy, ResearchMarkdownPolicy {
   readonly directory: string
   readonly watchStabilityMs: number
   readonly watchPollMs: number
@@ -44,6 +46,7 @@ export class ResearchCatalogHost {
   private files!: ResearchFiles
   private watcher: FSWatcher | undefined
   private closed = false
+  private readonly lifetime = new AbortController()
   private snapshot: ResearchCatalog = { revision: 0, topics: [], papers: [] }
   private readonly followers = new Set<ResearchFollower>()
   private readonly archives = new Set<string>()
@@ -56,9 +59,11 @@ export class ResearchCatalogHost {
     ctx.on('session/event', (session) => { this.queueArchive(session) })
     ctx.effect(() => async () => {
       this.closed = true
+      this.lifetime.abort()
       for (const follower of this.followers) follower.close()
       this.followers.clear()
       await this.watcher?.close()
+      await this.ready.then(() => {}, (_error: unknown) => {})
       await this.writes
       const domain = await this.domain
       await domain.close()
@@ -84,7 +89,24 @@ export class ResearchCatalogHost {
    * @returns the latest canonical files; read failures preserve the last published catalog.
    */
   read(): Promise<ResearchCatalog> {
-    return this.serialized(() => this.files.withLock(async () => this.accept(await this.files.read())))
+    return this.serialized(() => this.files.withLock(async () => {
+      return this.accept(await this.ensureMarkdown(this.files, await this.files.read()))
+    }))
+  }
+
+  /**
+   * Explicitly retry complete Markdown extraction without changing the PDF or notebooks.
+   * @param paperId - owning paper with an attached original.
+   * @returns confirmed extraction status and catalog; conversion failures remain visible on the paper.
+   */
+  extractMarkdown(paperId: ResearchPaperId): Promise<ResearchCatalog> {
+    return this.serialized(() => this.files.withLock(async () => {
+      const catalog = await this.files.read()
+      const paper = catalog.papers.find(item => item.id === paperId)
+      if (paper === undefined) throw new RemoteError('research/not-found', 'Paper not found', { id: paperId })
+      if (paper.pdfPath === '') throw new RemoteError('research/invalid', 'Attach the original PDF before extracting Markdown', { field: 'pdfPath' })
+      return this.accept(await this.ensureMarkdown(this.files, catalog, paperId))
+    }))
   }
 
   /**
@@ -334,7 +356,7 @@ export class ResearchCatalogHost {
             if (request.mode === 'migrate') await source.copyTo(destination)
             const loaded = await restoreResearchSessions(this.ctx, destination, await destination.read())
             await destination.write({ ...loaded, revision: Math.max(loaded.revision, this.snapshot.revision) + 1 })
-            return destination.read()
+            return this.ensureMarkdown(destination, await destination.read())
           })
         })
         await (await this.domain).global.set({ revision: catalog.revision, directory: destination.directory, topics: [], papers: [] })
@@ -385,7 +407,7 @@ export class ResearchCatalogHost {
       const loaded = await this.files.read(previous)
       const restored = await restoreResearchSessions(this.ctx, this.files, loaded)
       if (restored !== loaded) await this.files.write(restored)
-      return restored
+      return this.ensureMarkdown(this.files, restored)
     })
     await domain.global.set({ revision: catalog.revision, directory: this.files.directory, topics: [], papers: [] })
     this.accept(catalog)
@@ -426,14 +448,52 @@ export class ResearchCatalogHost {
       const previous = await this.files.read()
       this.accept(previous)
       const next = await update(previous)
-      if (next === previous) return this.accept(previous)
+      if (next === previous) return this.accept(await this.ensureMarkdown(this.files, previous))
       await this.files.write({ ...next, revision: previous.revision + 1 }, previous)
       if (next.papers.length !== previous.papers.length || next.topics.length !== previous.topics.length) {
         await this.watcher?.close()
         await this.watch()
       }
-      return this.accept(await this.files.read())
+      return this.accept(await this.ensureMarkdown(this.files, await this.files.read()))
     }))
+  }
+
+  private async ensureMarkdown(files: ResearchFiles, catalog: ResearchCatalog, retry?: ResearchPaperId): Promise<ResearchCatalog> {
+    let confirmed = catalog
+    for (const paper of catalog.papers) {
+      if (paper.pdfPath === '') continue
+      const path = await files.path('papers', paper.id, 'paper.md')
+      if (paper.id !== retry && paper.markdown !== undefined && paper.markdown.sourceSha256 === paper.pdfSha256) {
+        if (paper.markdown.status === 'failed') continue
+        try { if ((await stat(path)).isFile()) continue } catch (error: unknown) { if (!missing(error)) throw error }
+      }
+      let sourceSha256 = paper.pdfSha256
+      let markdown: NonNullable<typeof paper.markdown>
+      try {
+        const bytes = await importPdf(paper.pdfPath, files.directory, this.policy, this.lifetime.signal)
+        const actualSha256 = digest(bytes)
+        sourceSha256 = paper.pdfSha256 ?? actualSha256
+        if (paper.pdfSha256 !== undefined && paper.pdfSha256 !== actualSha256) {
+          throw new RemoteError('research/extraction-failed', 'The managed original changed; restore the attached PDF before retrying', { reason: 'source-changed' })
+        }
+        const result = await extractPaperMarkdown(paper.pdfPath, bytes, this.policy, this.lifetime.signal)
+        this.lifetime.signal.throwIfAborted()
+        await writeFileAtomic(path, result.text, { mode: 0o600, dirMode: 0o700 })
+        markdown = { status: 'ready', sourceSha256, path: 'paper.md', pages: result.pages, backend: result.backend }
+      } catch (error: unknown) {
+        this.lifetime.signal.throwIfAborted()
+        const failure = remoteErrorOf(error)
+        const code = failure?.code === 'research/extraction-failed' ? failure.details.reason : 'conversion-failed'
+        markdown = { status: 'failed', ...sourceSha256 === undefined ? {} : { sourceSha256 }, code }
+        this.ctx.logger.warn('PDF Markdown extraction failed for %s (%s); original PDF and notes retained. Retry from the PDF panel: %s', paper.id, code, error)
+      }
+      const next = { ...confirmed, revision: confirmed.revision + 1,
+        papers: confirmed.papers.map(item => item.id === paper.id
+          ? { ...item, markdown, pdfSha256: item.pdfSha256 ?? sourceSha256 } : item) }
+      await files.write(next, confirmed)
+      confirmed = await files.read()
+    }
+    return confirmed
   }
 
   private serialized<T>(operation: () => Promise<T>): Promise<T> {

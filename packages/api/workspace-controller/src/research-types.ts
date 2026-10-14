@@ -44,6 +44,14 @@ export interface ResearchNote {
   readonly revision: number
 }
 
+/** Complete automatic PDF extraction, or a retained failure that can be explicitly retried. */
+export type ResearchMarkdown =
+  | { readonly status: 'ready'; readonly sourceSha256: string; readonly path: 'paper.md'; readonly pages: number; readonly backend: 'pdfjs' | 'pdftotext' }
+  | { readonly status: 'failed'; readonly sourceSha256?: string | undefined; readonly code: ResearchMarkdownFailure }
+
+/** Stable extraction failures; the original PDF and notebooks remain available. */
+export type ResearchMarkdownFailure = 'no-text' | 'text-limit' | 'timeout' | 'conversion-failed' | 'source-changed'
+
 /** A topic with its own Agent session and execution workspace. */
 export interface ResearchTopic {
   readonly id: ResearchTopicId
@@ -65,6 +73,8 @@ export interface ResearchPaper {
   readonly repositoryUrl: string
   readonly ai: ResearchNote
   readonly learning: ResearchNote
+  /** Automatic full-text Markdown publication; absent before a PDF is attached or processed. */
+  readonly markdown?: ResearchMarkdown | undefined
   /** PDF text selections stored with the paper metadata; absent in unannotated libraries. */
   readonly highlights?: readonly ResearchHighlight[] | undefined
   /** Absolute managed directory in the Host filesystem. */
@@ -170,5 +180,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'research/storage-failed': { readonly operation: string; readonly path: string }
     /** A library directory contains invalid or unsupported metadata. */
     'research/invalid-library': { readonly path: string }
+    /** Full-text extraction failed without changing the original or publishing partial Markdown. */
+    'research/extraction-failed': { readonly reason: ResearchMarkdownFailure }
   }
 }

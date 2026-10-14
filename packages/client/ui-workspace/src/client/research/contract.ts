@@ -15,6 +15,7 @@ export interface ResearchInjected {
   createTopic: (request: Pick<ResearchCreateTopicRequest, 'title'>) => Promise<void>
   createPaper: (request: Omit<ResearchCreatePaperRequest, 'sessionId'>) => Promise<void>
   highlight: (request: ResearchHighlightRequest) => Promise<void>
+  extractMarkdown: (paperId: ResearchPaperId) => Promise<void>
   saveNote: (request: ResearchSaveNoteRequest) => Promise<void>
   configureDirectory: (request: ResearchDirectoryRequest) => Promise<void>
   mentions: (paperIds: readonly ResearchPaperId[]) => Promise<readonly string[]>

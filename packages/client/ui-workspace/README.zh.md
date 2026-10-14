@@ -209,6 +209,8 @@ AI 笔记和学习笔记分别保存到论文目录下的 Markdown 文件。AI �
 
 在 PDF 原文面板中选中文字，再选择高亮颜色。折叠面板、切换论文或刷新后，高亮仍然保留，并随论文资料库迁移。双击高亮可删除，也可聚焦删除控件后按 Enter。[PDF 渲染器](../ui-sidebar-documentpreview/README.zh.md#what-it-registers)负责选区和工具条交互，[科研控制器](../../api/workspace-controller/README.zh.md#research-catalog)负责持久化。
 
+PDF 面板显示已确认保存的正文 Markdown 文件名和原始页数。转换失败时，提示和重试入口显示在 PDF 旁边，原文和笔记仍可使用。[科研控制器](../../api/workspace-controller/README.zh.md#research-catalog)负责自动转换和文件发布。
+
 PDF 预览仍是阅读界面。Host 提供论文作用域内的 Agent 工具，用于 PDF 下载、有页码的正文提取、笔记更新、续读位置和 Topic 对比总结。代码仓库链接在外部打开；Agent 使用已有 shell 工具将代码下载到论文目录的 code 子目录。
 
 <a id="model-experience"></a>

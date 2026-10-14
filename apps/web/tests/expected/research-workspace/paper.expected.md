@@ -25,6 +25,7 @@
   - strong: Original PDF
   - button "Arrange Original PDF"
   - button "Collapse Original PDF"
+  - status: Full text saved to paper.md (2 pages)
   - img "PDF page 1"
   - text: Selectable PDF text
   - img "PDF page 2"

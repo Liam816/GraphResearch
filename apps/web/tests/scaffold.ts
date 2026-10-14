@@ -586,6 +586,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // First-use initialization must create directories only inside this scaffold's temporary world.
     { id: 'workspace-controller', config: {
       documentsDirectory: join(workspaceCwd, 'Documents'), researchDirectory: join(workspaceCwd, '.dsh-storages', 'research-library'),
+      researchPdfTextBackend: 'pdfjs',
     } },
     // Skill discovery is model-visible input. Pin every host-level root inside
     // the owned temp world so ~/.dsh, ~/.agents, and a bundled-root env setting

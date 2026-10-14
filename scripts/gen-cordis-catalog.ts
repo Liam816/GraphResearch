@@ -795,6 +795,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   ResearchHighlightRect: 'workspace.md',
   ResearchHighlightId: 'workspace.md',
   ResearchHighlightColor: 'workspace.md',
+  ResearchMarkdown: 'workspace.md',
+  ResearchMarkdownFailure: 'workspace.md',
   ResearchSaveNoteRequest: 'workspace.md',
   ResearchDirectoryRequest: 'workspace.md',
   ResearchImportPaperRequest: 'workspace.md',

@@ -22,7 +22,7 @@ export class ClientResearchModel {
 
   /** @param remote - generated Workspace namespace. */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight'>) {}
+    'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown'>) {}
 
   /** Fetch current durable data; failures preserve existing catalog entries. */
   async refresh(): Promise<void> {
@@ -72,6 +72,16 @@ export class ClientResearchModel {
    */
   async highlight(request: ResearchHighlightRequest): Promise<void> {
     const result = await this.remote.researchHighlight(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
+
+  /**
+   * Retry the paper's complete Markdown extraction and publish its confirmed status.
+   * @param paperId - paper with an attached original.
+   */
+  async extractMarkdown(paperId: ResearchPaperId): Promise<void> {
+    const result = await this.remote.researchExtractMarkdown(paperId)
     if (!result.ok) throw result.error
     this.accept(result.value)
   }

@@ -75,7 +75,7 @@ async function harness(options: { systemDocuments?: boolean; nativeSessions?: bo
     contexts: { configureHost: () => dispose },
   } as never)
   const controller = new WorkspaceController(ctx, {
-    ...options.systemDocuments === true ? {} : { documentsDirectory: root }, researchDirectory: join(root, 'data'),
+    ...options.systemDocuments === true ? {} : { documentsDirectory: root }, researchDirectory: join(root, 'data'), researchPdfTextBackend: 'pdfjs',
   })
   return { controller, ctx, root, storageDomain }
 }
@@ -501,12 +501,68 @@ describe('Research catalog', () => {
     return { ...fixture, topic: catalog.topics[0]!, workspace }
   }
 
+  it('automatically publishes whole-paper Markdown, backfills legacy metadata and retains it on migration', async () => {
+    const { controller, topic, root } = await researchFixture()
+    writeFileSync(join(root, 'a.pdf'), pdfFixture())
+    const created = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = created.papers[0]!, markdownPath = join(paper.directory!, 'paper.md')
+    const expected = '## Page 1\n\nSelectable PDF text\n\n## Page 2\n\nSelectable PDF text\n'
+    expect(readFileSync(markdownPath, 'utf8')).toBe(expected)
+    expect(paper.markdown).toMatchObject({ status: 'ready', pages: 2, backend: 'pdfjs', sourceSha256: paper.pdfSha256 })
+    const unchanged = await Promise.all([controller.researchList(), controller.researchList()])
+    expect(unchanged.map(item => item.revision)).toEqual([created.revision, created.revision])
+    const indexPath = join(root, 'data', 'library.json')
+    const index = JSON.parse(readFileSync(indexPath, 'utf8')) as { papers: Array<{ markdown?: unknown; pdfSha256?: string }> }
+    delete index.papers[0]!.markdown; delete index.papers[0]!.pdfSha256
+    writeFileSync(indexPath, JSON.stringify(index)); rmSync(markdownPath)
+    const backfilled = await controller.researchList()
+    expect(backfilled.papers[0]?.markdown).toMatchObject({ status: 'ready', path: 'paper.md' })
+    expect(readFileSync(markdownPath, 'utf8')).toBe(expected)
+    expect((await controller.researchList()).revision).toBe(backfilled.revision)
+    const moved = await controller.researchConfigure({ directory: join(root, 'markdown-library'), mode: 'migrate' })
+    expect(moved.papers[0]?.markdown).toEqual(backfilled.papers[0]?.markdown)
+    expect(readFileSync(join(moved.papers[0]!.directory!, 'paper.md'), 'utf8')).toBe(expected)
+  })
+
+  it('retains conversion failures without repeated automatic retries and recovers after restoring the original', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const bytes = pdfFixture()
+    writeFileSync(join(root, 'a.pdf'), bytes)
+    const created = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = created.papers[0]!, markdownPath = join(paper.directory!, 'paper.md')
+    await controller.researchSaveNote({ paperId: paper.id, kind: 'ai', text: 'Existing notes', expectedRevision: 0 })
+    rmSync(paper.pdfPath); rmSync(markdownPath)
+    const failed = await controller.researchList()
+    expect(failed.papers[0]?.markdown).toMatchObject({ status: 'failed', code: 'conversion-failed' })
+    writeFileSync(paper.pdfPath, bytes)
+    expect((await controller.researchList()).revision).toBe(failed.revision)
+    expect(existsSync(markdownPath)).toBe(false)
+    const retried = await controller.researchExtractMarkdown(paper.id)
+    expect(retried.papers[0]).toMatchObject({ id: paper.id, sessionId: paper.sessionId,
+      ai: { text: 'Existing notes', revision: 1 }, markdown: { status: 'ready', pages: 2 } })
+    expect(readFileSync(markdownPath, 'utf8')).toContain('## Page 2')
+    expect(readFileSync(paper.pdfPath)).toEqual(Buffer.from(bytes))
+    await expect(controller.researchExtractMarkdown('missing' as ResearchPaperId)).rejects.toMatchObject({ code: 'research/not-found' })
+  })
+
+  it('preserves an unparseable PDF and notebooks while recording the extraction failure', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const created = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = created.papers[0]!
+    expect(paper.markdown).toMatchObject({ status: 'failed', code: 'conversion-failed' })
+    expect(readFileSync(paper.pdfPath)).toEqual(readFileSync(join(root, 'a.pdf')))
+    expect(existsSync(join(paper.directory!, 'paper.md'))).toBe(false)
+    await controller.researchSaveNote({ paperId: paper.id, kind: 'learning', text: 'Retained draft', expectedRevision: 0 })
+    expect((await controller.researchExtractMarkdown(paper.id)).papers[0]?.learning.text).toBe('Retained draft')
+  })
+
   it('creates distinct papers without PDFs and retains their empty original state after migration and reopening', async () => {
     const { controller, topic, root } = await researchFixture()
     const first = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
     const second = await controller.researchCreatePaper({ topicId: topic.id, title: 'B', pdfPath: '  ', repositoryUrl: '', sessionId: SessionId('paper-b') })
     expect(second.papers).toHaveLength(2)
     expect(second.papers.every(paper => paper.pdfPath === '' && paper.pdfSha256 === undefined)).toBe(true)
+    expect(second.papers.every(paper => paper.markdown === undefined)).toBe(true)
     const paper = first.papers[0]!
     expect(existsSync(join(root, 'data', 'papers', paper.id, 'paper.pdf'))).toBe(false)
     await expect(controller.researchReadPaper({ paperId: paper.id }, new AbortController().signal))
@@ -535,6 +591,8 @@ describe('Research catalog', () => {
     expect(attached.papers[0]).toMatchObject({ id: paper.id, sessionId: paper.sessionId, directory: paper.directory,
       ai: { text: 'Existing analysis', revision: 1 }, pdfSha256: digest(original) })
     expect(readFileSync(attached.papers[0]!.pdfPath)).toEqual(Buffer.from(original))
+    expect(attached.papers[0]?.markdown).toMatchObject({ status: 'ready', path: 'paper.md', pages: 2, sourceSha256: digest(original) })
+    expect(readFileSync(join(paper.directory!, 'paper.md'), 'utf8')).toContain('## Page 2\n\nSelectable PDF text')
     expect((await controller.researchReadPaper({ paperId: paper.id, startPage: 1, pageCount: 1 }, signal)).pages[0]?.text).toContain('Selectable PDF text')
     expect(await controller.researchAttachPdf({ paperId: paper.id, source }, signal)).toEqual(attached)
     writeFileSync(source, pdfFixture(4))

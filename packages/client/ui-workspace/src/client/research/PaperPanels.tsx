@@ -19,9 +19,10 @@ import type { ResearchWorkbenchProps } from './contract.ts'
 import { isResearchPanel, reorderPanels, resolvePanelOrder } from './store.ts'
 import type { PaperView, PanelPlacement, ResearchPanel } from './store.ts'
 import { ResearchNotes } from './Notes.tsx'
+import { PaperMarkdownStatus } from './MarkdownStatus.tsx'
 import css from './Research.module.css'
 
-type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'refresh' | 'highlight'>
+type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'refresh' | 'highlight' | 'extractMarkdown'>
 interface PaperPanelsProps extends PanelSeats {
   paper: ResearchPaper
   highlightAvailable: boolean
@@ -35,6 +36,7 @@ interface DragPreview {
   target: ResearchPanel | null
   placement: PanelPlacement
 }
+
 
 function previewFor(operation: DragEndEvent['operation'], order: readonly ResearchPanel[]): DragPreview | null {
   const source = operation.source?.id, target = operation.target?.id
@@ -101,11 +103,12 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
       {panel === 'agent' ? props.renderFactorySlot('conversation.content', { variant: 'embedded', phase: props.phase, hero: props.hero })
         : panel === 'pdf' ? paper.pdfPath === ''
           ? <div className={css.allClosed}><h2>{t('pdfMissing')}</h2><p>{t('pdfMissingHint')}</p></div>
-          : props.renderFactorySlot('document.pdf', { path: paper.pdfPath, annotations: {
-            available: props.highlightAvailable,
-            highlights: paper.highlights ?? [],
-            change: change => props.highlight({ paperId: paper.id, change }),
-          } })
+          : <><PaperMarkdownStatus paper={paper} t={t} extractMarkdown={props.extractMarkdown} />
+            {props.renderFactorySlot('document.pdf', { path: paper.pdfPath, annotations: {
+              available: props.highlightAvailable,
+              highlights: paper.highlights ?? [],
+              change: change => props.highlight({ paperId: paper.id, change }),
+            } })}</>
           : <ResearchNotes paper={paper} view={view} t={t} actions={actions} saveNote={props.saveNote} refresh={props.refresh} />}
     </div>
   </section>

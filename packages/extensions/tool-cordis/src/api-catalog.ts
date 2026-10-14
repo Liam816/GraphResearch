@@ -3788,6 +3788,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the committed library snapshot.',
       },
       {
+        signature: '@Remote(\'researchExtractMarkdown\') researchExtractMarkdown(paperId: ResearchPaperId): Promise<ResearchCatalog>',
+        description: 'Retry full-text Markdown conversion while retaining the attached PDF and notebooks.',
+        parameters: [{ name: 'paperId', description: 'paper with an attached original.' }],
+        returns: 'confirmed catalog with ready or failed extraction status.',
+      },
+      {
         signature: 'researchCurrent(): ResearchCatalog',
         description: 'Read the confirmed in-memory library.',
         parameters: [],
@@ -6630,6 +6636,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResearchImportPaperRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly source?: string;\n    readonly sourceId?: string;\n    readonly repositoryUrl?: string;\n}',
   },
   {
+    name: 'ResearchMarkdown',
+    declaration: 'export type ResearchMarkdown = {\n    readonly status: \'ready\';\n    readonly sourceSha256: string;\n    readonly path: \'paper.md\';\n    readonly pages: number;\n    readonly backend: \'pdfjs\' | \'pdftotext\';\n} | {\n    readonly status: \'failed\';\n    readonly sourceSha256?: string | undefined;\n    readonly code: ResearchMarkdownFailure;\n};',
+  },
+  {
+    name: 'ResearchMarkdownFailure',
+    declaration: 'export type ResearchMarkdownFailure = \'no-text\' | \'text-limit\' | \'timeout\' | \'conversion-failed\' | \'source-changed\';',
+  },
+  {
     name: 'ResearchNote',
     declaration: 'export interface ResearchNote {\n    readonly text: string;\n    readonly revision: number;\n}',
   },
@@ -6639,7 +6653,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchPaper',
-    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly highlights?: readonly ResearchHighlight[] | undefined;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
+    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly markdown?: ResearchMarkdown | undefined;\n    readonly highlights?: readonly ResearchHighlight[] | undefined;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
   },
   {
     name: 'ResearchPaperId',

@@ -34,6 +34,8 @@ it('records research context, reads original pages, and saves the live AI notebo
       pdfPath: 'paper.pdf', repositoryUrl: '', ai: empty, learning: empty, progress: '' }],
   }))
   await scaffold.ctx.workspaceController.researchList()
+  expect(await readFile(join(paperDirectory, 'paper.md'), 'utf8'))
+    .toBe('## Page 1\n\nSelectable PDF text\n\n## Page 2\n\nSelectable PDF text\n')
   const agent = scaffold.ctx.agents.get(paperSession.sessionId)
   if (agent === undefined) throw new Error('the paper Agent must exist')
   const prompts = fixtureUserPrompts(await readFile(FIXTURE, 'utf8'))

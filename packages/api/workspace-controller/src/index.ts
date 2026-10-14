@@ -60,6 +60,12 @@ export interface Config {
   researchMaxReadPages?: number
   /** Maximum original characters returned by one reading call. */
   researchMaxReadCharacters?: number
+  /** Whole-paper text backend; auto prefers Poppler and falls back to PDF.js. */
+  researchPdfTextBackend?: 'auto' | 'pdfjs' | 'pdftotext'
+  /** Maximum UTF-8 bytes in complete generated paper.md, including page headings. */
+  researchMaxMarkdownBytes?: number
+  /** Whole-paper conversion deadline in milliseconds. */
+  researchMarkdownTimeoutMs?: number
   /** Maximum wait for another library writer in milliseconds. */
   researchLockTimeoutMs?: number
   /** File must remain stable for this many milliseconds before external edits are published. */
@@ -108,6 +114,9 @@ export class WorkspaceController extends TypertRemoteService {
     researchDownloadTimeoutMs: z.natural().min(1).default(60_000),
     researchMaxReadPages: z.natural().min(1).default(20),
     researchMaxReadCharacters: z.natural().min(1).default(60_000),
+    researchPdfTextBackend: z.union(['auto', 'pdfjs', 'pdftotext']).default('auto'),
+    researchMaxMarkdownBytes: z.natural().min(1).default(8 * 1024 * 1024),
+    researchMarkdownTimeoutMs: z.natural().min(1).default(60_000),
     researchLockTimeoutMs: z.natural().min(1).default(10_000),
     researchWatchStabilityMs: z.natural().min(1).default(250),
     researchWatchPollMs: z.natural().min(1).default(100),
@@ -134,6 +143,8 @@ export class WorkspaceController extends TypertRemoteService {
       maxPdfBytes: this.config.researchMaxPdfBytes, downloadTimeoutMs: this.config.researchDownloadTimeoutMs,
       maxReadPages: this.config.researchMaxReadPages, maxReadCharacters: this.config.researchMaxReadCharacters,
       maxHighlightBytes: this.config.researchMaxHighlightBytes,
+      pdfTextBackend: this.config.researchPdfTextBackend, maxMarkdownBytes: this.config.researchMaxMarkdownBytes,
+      markdownTimeoutMs: this.config.researchMarkdownTimeoutMs,
       lockTimeoutMs: this.config.researchLockTimeoutMs,
       watchStabilityMs: this.config.researchWatchStabilityMs, watchPollMs: this.config.researchWatchPollMs,
     })
@@ -321,6 +332,14 @@ export class WorkspaceController extends TypertRemoteService {
    */
   @Remote('researchHighlight')
   researchHighlight(request: ResearchHighlightRequest): Promise<ResearchCatalog> { return this.research.highlight(request) }
+
+  /**
+   * Retry full-text Markdown conversion while retaining the attached PDF and notebooks.
+   * @param paperId - paper with an attached original.
+   * @returns confirmed catalog with ready or failed extraction status.
+   */
+  @Remote('researchExtractMarkdown')
+  researchExtractMarkdown(paperId: ResearchPaperId): Promise<ResearchCatalog> { return this.research.extractMarkdown(paperId) }
 
   /**
    * Read the confirmed in-memory library.

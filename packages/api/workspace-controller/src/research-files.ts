@@ -12,6 +12,12 @@ const identity = z.string().regex(/^[A-Za-z0-9_-]+$/)
 const topicId = identity.transform(value => brandString<ResearchTopicId>(value))
 const paperId = identity.transform(value => brandString<ResearchPaperId>(value))
 const note = z.object({ text: z.string(), revision: z.number().int().nonnegative() })
+const markdown = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('ready'), sourceSha256: z.string(), path: z.literal('paper.md'),
+    pages: z.number().int().positive(), backend: z.enum(['pdfjs', 'pdftotext']) }),
+  z.object({ status: z.literal('failed'), sourceSha256: z.string().optional(),
+    code: z.enum(['no-text', 'text-limit', 'timeout', 'conversion-failed', 'source-changed']) }),
+])
 /** Validate annotation geometry at the file and Remote admission points. */
 export const researchHighlightSchema: z.ZodType<ResearchHighlight> = z.object({
   id: identity.transform(value => brandString<ResearchHighlightId>(value)),
@@ -32,6 +38,7 @@ const paper = z.object({
   directory: z.string().optional(), sourceId: z.string().optional(), pdfSha256: z.string().optional(),
   source: z.string().optional(), progress: z.string().optional(),
   highlights: z.array(researchHighlightSchema).optional(),
+  markdown: markdown.optional(),
 })
 
 /** Existing storage-domain records remain readable during first-use file migration. */

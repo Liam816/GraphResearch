@@ -18,7 +18,8 @@
     "src/research-files.ts",
     "src/research-pdf.ts",
     "src/research-agent.ts",
-    "src/research-session-backup.ts"
+    "src/research-session-backup.ts",
+    "src/research-markdown.ts"
   ],
   "references": [
     {
@@ -74,6 +75,9 @@
     },
     {
       "path": "../../api/session-controller/tsconfig.host.json"
+    },
+    {
+      "path": "../../subprocess/subprocess"
     }
   ]
 }
