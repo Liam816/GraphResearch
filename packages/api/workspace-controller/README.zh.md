@@ -51,6 +51,9 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 `researchImportPaper` 可仅凭标题创建论文，也可同时复制本地 PDF 或下载 HTTP(S) 来源。未添加原文时 `pdfPath` 为空。`researchAttachPdf` 为现有论文补充 PDF，保留论文身份、Session 和笔记；相同内容可安全重试，不同的已有 PDF 拒绝覆盖。显式补充 PDF 时，即使另一论文具有相同内容，也保留目标实体。匹配的 arXiv/DOI 身份或相同 PDF 字节复用现有论文并增加 Topic 关联。带版本的 arXiv 标识保留版本。各实体使用独立 Session。`researchReadPaper` 返回有页码的有限原文，并在论文目录下缓存结果；纯图片页面需要 OCR。`researchProgress` 保存续读位置，`researchTopicNote` 保存有版本检查的对比总结。
 
+
+`researchHighlight` 新增或删除一个稳定的文字选区标识。新增时验证颜色、页码和归一化矩形；相同的重复新增和不存在的删除可安全重试，并发编辑保留其他选区。高亮保存于论文的 `paper.json` 和资料库元数据，随资料库迁移，通过已有的科研快照流更新。`researchMaxHighlightBytes` 限制每篇论文完整高亮列表的序列化大小，默认为 4 MiB。保存失败时保留已确认目录，可能留下可恢复的事务日志；重复相同操作可完成恢复而不重复创建高亮。尚无高亮的资料库无需转换。目录响应通过 `capabilities.pdfHighlights` 声明支持高亮；此运行时标志不写入资料库。
+
 `researchFollow` 推送完整基线，以及已提交或外部观察到的笔记变更快照；重连启动新基线。浏览器草稿与已确认正文分别保留。协作进程间串行写入，检查 `expectedRevision`，并通过可恢复的事务日志发布 Markdown 与元数据。过期编辑不会写入文件。I/O 失败可能留下未完成的事务日志；重试前刷新以完成恢复，恢复期间发生冲突的外部修改会明确报告而不被覆盖。元数据无效、笔记文件缺失或监听失败时，浏览器保留已确认内容并显示问题。受管理路径拒绝符号链接。
 
 `researchConfigure` 打开另一资料库，或将当前资料复制到空目录，并在准备完成后持久化目录选择。迁移保留原目录。科研 Session 通过显式读取已有持久化提供方，在各实体目录内维护 `session.json` 快照；原有 Session 代次保持不变。部署限制可通过 `researchMaxNoteBytes`、`researchMaxPdfBytes`、`researchDownloadTimeoutMs`、`researchMaxReadPages`、`researchMaxReadCharacters`、`researchLockTimeoutMs`、`researchWatchStabilityMs` 和 `researchWatchPollMs` 配置。
@@ -66,7 +69,7 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 #### 模型看到的内容
 
-普通 Workspace 组织不贡献提示词或工具。科研实体的 Agent 获得作用域内的 `research_context`、`research_import_paper`、`research_attach_pdf`、`research_read_paper`、`research_write_note`、`research_update_progress` 和 `research_write_topic_note` 工具。必要的运行上下文包含资料库、论文目录、PDF 原文、笔记版本和续读位置。这些信息通过已有提示词上下文准入记录；工具调用和结果使用标准 Session 工具事件。笔记正文通过 `research_context` 显式读取。修改学习笔记要求用户明确提出。
+普通 Workspace 组织不贡献提示词或工具。科研实体的 Agent 获得作用域内的 `research_context`、`research_import_paper`、`research_attach_pdf`、`research_read_paper`、`research_write_note`、`research_update_progress` 和 `research_write_topic_note` 工具。必要的运行上下文包含资料库、论文目录、PDF 原文、笔记版本和续读位置。这些信息通过已有提示词上下文准入记录；工具调用和结果使用标准 Session 工具事件。笔记正文通过 `research_context` 显式读取，同时返回已保存高亮的文字、颜色和页面相对矩形。高亮操作本身不启动模型回合。修改学习笔记要求用户明确提出。
 
 #### Token 影响
 

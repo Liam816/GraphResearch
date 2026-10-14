@@ -17,6 +17,7 @@ import { WorkspaceFeed } from '../src/feed.ts'
 import type { WorkspaceFollowFrame } from '../src/types.ts'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import { pdfFixture } from '../../../client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
+import type { ResearchHighlight, ResearchHighlightId, ResearchPaperId } from '../src/research-types.ts'
 import { ResearchFiles, digest } from '../src/research-files.ts'
 
 // The controller relays whatever families the providers report; this suite merges its own.
@@ -551,6 +552,52 @@ describe('Research catalog', () => {
     expect(catalog.papers[0]).toMatchObject({ topicIds: [topic.id], ai: { text: '', revision: 0 }, learning: { text: '', revision: 0 } })
     const retry = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
     expect(retry).toEqual(catalog)
+  })
+
+  it('persists independent highlights, handles retries, and carries them with migrated paper metadata', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const created = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = created.papers[0]!
+    const make = (id: string): ResearchHighlight => ({ id: id as ResearchHighlightId, color: 'yellow', text: 'Selected method',
+      rects: [{ page: 1, x: 0.1, y: 0.2, width: 0.3, height: 0.04 }, { page: 2, x: 0.1, y: 0.1, width: 0.3, height: 0.04 }] })
+    const first = make('first'), second = make('second')
+    await Promise.all([first, second].map(highlight => controller.researchHighlight({ paperId: paper.id, change: { type: 'add', highlight } })))
+    const confirmed = await controller.researchList()
+    expect(confirmed.capabilities).toEqual({ pdfHighlights: true })
+    expect(JSON.parse(readFileSync(join(root, 'data', 'library.json'), 'utf8')) as { capabilities?: object }).not.toHaveProperty('capabilities')
+    expect(confirmed.papers[0]?.highlights).toEqual([first, second])
+    expect((JSON.parse(readFileSync(join(paper.directory!, 'paper.json'), 'utf8')) as { highlights: ResearchHighlight[] }).highlights).toEqual([first, second])
+    expect((await controller.researchHighlight({ paperId: paper.id, change: { type: 'add', highlight: first } })).revision).toBe(confirmed.revision)
+    await expect(controller.researchHighlight({ paperId: paper.id, change: { type: 'add', highlight: { ...first, color: 'blue' } } }))
+      .rejects.toMatchObject({ code: 'research/invalid' })
+    const moved = await controller.researchConfigure({ directory: join(root, 'highlight-library'), mode: 'migrate' })
+    expect(moved.papers[0]?.highlights).toEqual([first, second])
+    await controller.researchHighlight({ paperId: paper.id, change: { type: 'remove', id: first.id } })
+    const remaining = await controller.researchList()
+    expect(remaining.papers[0]?.highlights).toEqual([second])
+    expect((await controller.researchHighlight({ paperId: paper.id, change: { type: 'remove', id: first.id } })).revision).toBe(remaining.revision)
+    const reopened = await controller.researchConfigure({ directory: join(root, 'data'), mode: 'open' })
+    expect(reopened.papers[0]?.highlights).toEqual([first, second])
+  })
+
+  it('rejects highlights outside page coordinates or the configured budget and preserves confirmed data', async () => {
+    const { controller, topic } = await researchFixture()
+    const created = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = created.papers[0]!
+    const valid: ResearchHighlight = { id: 'bounded' as ResearchHighlightId, color: 'green', text: 'Method',
+      rects: [{ page: 1, x: 0.1, y: 0.2, width: 0.3, height: 0.04 }] }
+    for (const rect of [{ ...valid.rects[0]!, page: 0 }, { ...valid.rects[0]!, x: -0.1 }, { ...valid.rects[0]!, width: 1 }]) {
+      await expect(controller.researchHighlight({ paperId: paper.id, change: { type: 'add', highlight: { ...valid, rects: [rect] } } }))
+        .rejects.toMatchObject({ code: 'research/invalid' })
+    }
+    await expect(controller.researchHighlight({ paperId: paper.id, change: { type: 'add', highlight: { ...valid, text: 'x'.repeat(4 * 1024 * 1024) } } }))
+      .rejects.toMatchObject({ code: 'research/invalid' })
+    expect((await controller.researchList()).papers[0]?.highlights).toBeUndefined()
+    await expect(controller.researchHighlight({ paperId: 'missing' as ResearchPaperId, change: { type: 'add', highlight: valid } }))
+      .rejects.toMatchObject({ code: 'research/not-found' })
+    const blank = await controller.researchCreatePaper({ topicId: topic.id, title: 'B', repositoryUrl: '', sessionId: SessionId('paper-b') })
+    await expect(controller.researchHighlight({ paperId: blank.papers.find(item => item.title === 'B')!.id, change: { type: 'add', highlight: valid } }))
+      .rejects.toMatchObject({ code: 'research/invalid', details: { field: 'pdfPath' } })
   })
 
   it('saves AI and learning notebooks separately and rejects stale concurrent writes without losing saved data', async () => {

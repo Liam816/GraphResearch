@@ -16,7 +16,7 @@ import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-referenc
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
   ResearchDirectoryRequest, ResearchFollowFrame, ResearchImportPaperRequest, ResearchReadPaperRequest, ResearchPaperText, ResearchTopicId,
-  ResearchAttachPdfRequest,
+  ResearchAttachPdfRequest, ResearchHighlightRequest,
 } from './research-types.ts'
 import type {
   WorkspaceArchiveSessionRequest,
@@ -50,6 +50,8 @@ export interface Config {
   researchDirectory?: string
   /** Maximum bytes in one Markdown notebook. */
   researchMaxNoteBytes?: number
+  /** Maximum serialized highlight bytes per paper. */
+  researchMaxHighlightBytes?: number
   /** Maximum bytes in one imported PDF. */
   researchMaxPdfBytes?: number
   /** PDF download timeout in milliseconds. */
@@ -101,6 +103,7 @@ export class WorkspaceController extends TypertRemoteService {
     documentsLookupTimeoutMs: z.natural().min(1).default(10_000),
     researchDirectory: z.string().default(resolve(process.cwd(), 'data')),
     researchMaxNoteBytes: z.natural().min(1).default(8 * 1024 * 1024),
+    researchMaxHighlightBytes: z.natural().min(1).default(4 * 1024 * 1024),
     researchMaxPdfBytes: z.natural().min(1).default(64 * 1024 * 1024),
     researchDownloadTimeoutMs: z.natural().min(1).default(60_000),
     researchMaxReadPages: z.natural().min(1).default(20),
@@ -130,6 +133,7 @@ export class WorkspaceController extends TypertRemoteService {
       directory: this.config.researchDirectory, maxNoteBytes: this.config.researchMaxNoteBytes,
       maxPdfBytes: this.config.researchMaxPdfBytes, downloadTimeoutMs: this.config.researchDownloadTimeoutMs,
       maxReadPages: this.config.researchMaxReadPages, maxReadCharacters: this.config.researchMaxReadCharacters,
+      maxHighlightBytes: this.config.researchMaxHighlightBytes,
       lockTimeoutMs: this.config.researchLockTimeoutMs,
       watchStabilityMs: this.config.researchWatchStabilityMs, watchPollMs: this.config.researchWatchPollMs,
     })
@@ -309,6 +313,14 @@ export class WorkspaceController extends TypertRemoteService {
   researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog> {
     return this.research.saveNote(request)
   }
+
+  /**
+   * Add or remove a PDF text highlight without replacing concurrent annotations.
+   * @param request - owning paper and idempotent change.
+   * @returns the committed library snapshot.
+   */
+  @Remote('researchHighlight')
+  researchHighlight(request: ResearchHighlightRequest): Promise<ResearchCatalog> { return this.research.highlight(request) }
 
   /**
    * Read the confirmed in-memory library.

@@ -8,6 +8,8 @@ import type { PdfStore, PdfView } from './store.ts'
 import { renderPdfPage, type PdfDocument } from './document.ts'
 import { openPdf } from './runtime.ts'
 import { PdfWorkerFailure } from './errors.ts'
+import type { PdfAnnotations } from './highlights.ts'
+import { AnnotatedPages, HighlightLayer } from './HighlightControls.tsx'
 import { pdfTextRenderer } from './text.ts'
 import type { ZoomViewportProps } from '../zoom/ZoomViewport.tsx'
 import type { ZoomLabels, ZoomPreference } from '../zoom/types.ts'
@@ -56,6 +58,7 @@ export function PdfBody(props: PdfBodyProps & { readonly loading: ReactNode }): 
 
 /** Generic PDF reader shared by document tabs and independent research panels. */
 export interface PdfReaderProps extends PropsLocale<'sidebarPdf'> {
+  readonly annotations?: PdfAnnotations | undefined
   readonly data: Uint8Array<ArrayBuffer> | undefined
   readonly view: PdfView
   readonly signal: AbortSignal
@@ -108,16 +111,18 @@ export function PdfReader(props: PdfReaderProps): ReactNode {
     {Array.from({ length: load.document.numPages }, (_, index) => (
       <PdfPage key={index} document={load.document} page={index + 1}
         requested={index === 0 || view.page === index + 1} onVisible={pageVisible} signal={signal}
-        onWidth={index === 0 ? setPageWidth : undefined} zoom={renderZoom} zoomSurfaceClass={zoomSurfaceClass} t={t} />
+        onWidth={index === 0 ? setPageWidth : undefined} zoom={renderZoom} zoomSurfaceClass={zoomSurfaceClass}
+        t={t} annotations={props.annotations} />
     ))}
   </section>
   return <ZoomViewport preference={preference} intrinsicWidth={pageWidth} horizontalInset={24} labels={labels}
     signal={signal} scrollportRef={props.scrollportRef} onPreference={setPreference} onRenderZoom={setRenderZoom}>
-    {pages}
+    <AnnotatedPages annotations={props.annotations} t={t}>{pages}</AnnotatedPages>
   </ZoomViewport>
 }
 
-function PdfPage({ document, page, requested: initiallyRequested, onVisible, signal, onWidth, zoom, zoomSurfaceClass, t }: {
+function PdfPage({ document, page, requested: initiallyRequested, onVisible, signal, onWidth, zoom, zoomSurfaceClass, t, annotations }: {
+  readonly annotations: PdfAnnotations | undefined
   readonly document: PdfDocument
   readonly page: number
   readonly requested: boolean
@@ -216,6 +221,7 @@ function PdfPage({ document, page, requested: initiallyRequested, onVisible, sig
       style={{ '--document-zoom-width': `${width ?? 0}px` } as CSSProperties}
       hidden={state !== 'ready'}>
       <canvas ref={canvas} className={css.canvas} role="img" aria-label={t('pageImage', { page })} />
+      <HighlightLayer annotations={annotations} page={page} t={t} />
       <div ref={text} className={css.text} data-pdf-text />
     </div>
   </div>

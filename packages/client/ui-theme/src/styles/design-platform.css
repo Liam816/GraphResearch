@@ -2,6 +2,12 @@
    font-weight: 500 in this UI — non-variable webfonts snap intermediate
    weights unpredictably across platforms. */
 body {
+  /* Markers retain their paper colors against the original white PDF page in both themes. */
+  --dsw-specific-pdf-highlight-yellow: rgb(255, 224, 102);
+  --dsw-specific-pdf-highlight-green: rgb(165, 243, 180);
+  --dsw-specific-pdf-highlight-blue: rgb(165, 216, 255);
+  --dsw-specific-pdf-highlight-pink: rgb(255, 201, 222);
+  --dsw-specific-pdf-highlight-orange: rgb(255, 216, 168);
   --dsw-static-amber-100: rgb(254, 245, 231);
   --dsw-static-amber-400: rgb(247, 173, 49);
   --dsw-static-amber-500: rgb(245, 158, 11);

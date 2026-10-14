@@ -301,7 +301,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-workspace-controller`
 
 - `inject`: `typert` · `workspaceRegistry` · `storageDomain` · `sessionController` · `agents` · `sessions` · `sessionPersistence`
-- `source`: [`packages/api/workspace-controller/src/index.ts:43`](../packages/api/workspace-controller/src/index.ts)
+- `source`: [`packages/api/workspace-controller/src/index.ts:44`](../packages/api/workspace-controller/src/index.ts)
 
 ```ts config-catalog
 /** First-use directory policy for the Host account. */
@@ -314,6 +314,8 @@ export interface Config {
   researchDirectory?: string
   /** Maximum bytes in one Markdown notebook. */
   researchMaxNoteBytes?: number
+  /** Maximum serialized highlight bytes per paper. */
+  researchMaxHighlightBytes?: number
   /** Maximum bytes in one imported PDF. */
   researchMaxPdfBytes?: number
   /** PDF download timeout in milliseconds. */

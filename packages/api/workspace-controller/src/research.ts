@@ -11,7 +11,7 @@ import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { defineDomain, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import type { Session } from '@deepseek-ai/dsh-session'
-import { digest, missing, ResearchFiles, researchCatalogSchema } from './research-files.ts'
+import { digest, missing, ResearchFiles, researchCatalogSchema, researchHighlightSchema } from './research-files.ts'
 import type { ResearchFilePolicy } from './research-files.ts'
 import { importPdf, readPdfText } from './research-pdf.ts'
 import type { ResearchPdfPolicy } from './research-pdf.ts'
@@ -19,7 +19,7 @@ import { restoreResearchSessions } from './research-session-backup.ts'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchDirectoryRequest,
   ResearchFollowFrame, ResearchPaperId, ResearchReadPaperRequest, ResearchPaperText, ResearchSaveNoteRequest, ResearchTopicId,
-  ResearchImportPaperRequest, ResearchAttachPdfRequest,
+  ResearchImportPaperRequest, ResearchAttachPdfRequest, ResearchHighlightRequest,
 } from './research-types.ts'
 
 const initialCatalog: ResearchCatalog = { revision: 0, topics: [], papers: [] }
@@ -33,6 +33,7 @@ export interface ResearchPolicy extends ResearchFilePolicy, ResearchPdfPolicy {
   readonly directory: string
   readonly watchStabilityMs: number
   readonly watchPollMs: number
+  readonly maxHighlightBytes: number
 }
 
 /** Host-owned library. Interrupted saves retain a recoverable journal and confirmed browser data. */
@@ -242,6 +243,45 @@ export class ResearchCatalogHost {
   }
 
   /**
+   * Persist one selection or remove it without replacing other annotations.
+   * @param request - paper identity and idempotent annotation change.
+   * @returns the committed catalog; failed writes retain previously confirmed highlights.
+   */
+  highlight(request: ResearchHighlightRequest): Promise<ResearchCatalog> {
+    return this.mutate((catalog) => {
+      const paper = catalog.papers.find(item => item.id === request.paperId)
+      if (paper === undefined) throw new RemoteError('research/not-found', 'Paper not found', { id: request.paperId })
+      if (paper.pdfPath === '') throw new RemoteError('research/invalid', 'Attach the original PDF before highlighting it', { field: 'pdfPath' })
+      const previous = paper.highlights ?? []
+      let highlights: typeof previous
+      const change = request.change
+      switch (change.type) {
+        case 'add': {
+          const parsed = researchHighlightSchema.safeParse(change.highlight)
+          if (!parsed.success) throw new RemoteError('research/invalid', 'Select text inside the original PDF', { field: 'highlight' })
+          const existing = previous.find(item => item.id === parsed.data.id)
+          if (existing !== undefined) {
+            if (JSON.stringify(existing) === JSON.stringify(parsed.data)) return catalog
+            throw new RemoteError('research/invalid', 'This highlight identity already exists', { field: 'highlight' })
+          }
+          highlights = [...previous, parsed.data]
+          if (Buffer.byteLength(JSON.stringify(highlights)) > this.policy.maxHighlightBytes) {
+            throw new RemoteError('research/invalid', 'Paper highlights exceed the configured size limit', { field: 'highlight' })
+          }
+          break
+        }
+        case 'remove': {
+          highlights = previous.filter(item => item.id !== change.id)
+          if (highlights.length === previous.length) return catalog
+          break
+        }
+        default: return assertNever(change)
+      }
+      return { ...catalog, papers: catalog.papers.map(item => item.id === paper.id ? { ...item, highlights } : item) }
+    })
+  }
+
+  /**
    * Store the next reading step.
    * @param paperId - Owning paper.
    * @param text - Continuation point and questions.
@@ -386,7 +426,7 @@ export class ResearchCatalogHost {
       const previous = await this.files.read()
       this.accept(previous)
       const next = await update(previous)
-      if (next === previous) return previous
+      if (next === previous) return this.accept(previous)
       await this.files.write({ ...next, revision: previous.revision + 1 }, previous)
       if (next.papers.length !== previous.papers.length || next.topics.length !== previous.topics.length) {
         await this.watcher?.close()
@@ -412,11 +452,12 @@ export class ResearchCatalogHost {
   }
 
   private accept(catalog: ResearchCatalog): ResearchCatalog {
+    const confirmed: ResearchCatalog = { ...catalog, capabilities: { pdfHighlights: true } }
     if (catalog.revision !== this.snapshot.revision || catalog.directory !== this.snapshot.directory) {
-      this.snapshot = catalog
-      for (const follower of this.followers) follower.push({ type: 'changed', catalog })
+      this.snapshot = confirmed
+      for (const follower of this.followers) follower.push({ type: 'changed', catalog: confirmed })
     }
-    return catalog
+    return confirmed
   }
 
   private report(error: unknown): void {
@@ -516,3 +557,5 @@ function attachTopic(catalog: ResearchCatalog, paperId: ResearchPaperId, topicId
   if (paper?.topicIds.includes(topicId)) return catalog
   return { ...catalog, papers: catalog.papers.map(item => item.id === paperId ? { ...item, topicIds: [...item.topicIds, topicId] } : item) }
 }
+
+function assertNever(value: never): never { throw new Error(`Unexpected highlight change: ${String(value)}`) }

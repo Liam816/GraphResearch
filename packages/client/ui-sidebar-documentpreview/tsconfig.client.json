@@ -11,6 +11,8 @@
     "src/css-modules.d.ts"
   ],
   "references": [
+    { "path": "../../api/workspace-controller/tsconfig.client.json" },
+    { "path": "../../util/crypto" },
     {
       "path": "../../api/gateway/tsconfig.client.json"
     },

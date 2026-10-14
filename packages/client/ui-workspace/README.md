@@ -206,6 +206,9 @@ AI and learning notebooks save to separate Markdown files beneath the managed pa
 
 Drag a panel’s title handle to insert it before or after another panel. A title-only floating preview and insertion marker show the pending move; Escape cancels it. Space, Left/Right, and Space provide keyboard sorting, and each panel’s arrangement menu offers **Move left** and **Move right**, including in narrow workspaces. The complete three-panel order is stored per paper and also orders the header buttons. Folded panels retain their place, widths stay with their panels, and sorting preserves the mounted reading bodies, PDF position, and notebook drafts. Older preferences without an order use Agent → PDF → Notes while retaining their other saved fields.
 
+
+In the original PDF panel, select text and choose a marker color. Highlights survive panel folding, paper switching, and reload, and travel with the paper library. Double-click a highlight to remove it, or focus its removal control and press Enter. The [PDF renderer](../ui-sidebar-documentpreview/README.md#what-it-registers) owns selection and toolbar behavior; the [research controller](../../api/workspace-controller/README.md#research-catalog) owns persistence.
+
 PDF preview remains a viewing surface. The Host supplies paper-scoped Agent tools for PDF download, page-numbered text extraction, notebook updates, continuation points, and Topic comparison summaries. Repository links open externally; the Agent uses its existing shell tools to download code under the owning paper directory/code.
 
 <a id="model-experience"></a>

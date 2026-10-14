@@ -98,7 +98,8 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
       {topic !== undefined && <div className={css.topicIntro}><span>{t('topic')}</span><h1>{topic.title}</h1><p>{t('topicDescription')}</p><small>{t('paperCount', { count: catalog.papers.filter(item => item.topicIds.includes(topic.id)).length })}</small></div>}
       <div className={css.agentContent}>{agent()}</div>
     </div> : <ResearchPaperPanels key={paper.id} paper={paper} view={view} id={panelId} phase={phase} hero={hero}
-      t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote} refresh={props.refresh} />}
+      t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote}
+      highlight={props.highlight} highlightAvailable={catalog.capabilities?.pdfHighlights === true} refresh={props.refresh} />}
     <Modal open={referencesOpen} title={t('context')} description={t('contextHint')} closeLabel={t('close')}
       onClose={() => { if (!referenceBusy) setReferencesOpen(false) }} footer={<>
         <Button disabled={referenceBusy} onClick={() => { setReferencesOpen(false) }}>{t('cancel')}</Button>

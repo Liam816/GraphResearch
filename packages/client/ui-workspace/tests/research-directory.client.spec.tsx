@@ -28,7 +28,8 @@ function fixture(managed: boolean) {
     usePanelInfo: select => select({ activePanelId: null }),
     useResource: () => ({ status: 'none', value: undefined, failure: undefined, reload: () => {} }),
     refresh: vi.fn(async () => {}), open: vi.fn(), createTopic: vi.fn(async () => {}), createPaper: vi.fn(async () => {}),
-    saveNote: vi.fn(async () => {}), configureDirectory: vi.fn(async () => {}), mentions: vi.fn(async () => []),
+    highlight: vi.fn(async () => {}), saveNote: vi.fn(async () => {}),
+    configureDirectory: vi.fn(async () => {}), mentions: vi.fn(async () => []),
   }
   render(<ResearchDirectory {...props} />)
   fireEvent.click(screen.getByRole('button', { name: 'Add paper' }))

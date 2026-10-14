@@ -72,6 +72,7 @@
     "tests/sessionless-header.e2e.ts",
     "tests/document-preview.e2e.ts",
     "tests/research-workspace.e2e.ts",
+    "tests/research-highlights.e2e.ts",
     "tests/research-agent.snapshot.ts",
     "tests/excel-opc.e2e.ts",
     "tests/office-fixture.ts",

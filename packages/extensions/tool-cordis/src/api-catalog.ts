@@ -3782,6 +3782,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the committed catalog; conflicts preserve the previous notebook.',
       },
       {
+        signature: '@Remote(\'researchHighlight\') researchHighlight(request: ResearchHighlightRequest): Promise<ResearchCatalog>',
+        description: 'Add or remove a PDF text highlight without replacing concurrent annotations.',
+        parameters: [{ name: 'request', description: 'owning paper and idempotent change.' }],
+        returns: 'the committed library snapshot.',
+      },
+      {
         signature: 'researchCurrent(): ResearchCatalog',
         description: 'Read the confirmed in-memory library.',
         parameters: [],
@@ -6581,7 +6587,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchCatalog',
-    declaration: 'export interface ResearchCatalog {\n    readonly revision: number;\n    readonly topics: readonly ResearchTopic[];\n    readonly papers: readonly ResearchPaper[];\n    readonly directory?: string | undefined;\n}',
+    declaration: 'export interface ResearchCatalog {\n    readonly revision: number;\n    readonly topics: readonly ResearchTopic[];\n    readonly papers: readonly ResearchPaper[];\n    readonly capabilities?: {\n        readonly pdfHighlights: true;\n    } | undefined;\n    readonly directory?: string | undefined;\n}',
   },
   {
     name: 'ResearchCreatePaperRequest',
@@ -6600,6 +6606,26 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type ResearchFollowFrame = {\n    readonly type: \'baseline\';\n    readonly catalog: ResearchCatalog;\n} | {\n    readonly type: \'changed\';\n    readonly catalog: ResearchCatalog;\n} | {\n    readonly type: \'error\';\n    readonly message: string;\n};',
   },
   {
+    name: 'ResearchHighlight',
+    declaration: 'export interface ResearchHighlight {\n    readonly id: ResearchHighlightId;\n    readonly color: ResearchHighlightColor;\n    readonly text: string;\n    readonly rects: readonly ResearchHighlightRect[];\n}',
+  },
+  {
+    name: 'ResearchHighlightColor',
+    declaration: 'export type ResearchHighlightColor = \'yellow\' | \'green\' | \'blue\' | \'pink\' | \'orange\';',
+  },
+  {
+    name: 'ResearchHighlightId',
+    declaration: 'export type ResearchHighlightId = Branded<\'ResearchHighlightId\'>;',
+  },
+  {
+    name: 'ResearchHighlightRect',
+    declaration: 'export interface ResearchHighlightRect {\n    readonly page: number;\n    readonly x: number;\n    readonly y: number;\n    readonly width: number;\n    readonly height: number;\n}',
+  },
+  {
+    name: 'ResearchHighlightRequest',
+    declaration: 'export interface ResearchHighlightRequest {\n    readonly paperId: ResearchPaperId;\n    readonly change: {\n        readonly type: \'add\';\n        readonly highlight: ResearchHighlight;\n    } | {\n        readonly type: \'remove\';\n        readonly id: ResearchHighlightId;\n    };\n}',
+  },
+  {
     name: 'ResearchImportPaperRequest',
     declaration: 'export interface ResearchImportPaperRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly source?: string;\n    readonly sourceId?: string;\n    readonly repositoryUrl?: string;\n}',
   },
@@ -6613,7 +6639,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchPaper',
-    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
+    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly highlights?: readonly ResearchHighlight[] | undefined;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
   },
   {
     name: 'ResearchPaperId',

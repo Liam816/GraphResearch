@@ -168,7 +168,7 @@ interface SessionActivity {
 
 ## Research library
 
-The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
+The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, page-relative text highlights, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -448,6 +448,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the committed catalog; conflicts preserve the previous notebook.
  */
 @Remote('researchSaveNote') researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog>
+
+/**
+ * Add or remove a PDF text highlight without replacing concurrent annotations.
+ * @param request - owning paper and idempotent change.
+ * @returns the committed library snapshot.
+ */
+@Remote('researchHighlight') researchHighlight(request: ResearchHighlightRequest): Promise<ResearchCatalog>
 
 /**
  * Read the confirmed in-memory library.

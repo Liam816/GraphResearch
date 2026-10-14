@@ -168,7 +168,7 @@ interface SessionActivity {
 
 ## 科研资料库
 
-Workspace 控制器还管理科研资料库，Topic 和论文身份独立于 Workspace 与 Session 身份。[科研类型](../../packages/api/workspace-controller/src/research-types.ts)定义 `ResearchCatalog`、品牌类型 `ResearchTopicId` 和 `ResearchPaperId`、带版本检查的笔记请求、目录选择与导入请求、有页码的 PDF 正文，以及完整的 `ResearchFollowFrame` 快照。[控制器参考](../../packages/api/workspace-controller/README.zh.md#research-catalog)说明文件布局、迁移、Agent 上下文和失败行为。
+Workspace 控制器还管理科研资料库，Topic 和论文身份独立于 Workspace 与 Session 身份。[科研类型](../../packages/api/workspace-controller/src/research-types.ts)定义 `ResearchCatalog`、品牌类型 `ResearchTopicId` 和 `ResearchPaperId`、页面相对坐标的文字高亮、带版本检查的笔记请求、目录选择与导入请求、有页码的 PDF 正文，以及完整的 `ResearchFollowFrame` 快照。[控制器参考](../../packages/api/workspace-controller/README.zh.md#research-catalog)说明文件布局、迁移、Agent 上下文和失败行为。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -448,6 +448,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the committed catalog; conflicts preserve the previous notebook.
  */
 @Remote('researchSaveNote') researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog>
+
+/**
+ * Add or remove a PDF text highlight without replacing concurrent annotations.
+ * @param request - owning paper and idempotent change.
+ * @returns the committed library snapshot.
+ */
+@Remote('researchHighlight') researchHighlight(request: ResearchHighlightRequest): Promise<ResearchCatalog>
 
 /**
  * Read the confirmed in-memory library.

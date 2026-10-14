@@ -1,0 +1,8 @@
+- toolbar "Choose highlight color":
+  - button "Yellow highlight"
+  - button "Green highlight"
+  - button "Blue highlight"
+  - button "Pink highlight"
+  - button "Orange highlight"
+  - button "Cancel"
+  - text: Double-click a highlight to remove it

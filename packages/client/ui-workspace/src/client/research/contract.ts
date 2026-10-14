@@ -1,6 +1,6 @@
 /** Public Slot inputs; component code receives only snapshots, actions, and standard props. */
 import type { HostObservable, PropsHooks, PropsLocale, PropsRenderFactories, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ResearchSnapshot, ResearchCreateTopicRequest, ResearchCreatePaperRequest, ResearchSaveNoteRequest, ResearchPaperId, ResearchDirectoryRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchSnapshot, ResearchCreateTopicRequest, ResearchCreatePaperRequest, ResearchSaveNoteRequest, ResearchPaperId, ResearchDirectoryRequest, ResearchHighlightRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ResearchViewStore } from './store.ts'
 import type { ResearchKey } from './locales.ts'
@@ -14,6 +14,7 @@ export interface ResearchInjected {
   open: (sessionId: SessionId) => void
   createTopic: (request: Pick<ResearchCreateTopicRequest, 'title'>) => Promise<void>
   createPaper: (request: Omit<ResearchCreatePaperRequest, 'sessionId'>) => Promise<void>
+  highlight: (request: ResearchHighlightRequest) => Promise<void>
   saveNote: (request: ResearchSaveNoteRequest) => Promise<void>
   configureDirectory: (request: ResearchDirectoryRequest) => Promise<void>
   mentions: (paperIds: readonly ResearchPaperId[]) => Promise<readonly string[]>

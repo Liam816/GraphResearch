@@ -21,9 +21,10 @@ import type { PaperView, PanelPlacement, ResearchPanel } from './store.ts'
 import { ResearchNotes } from './Notes.tsx'
 import css from './Research.module.css'
 
-type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'refresh'>
+type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'refresh' | 'highlight'>
 interface PaperPanelsProps extends PanelSeats {
   paper: ResearchPaper
+  highlightAvailable: boolean
   view: PaperView
   id: string
   phase: 'settling' | 'hero' | 'active'
@@ -100,7 +101,11 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
       {panel === 'agent' ? props.renderFactorySlot('conversation.content', { variant: 'embedded', phase: props.phase, hero: props.hero })
         : panel === 'pdf' ? paper.pdfPath === ''
           ? <div className={css.allClosed}><h2>{t('pdfMissing')}</h2><p>{t('pdfMissingHint')}</p></div>
-          : props.renderFactorySlot('document.pdf', { path: paper.pdfPath })
+          : props.renderFactorySlot('document.pdf', { path: paper.pdfPath, annotations: {
+            available: props.highlightAvailable,
+            highlights: paper.highlights ?? [],
+            change: change => props.highlight({ paperId: paper.id, change }),
+          } })
           : <ResearchNotes paper={paper} view={view} t={t} actions={actions} saveNote={props.saveNote} refresh={props.refresh} />}
     </div>
   </section>

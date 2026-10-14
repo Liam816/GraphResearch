@@ -6,12 +6,21 @@ import { z } from 'zod'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import type { ResearchCatalog, ResearchPaper, ResearchPaperId, ResearchTopicId } from './research-types.ts'
+import type { ResearchCatalog, ResearchPaper, ResearchPaperId, ResearchTopicId, ResearchHighlight, ResearchHighlightId } from './research-types.ts'
 
 const identity = z.string().regex(/^[A-Za-z0-9_-]+$/)
 const topicId = identity.transform(value => brandString<ResearchTopicId>(value))
 const paperId = identity.transform(value => brandString<ResearchPaperId>(value))
 const note = z.object({ text: z.string(), revision: z.number().int().nonnegative() })
+/** Validate annotation geometry at the file and Remote admission points. */
+export const researchHighlightSchema: z.ZodType<ResearchHighlight> = z.object({
+  id: identity.transform(value => brandString<ResearchHighlightId>(value)),
+  color: z.enum(['yellow', 'green', 'blue', 'pink', 'orange']), text: z.string().trim().min(1),
+  rects: z.array(z.object({
+    page: z.number().int().positive(), x: z.number().min(0).max(1), y: z.number().min(0).max(1),
+    width: z.number().positive().max(1), height: z.number().positive().max(1),
+  }).refine(rect => rect.x + rect.width <= 1.000001 && rect.y + rect.height <= 1.000001)).min(1),
+})
 const topic = z.object({
   id: topicId, title: z.string(), workspaceId: z.string().transform(value => brandString<ResearchCatalog['topics'][number]['workspaceId']>(value)),
   sessionId: z.string().transform(value => brandString<ResearchCatalog['topics'][number]['sessionId']>(value)), notes: note.optional(),
@@ -22,6 +31,7 @@ const paper = z.object({
   pdfPath: z.string(), repositoryUrl: z.string(), ai: note, learning: note,
   directory: z.string().optional(), sourceId: z.string().optional(), pdfSha256: z.string().optional(),
   source: z.string().optional(), progress: z.string().optional(),
+  highlights: z.array(researchHighlightSchema).optional(),
 })
 
 /** Existing storage-domain records remain readable during first-use file migration. */
@@ -158,10 +168,10 @@ export class ResearchFiles {
     const topics: Index['topics'] = [], papers: Index['papers'] = []
     for (const item of catalog.topics) topics.push({ ...item, notes: await prepare('topic', item.id, item.notes ?? { text: '', revision: 0 }) })
     for (const item of catalog.papers) {
-      const { directory: _directory, ai, learning, ...metadata } = item
+      const { directory: _directory, ai, learning, highlights, ...metadata } = item
       const folder = await this.path('papers', item.id)
       for (const child of ['notes', 'assets', 'extracted', 'code']) await mkdir(await this.path('papers', item.id, child), { recursive: true, mode: 0o700 })
-      papers.push({ ...metadata, topicIds: [...metadata.topicIds], pdfPath: item.pdfPath === '' ? '' : relative(folder, await this.path('papers', item.id, 'paper.pdf')),
+      papers.push({ ...metadata, ...highlights === undefined ? {} : { highlights: [...highlights] }, topicIds: [...metadata.topicIds], pdfPath: item.pdfPath === '' ? '' : relative(folder, await this.path('papers', item.id, 'paper.pdf')),
         ai: await prepare('ai', item.id, ai), learning: await prepare('learning', item.id, learning) })
     }
     const journal: Journal = { index: { version: 1, revision: catalog.revision, topics, papers }, writes }

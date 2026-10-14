@@ -4,7 +4,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { WorkspaceRemote } from './model.ts'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
-  ResearchDirectoryRequest, ResearchImportPaperRequest,
+  ResearchDirectoryRequest, ResearchImportPaperRequest, ResearchHighlightRequest,
 } from '../research-types.ts'
 
 /** Confirmed catalog and explicit transport lifecycle. */
@@ -22,7 +22,7 @@ export class ClientResearchModel {
 
   /** @param remote - generated Workspace namespace. */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper'>) {}
+    'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight'>) {}
 
   /** Fetch current durable data; failures preserve existing catalog entries. */
   async refresh(): Promise<void> {
@@ -62,6 +62,16 @@ export class ClientResearchModel {
    */
   async saveNote(request: ResearchSaveNoteRequest): Promise<void> {
     const result = await this.remote.researchSaveNote(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
+
+  /**
+   * Persist one PDF annotation change and publish the acknowledged library.
+   * @param request - paper identity and addition or removal.
+   */
+  async highlight(request: ResearchHighlightRequest): Promise<void> {
+    const result = await this.remote.researchHighlight(request)
     if (!result.ok) throw result.error
     this.accept(result.value)
   }

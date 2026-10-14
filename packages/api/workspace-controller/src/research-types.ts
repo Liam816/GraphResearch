@@ -7,6 +7,34 @@ import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 export type ResearchTopicId = Branded<'ResearchTopicId'>
 /** Stable identity of a paper, independent of its title and directory. */
 export type ResearchPaperId = Branded<'ResearchPaperId'>
+/** Stable identity of one text selection, including selections spanning several pages. */
+export type ResearchHighlightId = Branded<'ResearchHighlightId'>
+/** Named marker colors, rendered against the original PDF page. */
+export type ResearchHighlightColor = 'yellow' | 'green' | 'blue' | 'pink' | 'orange'
+
+/** A selected text rectangle relative to its displayed page, independent of zoom. */
+export interface ResearchHighlightRect {
+  readonly page: number
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
+/** Persisted text selection; coordinates are fractions of the original page dimensions. */
+export interface ResearchHighlight {
+  readonly id: ResearchHighlightId
+  readonly color: ResearchHighlightColor
+  readonly text: string
+  readonly rects: readonly ResearchHighlightRect[]
+}
+
+/** Idempotent additions and removals preserve other readers' highlights. */
+export interface ResearchHighlightRequest {
+  readonly paperId: ResearchPaperId
+  readonly change: { readonly type: 'add'; readonly highlight: ResearchHighlight }
+    | { readonly type: 'remove'; readonly id: ResearchHighlightId }
+}
 /** Editable notebook classification. */
 export type ResearchNoteKind = 'ai' | 'learning'
 
@@ -37,6 +65,8 @@ export interface ResearchPaper {
   readonly repositoryUrl: string
   readonly ai: ResearchNote
   readonly learning: ResearchNote
+  /** PDF text selections stored with the paper metadata; absent in unannotated libraries. */
+  readonly highlights?: readonly ResearchHighlight[] | undefined
   /** Absolute managed directory in the Host filesystem. */
   readonly directory?: string | undefined
   /** arXiv or DOI identity used to reuse an existing paper. */
@@ -54,6 +84,8 @@ export interface ResearchCatalog {
   readonly revision: number
   readonly topics: readonly ResearchTopic[]
   readonly papers: readonly ResearchPaper[]
+  /** Runtime capabilities of the responding Host; absent in older backends and never persisted. */
+  readonly capabilities?: { readonly pdfHighlights: true } | undefined
   /** Absolute managed library root. */
   readonly directory?: string | undefined
 }
