@@ -8,8 +8,16 @@ import { DirectoryPickerController } from './directory-picker.ts'
 import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
 import { ResearchCatalogHost } from './research.ts'
+import { resolve } from 'node:path'
+import type {} from '@deepseek-ai/dsh-api-session-controller'
+import type { Agent } from '@deepseek-ai/dsh-agent'
+import * as ResearchAgent from './research-agent.ts'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
-import type { ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId } from './research-types.ts'
+import type {
+  ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
+  ResearchDirectoryRequest, ResearchFollowFrame, ResearchImportPaperRequest, ResearchReadPaperRequest, ResearchPaperText, ResearchTopicId,
+  ResearchAttachPdfRequest,
+} from './research-types.ts'
 import type {
   WorkspaceArchiveSessionRequest,
   WorkspaceArchiveValue,
@@ -38,10 +46,28 @@ export interface Config {
   documentsDirectory?: string
   /** Maximum duration of the operating system's Documents lookup. */
   documentsLookupTimeoutMs?: number
+  /** Absolute initial research library; the persisted selection takes precedence after first use. */
+  researchDirectory?: string
+  /** Maximum bytes in one Markdown notebook. */
+  researchMaxNoteBytes?: number
+  /** Maximum bytes in one imported PDF. */
+  researchMaxPdfBytes?: number
+  /** PDF download timeout in milliseconds. */
+  researchDownloadTimeoutMs?: number
+  /** Maximum pages in one Agent reading call. */
+  researchMaxReadPages?: number
+  /** Maximum original characters returned by one reading call. */
+  researchMaxReadCharacters?: number
+  /** Maximum wait for another library writer in milliseconds. */
+  researchLockTimeoutMs?: number
+  /** File must remain stable for this many milliseconds before external edits are published. */
+  researchWatchStabilityMs?: number
+  /** File stability polling interval in milliseconds. */
+  researchWatchPollMs?: number
 }
 
 /** Directory policy after schema defaults have been applied. */
-type ResolvedConfig = Config & { documentsLookupTimeoutMs: number }
+type ResolvedConfig = Required<Omit<Config, 'documentsDirectory'>> & Pick<Config, 'documentsDirectory'>
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -52,7 +78,7 @@ declare module '@deepseek-ai/cordis' {
 
 /** Host service backing the generated `ctx.remote.workspace` namespace. */
 export class WorkspaceController extends TypertRemoteService {
-  static inject = ['typert', 'workspaceRegistry', 'storageDomain']
+  static inject = ['typert', 'workspaceRegistry', 'storageDomain', 'sessionController', 'agents', 'sessions', 'sessionPersistence']
 
   /**
    * Prepare canonical references for selected paper sessions.
@@ -73,12 +99,22 @@ export class WorkspaceController extends TypertRemoteService {
   static Config: z<Config, ResolvedConfig> = z.object({
     documentsDirectory: z.string(),
     documentsLookupTimeoutMs: z.natural().min(1).default(10_000),
+    researchDirectory: z.string().default(resolve(process.cwd(), 'data')),
+    researchMaxNoteBytes: z.natural().min(1).default(8 * 1024 * 1024),
+    researchMaxPdfBytes: z.natural().min(1).default(64 * 1024 * 1024),
+    researchDownloadTimeoutMs: z.natural().min(1).default(60_000),
+    researchMaxReadPages: z.natural().min(1).default(20),
+    researchMaxReadCharacters: z.natural().min(1).default(60_000),
+    researchLockTimeoutMs: z.natural().min(1).default(10_000),
+    researchWatchStabilityMs: z.natural().min(1).default(250),
+    researchWatchPollMs: z.natural().min(1).default(100),
   })
 
   private readonly config: ResolvedConfig
   private readonly commands: WorkspaceCommands
   private readonly feed: WorkspaceFeed
   private readonly research: ResearchCatalogHost
+  private readonly researchAgents = new WeakSet<Agent>()
 
   /**
    * @param ctx - Host context containing the Workspace registry.
@@ -90,7 +126,19 @@ export class WorkspaceController extends TypertRemoteService {
     if (this.config.documentsDirectory !== undefined) validateDocumentsDirectory(this.config.documentsDirectory)
     this.commands = new WorkspaceCommands(ctx)
     this.feed = new WorkspaceFeed(ctx)
-    this.research = new ResearchCatalogHost(ctx)
+    this.research = new ResearchCatalogHost(ctx, {
+      directory: this.config.researchDirectory, maxNoteBytes: this.config.researchMaxNoteBytes,
+      maxPdfBytes: this.config.researchMaxPdfBytes, downloadTimeoutMs: this.config.researchDownloadTimeoutMs,
+      maxReadPages: this.config.researchMaxReadPages, maxReadCharacters: this.config.researchMaxReadCharacters,
+      lockTimeoutMs: this.config.researchLockTimeoutMs,
+      watchStabilityMs: this.config.researchWatchStabilityMs, watchPollMs: this.config.researchWatchPollMs,
+    })
+    ctx.on('agent/created', async ({ agent }) => {
+      const catalog = this.research.current()
+      if (catalog.topics.some(item => item.sessionId === agent.id) || catalog.papers.some(item => item.sessionId === agent.id)) {
+        await this.bindResearchAgent(agent)
+      }
+    })
     // This package is the Loader entry for both Remote owners it hosts: the
     // directory-picking seam is abstract and never an entry itself. The child
     // stays pending until a picking backend is composed, so a host without one
@@ -222,8 +270,10 @@ export class WorkspaceController extends TypertRemoteService {
    * @returns the current durable topic, paper and notebook catalog.
    */
   @Remote('researchList')
-  researchList(): Promise<ResearchCatalog> {
-    return this.research.read()
+  async researchList(): Promise<ResearchCatalog> {
+    const catalog = await this.research.read()
+    await this.bindResearchAgents(catalog)
+    return catalog
   }
 
   /**
@@ -232,8 +282,10 @@ export class WorkspaceController extends TypertRemoteService {
    * @returns the committed catalog.
    */
   @Remote('researchCreateTopic')
-  researchCreateTopic(request: ResearchCreateTopicRequest): Promise<ResearchCatalog> {
-    return this.research.createTopic(request)
+  async researchCreateTopic(request: ResearchCreateTopicRequest): Promise<ResearchCatalog> {
+    const catalog = await this.research.createTopic(request)
+    await this.bindResearchAgents(catalog)
+    return catalog
   }
 
   /**
@@ -242,8 +294,10 @@ export class WorkspaceController extends TypertRemoteService {
    * @returns the committed catalog.
    */
   @Remote('researchCreatePaper')
-  researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog> {
-    return this.research.createPaper(request)
+  async researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog> {
+    const catalog = await this.research.createPaper(request)
+    await this.bindResearchAgents(catalog)
+    return catalog
   }
 
   /**
@@ -254,6 +308,106 @@ export class WorkspaceController extends TypertRemoteService {
   @Remote('researchSaveNote')
   researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog> {
     return this.research.saveNote(request)
+  }
+
+  /**
+   * Read the confirmed in-memory library.
+   * @returns confirmed research context for scoped Agent prompt providers.
+   */
+  researchCurrent(): ResearchCatalog { return this.research.current() }
+
+  /**
+   * Observe library and notebook changes.
+   * @param signal - caller lifetime.
+   * @returns full library snapshots and file-observation failures.
+   */
+  @Remote({ mode: 'stream' })
+  researchFollow(signal: AbortSignal): AsyncIterable<ResearchFollowFrame> { return this.research.follow(signal) }
+
+  /**
+   * Select or migrate the managed library.
+   * @param request - absolute destination and open or migrate operation.
+   * @returns selected library after durable selection.
+   */
+  @Remote('researchConfigure')
+  researchConfigure(request: ResearchDirectoryRequest): Promise<ResearchCatalog> { return this.research.configure(request) }
+
+  /**
+   * Register an independent Session and optionally import a local or downloaded PDF.
+   * @param request - Topic, title and optional original source.
+   * @param signal - caller cancellation.
+   * @returns selected paper identity and its complete library projection.
+   */
+  @Remote('researchImportPaper')
+  async researchImportPaper(
+    request: ResearchImportPaperRequest, signal: AbortSignal,
+  ): Promise<{ readonly catalog: ResearchCatalog; readonly paperId: ResearchPaperId }> {
+    const result = await this.research.importPaper(request, async workspaceId =>
+      (await this.ctx.sessionController.create({ workspaceId })).sessionId, signal)
+    await this.bindResearchAgents(result.catalog)
+    return result
+  }
+
+  /**
+   * Supply an existing paper's PDF while preserving its Session and notebooks.
+   * @param request - target paper and local or HTTP(S) PDF source.
+   * @param signal - caller cancellation.
+   * @returns committed library with the attached original.
+   */
+  @Remote('researchAttachPdf')
+  researchAttachPdf(request: ResearchAttachPdfRequest, signal: AbortSignal): Promise<ResearchCatalog> {
+    return this.research.attachPdf(request, signal)
+  }
+
+  /**
+   * Read a bounded original page range.
+   * @param request - bounded original PDF page range.
+   * @param signal - cancellation.
+   * @returns extracted text with original page numbers.
+   */
+  @Remote('researchReadPaper')
+  researchReadPaper(request: ResearchReadPaperRequest, signal: AbortSignal): Promise<ResearchPaperText> {
+    return this.research.readPaper(request, signal)
+  }
+
+  /**
+   * Save the paper continuation point.
+   * @param paperId - owning paper.
+   * @param text - continuation point and questions.
+   * @returns committed library.
+   */
+  @Remote('researchProgress')
+  researchProgress(paperId: ResearchPaperId, text: string): Promise<ResearchCatalog> { return this.research.progress(paperId, text) }
+
+  /**
+   * Save a revision-checked Topic summary.
+   * @param topicId - owning Topic.
+   * @param text - Markdown comparison.
+   * @param revision - last read revision.
+   * @returns committed library.
+   */
+  @Remote('researchTopicNote')
+  researchTopicNote(topicId: ResearchTopicId, text: string, revision: number): Promise<ResearchCatalog> {
+    return this.research.topicNote(topicId, text, revision)
+  }
+
+  private async bindResearchAgents(catalog: ResearchCatalog): Promise<void> {
+    const agents = this.ctx.get('agents')
+    if (agents === undefined) return
+    for (const item of [...catalog.topics, ...catalog.papers]) {
+      const agent = agents.get(item.sessionId)
+      if (agent !== undefined) await this.bindResearchAgent(agent)
+    }
+  }
+
+  private async bindResearchAgent(agent: Agent): Promise<void> {
+    if (this.researchAgents.has(agent)) return
+    this.researchAgents.add(agent)
+    try {
+      await this.research.captureSession(agent.session)
+      const fiber = await agent.ctx.plugin(ResearchAgent)
+      this.ctx.effect(() => () => fiber.dispose(), 'workspace-controller: research Agent tools')
+    } catch (error: unknown) { this.researchAgents.delete(agent); throw error }
   }
 }
 

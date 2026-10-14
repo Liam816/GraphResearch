@@ -60,4 +60,13 @@ describe('workspace snapshots', () => {
       { path: 'nul.bin', kind: 'binary', base64: 'YQBi' },
     ])
   })
+
+  it('represents committed empty subdirectories and rejects a marker beside real contents', async () => {
+    const directory = await root()
+    await mkdir(join(directory, 'code'))
+    await writeFile(join(directory, 'code', EMPTY_WORKSPACE_MARKER), '')
+    expect(await captureExpectedWorkspaceSnapshot(directory)).toEqual([{ path: 'code', kind: 'empty-directory' }])
+    await writeFile(join(directory, 'code', 'unexpected.txt'), 'contents')
+    await expect(captureExpectedWorkspaceSnapshot(directory)).rejects.toThrow('marker has sibling contents')
+  })
 })

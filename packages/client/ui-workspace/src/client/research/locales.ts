@@ -1,11 +1,20 @@
 /** Product and accessibility copy for the research workspace. */
 export const zh = {
+  librarySettings: '论文资料目录', libraryDirectory: '资料目录', directoryMode: '操作方式', applyDirectory: '应用目录',
+  openLibrary: '打开另一资料库', migrateLibrary: '迁移当前资料库',
+  openLibraryHint: '输入后端所在机器的绝对路径。已有资料库会直接打开，空目录会初始化为新的资料库。',
+  migrateLibraryHint: '将当前资料复制到一个空目录，完成后使用新目录。原目录保留。',
+  directoryChangeFailed: '目录操作未完成。请检查路径、目录内容和访问权限后重试',
+  managedWorkspace: '会话和论文资料使用当前资料库目录', latestSaved: '查看最新保存版本',
   research: '研究目录', search: '搜索 Topic 或论文', createTopic: '新建 Topic', addPaper: '添加论文',
   empty: '从一个研究主题开始', emptyHint: '创建 Topic，再添加论文、PDF 和阅读笔记。',
   topic: 'Topic', paper: '论文', title: '名称', workspace: '工作目录', pdfPath: 'PDF 文件路径', repository: '代码仓库',
-  pdfHint: '填写工作目录内的 PDF 路径，例如 papers/rt-2.pdf。', repositoryHint: '可选，填写开源仓库的 HTTP(S) 链接。',
+  pdfHint: '可选，填写本地 PDF 路径或下载链接；也可以先创建论文，再让 Agent 下载原文。', repositoryHint: '可选，填写开源仓库的 HTTP(S) 链接。',
+  pdfMissing: '尚未添加 PDF 原文', pdfMissingHint: '可以在 Agent 对话中说「帮我下载这篇论文」，也可以附上论文链接。下载完成后会自动显示在这里。',
   cancel: '取消', create: '创建', creating: '创建中…', close: '关闭', loading: '正在读取研究目录…', retry: '重试',
   failed: '操作未完成，请重试。你的数据已保留。', directoryFailed: '研究目录暂时无法读取。',
+  backendRestartRequired: '前端已更新，当前后端尚不支持论文资料库。请停止并重新启动项目服务，然后刷新页面',
+  createFailed: '创建未完成，填写内容已保留。请刷新研究目录确认是否已经创建，再决定是否重试',
   noWorkspaces: '请先在下方添加一个工作目录。', noResults: '没有匹配的 Topic 或论文',
   agent: 'Agent 对话', pdf: 'PDF 原文', notes: '阅读笔记', ai: 'AI 笔记', learning: '学习笔记',
   panels: '面板显示', panelFocus: '切换阅读面板', show: '展开 {panel}', viewPanel: '查看 {panel}',
@@ -25,7 +34,7 @@ export const zh = {
   topicDescription: '围绕这个 Topic 提问、梳理阅读路线，或对比多篇论文。',
   independent: '独立会话', general: 'Agent 工作区', paperCount: '{count} 篇论文', expand: '展开 {title}', fold: '折叠 {title}',
   codeMissing: '尚未关联代码仓库', original: '打开原文', invalid: '请检查名称、PDF 路径和仓库链接。',
-  aiHint: '可将 Agent 的解读整理到这里，AI 笔记与个人学习笔记分别保存。',
+  aiHint: 'Agent 写入后会自动更新这里的 Markdown 预览，未保存的编辑草稿会保留',
   copy: '复制代码', copied: '已复制', footnotes: '脚注',
 } satisfies Record<string, string>
 
@@ -33,12 +42,21 @@ export const zh = {
 export type ResearchKey = keyof typeof zh
 /** English research dictionary. */
 export const en = {
+  librarySettings: 'Paper library directory', libraryDirectory: 'Library directory', directoryMode: 'Operation', applyDirectory: 'Apply directory',
+  openLibrary: 'Open another library', migrateLibrary: 'Migrate current library',
+  openLibraryHint: 'Enter an absolute path on the Host machine. Existing libraries open directly; empty directories become new libraries.',
+  migrateLibraryHint: 'Copy the current library into an empty directory and use it after completion. The original directory is retained.',
+  directoryChangeFailed: 'Directory operation failed. Check the path, directory contents, and access permissions, then retry.',
+  managedWorkspace: 'Sessions and paper resources use the selected library directory.', latestSaved: 'View latest saved version',
   research: 'Research library', search: 'Search topics or papers', createTopic: 'New topic', addPaper: 'Add paper',
   empty: 'Start with a research topic', emptyHint: 'Create a topic, then add papers, PDFs, and reading notes.',
   topic: 'Topic', paper: 'Paper', title: 'Title', workspace: 'Working directory', pdfPath: 'PDF file path', repository: 'Code repository',
-  pdfHint: 'Enter a PDF path inside the working directory, such as papers/rt-2.pdf.', repositoryHint: 'Optional HTTP(S) link to the open source repository.',
+  pdfHint: 'Optional local PDF path or download URL. You can create the paper first and ask its Agent to download the original later.', repositoryHint: 'Optional HTTP(S) link to the open source repository.',
+  pdfMissing: 'No original PDF yet', pdfMissingHint: 'Ask the paper’s Agent to download the original, or share a paper link in the chat. The PDF will appear here automatically when ready.',
   cancel: 'Cancel', create: 'Create', creating: 'Creating…', close: 'Close', loading: 'Loading research library…', retry: 'Retry',
   failed: 'The operation failed. Your data was retained. Please retry.', directoryFailed: 'The research library is unavailable.',
+  backendRestartRequired: 'The frontend was updated, but this backend does not support the paper library. Stop and restart the project server, then reload the page.',
+  createFailed: 'Creation did not complete. Your form entries were retained. Refresh the library to check whether the item was created before retrying.',
   noWorkspaces: 'Add a working directory below first.', noResults: 'No matching topics or papers',
   agent: 'Agent chat', pdf: 'Original PDF', notes: 'Reading notes', ai: 'AI notes', learning: 'Learning notes',
   panels: 'Panel visibility', panelFocus: 'Reading panel', show: 'Show {panel}', viewPanel: 'View {panel}',
@@ -58,6 +76,6 @@ export const en = {
   topicDescription: 'Ask about this topic, plan your reading, or compare papers.',
   independent: 'Independent session', general: 'Agent workspace', paperCount: '{count} papers', expand: 'Expand {title}', fold: 'Collapse {title}',
   codeMissing: 'No code repository linked', original: 'Open original', invalid: 'Check the title, PDF path, and repository URL.',
-  aiHint: 'Collect the Agent’s explanations here. AI notes and personal learning notes are saved separately.',
+  aiHint: 'Agent writes update this Markdown preview automatically. Unsaved editor drafts are retained.',
   copy: 'Copy code', copied: 'Copied', footnotes: 'Footnotes',
 } satisfies Record<ResearchKey, string>

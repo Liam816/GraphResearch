@@ -44,20 +44,37 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 -----
 
+<a id="research-catalog"></a>
 ### 研究目录
 
-`research` storage domain 管理稳定的 Topic 和论文身份、各自独立的 Session 绑定、PDF 路径、仓库链接，以及分别记录版本的 AI 笔记和学习笔记。`researchList`、`researchCreateTopic`、`researchCreatePaper` 和 `researchSaveNote` 返回带版本的完整目录。实体 Session 必须归属所选工作目录，实体间不能共用 Session。使用相同 Session 和元数据重试创建是幂等的。笔记写入由 Host 串行处理并要求 `expectedRevision`，版本冲突会拒绝请求而不修改已保存笔记。Client 的 `ctx.research` 在读取失败时保留已确认目录，按版本顺序接收命令响应。刷新读取外部编辑，笔记版本检查防止另一浏览器静默覆盖修改。
+论文资料库初始位置为 `<启动目录>/data`；`researchDirectory` 配置初始后端绝对路径，之后以界面持久化的目录选择为准。`library.json` 管理 Topic 和论文元数据。稳定的 `papers/<paper-id>/` 子目录包含可选的 `paper.pdf`、`paper.json`、`notes/ai.md`、`notes/learning.md`、`extracted/`、`code/` 和 `assets/`。Markdown 文件保存笔记正文，索引记录版本与内容摘要。Topic 使用 `topics/<topic-id>/notes.md`。首次使用会迁移已有科研 domain 记录，此后 domain 仅保留选中的资料目录。缺失的旧 PDF 不影响笔记读取，可补充到对应的 `paper.pdf` 位置。
 
-`researchMentions` 为最多三篇所选论文返回规范 Session 引用。用户发送提示词之前，引用仅保留在草稿中；上下文捕获和日志记录由已有 Session-reference 服务负责。目录元数据和笔记不会自动对模型可见，Session 持久化格式保持不变。
+`researchImportPaper` 可仅凭标题创建论文，也可同时复制本地 PDF 或下载 HTTP(S) 来源。未添加原文时 `pdfPath` 为空。`researchAttachPdf` 为现有论文补充 PDF，保留论文身份、Session 和笔记；相同内容可安全重试，不同的已有 PDF 拒绝覆盖。显式补充 PDF 时，即使另一论文具有相同内容，也保留目标实体。匹配的 arXiv/DOI 身份或相同 PDF 字节复用现有论文并增加 Topic 关联。带版本的 arXiv 标识保留版本。各实体使用独立 Session。`researchReadPaper` 返回有页码的有限原文，并在论文目录下缓存结果；纯图片页面需要 OCR。`researchProgress` 保存续读位置，`researchTopicNote` 保存有版本检查的对比总结。
+
+`researchFollow` 推送完整基线，以及已提交或外部观察到的笔记变更快照；重连启动新基线。浏览器草稿与已确认正文分别保留。协作进程间串行写入，检查 `expectedRevision`，并通过可恢复的事务日志发布 Markdown 与元数据。过期编辑不会写入文件。I/O 失败可能留下未完成的事务日志；重试前刷新以完成恢复，恢复期间发生冲突的外部修改会明确报告而不被覆盖。元数据无效、笔记文件缺失或监听失败时，浏览器保留已确认内容并显示问题。受管理路径拒绝符号链接。
+
+`researchConfigure` 打开另一资料库，或将当前资料复制到空目录，并在准备完成后持久化目录选择。迁移保留原目录。科研 Session 通过显式读取已有持久化提供方，在各实体目录内维护 `session.json` 快照；原有 Session 代次保持不变。部署限制可通过 `researchMaxNoteBytes`、`researchMaxPdfBytes`、`researchDownloadTimeoutMs`、`researchMaxReadPages`、`researchMaxReadCharacters`、`researchLockTimeoutMs`、`researchWatchStabilityMs` 和 `researchWatchPollMs` 配置。
+
+`researchMentions` 为最多三篇所选论文返回规范 Session 引用。用户发送提示词之前，引用仅保留在草稿中；上下文捕获和日志记录由已有 Session-reference 服务负责。Session 持久化格式保持不变。
+
+打开复制的资料库时，仅在原生持久化提供方没有对应 Session 的情况下恢复兼容的 `session.json` 快照，并修复缺失的 Workspace 关联。已有原生日志仍是依据。快照在 Session 事件后更新；备份附件和其他框架状态时仍需保留 Harness home。自定义 Host 组合除已有控制器依赖外，还必须提供 `agents`、`sessionController` 和 `sessionPersistence`；项目自带的 Web profile 已包含这些服务。
 
 <a id="model-experience"></a>
 ## 模型体验
 
-无，因为 Workspace 组织属于浏览器和 Host 的控制状态，并且不注册提示词、工具或会话事件。
+### 科研上下文与笔记
+
+#### 模型看到的内容
+
+普通 Workspace 组织不贡献提示词或工具。科研实体的 Agent 获得作用域内的 `research_context`、`research_import_paper`、`research_attach_pdf`、`research_read_paper`、`research_write_note`、`research_update_progress` 和 `research_write_topic_note` 工具。必要的运行上下文包含资料库、论文目录、PDF 原文、笔记版本和续读位置。这些信息通过已有提示词上下文准入记录；工具调用和结果使用标准 Session 工具事件。笔记正文通过 `research_context` 显式读取。修改学习笔记要求用户明确提出。
+
+#### Token 影响
+
+科研工具在科研 Agent 请求中增加 schema。必要上下文包含路径、身份标识、版本和续读位置；读取笔记或 PDF 时，通过工具结果加入所请求的正文。PDF 页数和字符数限制约束每次提取的内容量。
 
 #### KV Cache 影响
 
-无直接影响；Workspace 变更不会改变模型请求。
+普通 Workspace 变更不会改变请求。科研笔记版本、目录变化和续读位置在请求准入时替换已记录的运行上下文；工具 schema 仅属于科研实体的 Agent 作用域。
 
 ## 已知限制与延期工作
 
@@ -65,6 +82,7 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 - `follow()` 在重连后替换完整投影，不提供持久 cursor 或增量追赶协议。
 - 进程内删除标记只会在 Client 模型生命周期内阻止延迟数据复活已移除的 Workspace。
+- Session 快照恢复保留记录中的工作目录路径。跨机器迁移资料库时，原工作目录需要仍可访问；当前不支持自动改写 Session 路径。
 
 
 <a id="dev-note"></a>

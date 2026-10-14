@@ -3686,6 +3686,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Host service backing the generated `ctx.remote.workspace` namespace.',
     methods: [
       {
+        signature: '@Remote(\'researchMentions\') async researchMentions(paperIds: readonly ResearchPaperId[]): Promise<readonly string[]>',
+        description: 'Prepare canonical references for selected paper sessions.',
+        parameters: [{ name: 'paperIds', description: 'up to three paper identities.' }],
+        returns: 'canonical prompt references for the selected paper sessions.',
+      },
+      {
         signature: '@Remote(\'create\') create(request: WorkspaceCreateRequest): Promise<WorkspaceCreateValue>',
         description: 'Create or idempotently resolve one Workspace over an existing directory.',
         parameters: [{ name: 'request', description: 'directory path to register.' }],
@@ -3750,6 +3756,78 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Stream a complete Workspace baseline followed by ordered increments.',
         parameters: [{ name: 'signal', description: 'generation cancellation.' }],
         returns: 'baseline followed by ordered Workspace increments.',
+      },
+      {
+        signature: '@Remote(\'researchList\') async researchList(): Promise<ResearchCatalog>',
+        description: 'Read the confirmed research catalog.',
+        parameters: [],
+        returns: 'the current durable topic, paper and notebook catalog.',
+      },
+      {
+        signature: '@Remote(\'researchCreateTopic\') async researchCreateTopic(request: ResearchCreateTopicRequest): Promise<ResearchCatalog>',
+        description: 'Apply the requested research operation.',
+        parameters: [{ name: 'request', description: 'Topic metadata and its independent Session.' }],
+        returns: 'the committed catalog.',
+      },
+      {
+        signature: '@Remote(\'researchCreatePaper\') async researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog>',
+        description: 'Apply the requested research operation.',
+        parameters: [{ name: 'request', description: 'Paper metadata and its independent Session.' }],
+        returns: 'the committed catalog.',
+      },
+      {
+        signature: '@Remote(\'researchSaveNote\') researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog>',
+        description: 'Apply the requested research operation.',
+        parameters: [{ name: 'request', description: 'Notebook edit and acknowledged revision.' }],
+        returns: 'the committed catalog; conflicts preserve the previous notebook.',
+      },
+      {
+        signature: 'researchCurrent(): ResearchCatalog',
+        description: 'Read the confirmed in-memory library.',
+        parameters: [],
+        returns: 'confirmed research context for scoped Agent prompt providers.',
+      },
+      {
+        signature: '@Remote({ mode: \'stream\' }) researchFollow(signal: AbortSignal): AsyncIterable<ResearchFollowFrame>',
+        description: 'Observe library and notebook changes.',
+        parameters: [{ name: 'signal', description: 'caller lifetime.' }],
+        returns: 'full library snapshots and file-observation failures.',
+      },
+      {
+        signature: '@Remote(\'researchConfigure\') researchConfigure(request: ResearchDirectoryRequest): Promise<ResearchCatalog>',
+        description: 'Select or migrate the managed library.',
+        parameters: [{ name: 'request', description: 'absolute destination and open or migrate operation.' }],
+        returns: 'selected library after durable selection.',
+      },
+      {
+        signature: '@Remote(\'researchImportPaper\') async researchImportPaper( request: ResearchImportPaperRequest, signal: AbortSignal, ): Promise<{ readonly catalog: ResearchCatalog; readonly paperId: ResearchPaperId }>',
+        description: 'Register an independent Session and optionally import a local or downloaded PDF.',
+        parameters: [{ name: 'request', description: 'Topic, title and optional original source.' }, { name: 'signal', description: 'caller cancellation.' }],
+        returns: 'selected paper identity and its complete library projection.',
+      },
+      {
+        signature: '@Remote(\'researchAttachPdf\') researchAttachPdf(request: ResearchAttachPdfRequest, signal: AbortSignal): Promise<ResearchCatalog>',
+        description: 'Supply an existing paper\'s PDF while preserving its Session and notebooks.',
+        parameters: [{ name: 'request', description: 'target paper and local or HTTP(S) PDF source.' }, { name: 'signal', description: 'caller cancellation.' }],
+        returns: 'committed library with the attached original.',
+      },
+      {
+        signature: '@Remote(\'researchReadPaper\') researchReadPaper(request: ResearchReadPaperRequest, signal: AbortSignal): Promise<ResearchPaperText>',
+        description: 'Read a bounded original page range.',
+        parameters: [{ name: 'request', description: 'bounded original PDF page range.' }, { name: 'signal', description: 'cancellation.' }],
+        returns: 'extracted text with original page numbers.',
+      },
+      {
+        signature: '@Remote(\'researchProgress\') researchProgress(paperId: ResearchPaperId, text: string): Promise<ResearchCatalog>',
+        description: 'Save the paper continuation point.',
+        parameters: [{ name: 'paperId', description: 'owning paper.' }, { name: 'text', description: 'continuation point and questions.' }],
+        returns: 'committed library.',
+      },
+      {
+        signature: '@Remote(\'researchTopicNote\') researchTopicNote(topicId: ResearchTopicId, text: string, revision: number): Promise<ResearchCatalog>',
+        description: 'Save a revision-checked Topic summary.',
+        parameters: [{ name: 'topicId', description: 'owning Topic.' }, { name: 'text', description: 'Markdown comparison.' }, { name: 'revision', description: 'last read revision.' }],
+        returns: 'committed library.',
       },
     ],
   },
@@ -6496,6 +6574,70 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'RequestUserInput',
     declaration: 'export interface RequestUserInput {\n    readonly role: \'user\';\n    readonly content: UserMessage[\'content\'];\n    readonly id?: never;\n    readonly source?: never;\n}',
+  },
+  {
+    name: 'ResearchAttachPdfRequest',
+    declaration: 'export interface ResearchAttachPdfRequest {\n    readonly paperId: ResearchPaperId;\n    readonly source: string;\n}',
+  },
+  {
+    name: 'ResearchCatalog',
+    declaration: 'export interface ResearchCatalog {\n    readonly revision: number;\n    readonly topics: readonly ResearchTopic[];\n    readonly papers: readonly ResearchPaper[];\n    readonly directory?: string | undefined;\n}',
+  },
+  {
+    name: 'ResearchCreatePaperRequest',
+    declaration: 'export interface ResearchCreatePaperRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly sessionId: SessionId;\n    readonly pdfPath?: string;\n    readonly repositoryUrl: string;\n    readonly sourceId?: string;\n}',
+  },
+  {
+    name: 'ResearchCreateTopicRequest',
+    declaration: 'export interface ResearchCreateTopicRequest {\n    readonly title: string;\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'ResearchDirectoryRequest',
+    declaration: 'export interface ResearchDirectoryRequest {\n    readonly directory: string;\n    readonly mode: \'open\' | \'migrate\';\n}',
+  },
+  {
+    name: 'ResearchFollowFrame',
+    declaration: 'export type ResearchFollowFrame = {\n    readonly type: \'baseline\';\n    readonly catalog: ResearchCatalog;\n} | {\n    readonly type: \'changed\';\n    readonly catalog: ResearchCatalog;\n} | {\n    readonly type: \'error\';\n    readonly message: string;\n};',
+  },
+  {
+    name: 'ResearchImportPaperRequest',
+    declaration: 'export interface ResearchImportPaperRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly source?: string;\n    readonly sourceId?: string;\n    readonly repositoryUrl?: string;\n}',
+  },
+  {
+    name: 'ResearchNote',
+    declaration: 'export interface ResearchNote {\n    readonly text: string;\n    readonly revision: number;\n}',
+  },
+  {
+    name: 'ResearchNoteKind',
+    declaration: 'export type ResearchNoteKind = \'ai\' | \'learning\';',
+  },
+  {
+    name: 'ResearchPaper',
+    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
+  },
+  {
+    name: 'ResearchPaperId',
+    declaration: 'export type ResearchPaperId = Branded<\'ResearchPaperId\'>;',
+  },
+  {
+    name: 'ResearchPaperText',
+    declaration: 'export interface ResearchPaperText {\n    readonly paperId: ResearchPaperId;\n    readonly totalPages: number;\n    readonly pages: readonly {\n        readonly page: number;\n        readonly text: string;\n    }[];\n    readonly truncated: boolean;\n}',
+  },
+  {
+    name: 'ResearchReadPaperRequest',
+    declaration: 'export interface ResearchReadPaperRequest {\n    readonly paperId: ResearchPaperId;\n    readonly startPage?: number;\n    readonly pageCount?: number;\n}',
+  },
+  {
+    name: 'ResearchSaveNoteRequest',
+    declaration: 'export interface ResearchSaveNoteRequest {\n    readonly paperId: ResearchPaperId;\n    readonly kind: ResearchNoteKind;\n    readonly text: string;\n    readonly expectedRevision: number;\n}',
+  },
+  {
+    name: 'ResearchTopic',
+    declaration: 'export interface ResearchTopic {\n    readonly id: ResearchTopicId;\n    readonly title: string;\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n    readonly notes?: ResearchNote | undefined;\n}',
+  },
+  {
+    name: 'ResearchTopicId',
+    declaration: 'export type ResearchTopicId = Branded<\'ResearchTopicId\'>;',
   },
   {
     name: 'ResolvedAlwaysRetryPolicy',

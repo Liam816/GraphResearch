@@ -104,10 +104,19 @@ export async function captureWorkspaceSnapshot(
 }
 
 /**
- * Capture a committed `workspace.expected/` tree, excluding its Git-only empty marker.
+ * Capture a committed tree; an otherwise empty directory may contain a Git-only `.empty` marker.
  * @param root - Absolute expected-workspace directory.
  * @returns Stable expected entries.
  */
-export function captureExpectedWorkspaceSnapshot(root: string): Promise<WorkspaceSnapshotEntry[]> {
-  return captureWorkspaceSnapshot(root, { ignoredRootEntries: [EMPTY_WORKSPACE_MARKER] })
+export async function captureExpectedWorkspaceSnapshot(root: string): Promise<WorkspaceSnapshotEntry[]> {
+  const entries = await captureWorkspaceSnapshot(root, { ignoredRootEntries: [EMPTY_WORKSPACE_MARKER] })
+  return entries.map((entry) => {
+    const suffix = `/${EMPTY_WORKSPACE_MARKER}`
+    if (!entry.path.endsWith(suffix)) return entry
+    const directory = entry.path.slice(0, -suffix.length)
+    if (entries.some(other => other !== entry && other.path.startsWith(`${directory}/`))) {
+      throw new Error(`Expected empty-directory marker has sibling contents: ${entry.path}`)
+    }
+    return { path: directory, kind: 'empty-directory' }
+  })
 }

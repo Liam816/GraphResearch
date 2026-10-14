@@ -3,6 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { UiWorkspace } from '../navigation.ts'
 import type { ResearchInjected } from './contract.ts'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { createResearchViewStore, type ResearchViewStore } from './store.ts'
 import { ResearchDirectory } from './Directory.tsx'
@@ -21,7 +22,7 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
   const instance = handle.create()
   const store: typeof handle = { ...handle, create: () => instance }
   const pending = new Map<string, Promise<Parameters<ResearchInjected['open']>[0]>>()
-  const createSession = (key: string, workspaceId: Parameters<ResearchInjected['createTopic']>[0]['workspaceId']) => {
+  const createSession = (key: string, workspaceId: WorkspaceId) => {
     let session = pending.get(key)
     if (session === undefined) {
       session = ctx.sessions.create({ workspaceId })
@@ -35,11 +36,15 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     open,
     refresh: () => ctx.research.refresh(),
     saveNote: request => ctx.research.saveNote(request),
+    configureDirectory: request => ctx.research.configure(request),
     mentions: ids => ctx.research.mentions(ids),
     createTopic: async (request) => {
-      const key = JSON.stringify(['topic', request.workspaceId, request.title])
-      const sessionId = await createSession(key, request.workspaceId)
-      await ctx.research.createTopic({ ...request, sessionId })
+      const directory = ctx.research.state.getSnapshot().catalog.directory
+      if (directory === undefined) throw new Error('Research library directory is not ready')
+      const workspace = await ctx.workspaces.create({ path: directory })
+      const key = JSON.stringify(['topic', workspace.workspaceId, request.title])
+      const sessionId = await createSession(key, workspace.workspaceId)
+      await ctx.research.createTopic({ ...request, workspaceId: workspace.workspaceId, sessionId })
       pending.delete(key)
       const topic = ctx.research.state.getSnapshot().catalog.topics.find(item => item.sessionId === sessionId)
       if (topic !== undefined) instance.actions.topic(topic.id)
@@ -48,16 +53,15 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     createPaper: async (request) => {
       const topic = ctx.research.state.getSnapshot().catalog.topics.find(item => item.id === request.topicId)
       if (topic === undefined) throw new Error('Research Topic no longer exists')
-      const key = JSON.stringify(['paper', request.topicId, request.title, request.pdfPath, request.repositoryUrl])
-      const sessionId = await createSession(key, topic.workspaceId)
-      const file = await ctx.remote.workspaceFiles.stat(sessionId, request.pdfPath, new AbortController().signal)
-      if (!file.ok) throw file.error
-      await ctx.research.createPaper({ ...request, sessionId })
-      pending.delete(key)
+      const paperId = await ctx.research.importPaper({
+        topicId: topic.id, title: request.title, source: request.pdfPath ?? '', repositoryUrl: request.repositoryUrl,
+        ...request.sourceId === undefined ? {} : { sourceId: request.sourceId },
+      })
       instance.actions.topic(topic.id)
-      const paper = ctx.research.state.getSnapshot().catalog.papers.find(item => item.sessionId === sessionId)
-      if (paper !== undefined) instance.actions.expand(paper.id, true)
-      open(sessionId)
+      const paper = ctx.research.state.getSnapshot().catalog.papers.find(item => item.id === paperId)
+      if (paper === undefined) throw new Error('Imported paper is missing from the confirmed library')
+      instance.actions.expand(paper.id, true)
+      open(paper.sessionId)
     },
   })
   ctx.effect(() => ctx.locale.register('research', { zh, en }))

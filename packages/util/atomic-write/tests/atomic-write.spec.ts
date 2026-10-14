@@ -122,6 +122,13 @@ async function waitForLock(lockPath: string): Promise<void> {
 }
 
 describe('writeFileAtomic', () => {
+  it('preserves binary bytes including zeros and invalid UTF-8', async () => {
+    const target = join(await scratch(), 'paper.pdf')
+    const bytes = new Uint8Array([0, 255, 128, 37, 80, 68, 70])
+    await writeFileAtomic(target, bytes, { mode: 0o600 })
+    expect(await readFile(target)).toEqual(Buffer.from(bytes))
+  })
+
   it('creates the file and its parents with exactly the stated mode', async () => {
     const dir = await scratch()
     const target = join(dir, 'nested', 'deep', 'doc.yaml')

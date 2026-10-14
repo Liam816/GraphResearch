@@ -1,6 +1,8 @@
 - region "Research library":
   - strong: Research library
   - button "New topic"
+  - button "Paper library directory"
+  - paragraph: {{cwd}}/.dsh-storages/research-library
   - textbox "Search topics or papers"
   - navigation "Research library":
     - list:

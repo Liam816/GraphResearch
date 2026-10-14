@@ -98,7 +98,9 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
     </div>
     <div className={css.panelBody}>
       {panel === 'agent' ? props.renderFactorySlot('conversation.content', { variant: 'embedded', phase: props.phase, hero: props.hero })
-        : panel === 'pdf' ? props.renderFactorySlot('document.pdf', { path: paper.pdfPath })
+        : panel === 'pdf' ? paper.pdfPath === ''
+          ? <div className={css.allClosed}><h2>{t('pdfMissing')}</h2><p>{t('pdfMissingHint')}</p></div>
+          : props.renderFactorySlot('document.pdf', { path: paper.pdfPath })
           : <ResearchNotes paper={paper} view={view} t={t} actions={actions} saveNote={props.saveNote} refresh={props.refresh} />}
     </div>
   </section>

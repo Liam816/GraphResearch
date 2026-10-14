@@ -1,14 +1,18 @@
 /** Real Loader research navigation, PDF factory, independent sessions, and durable notebooks. */
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:http'
+import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
+import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import { pdfFixture } from '../../../packages/client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
 import { captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode } from './scaffold.ts'
 import { newEnglishPage, openSettings, saveFailureShot } from './support.ts'
 
 const EXPECTED = fileURLToPath(new URL('./expected/research-workspace/paper.expected.md', import.meta.url))
+const EMPTY_EXPECTED = fileURLToPath(new URL('./expected/research-workspace/empty-paper.expected.md', import.meta.url))
 const DIRECTORY_EXPECTED = fileURLToPath(new URL('./expected/research-workspace/directory.expected.md', import.meta.url))
 const REORDERED_EXPECTED = fileURLToPath(new URL('./expected/research-workspace/reordered.expected.md', import.meta.url))
 const SHOTS = fileURLToPath(new URL('../../../.artifacts/research-ui', import.meta.url))
@@ -18,6 +22,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   onTestFinished(() => scaffold.close())
   await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
   await writeFile(join(scaffold.workspaceCwd, 'paper.pdf'), pdfFixture(3))
+  await writeFile(join(scaffold.workspaceCwd, 'openvla.pdf'), pdfFixture(4))
   const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
   const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
   onTestFinished(() => browser.close())
@@ -45,11 +50,36 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
     await library.getByRole('button', { name: 'Add paper', exact: true }).click()
     const form = page.getByRole('dialog', { name: 'Add paper', exact: true })
     await form.getByLabel('Title', { exact: true }).fill(title)
-    await form.getByLabel('PDF file path', { exact: true }).fill('paper.pdf')
+    if (title !== 'RT-2') await form.getByLabel('PDF file path', { exact: true }).fill(join(scaffold.workspaceCwd, 'openvla.pdf'))
     await form.getByRole('button', { name: 'Create', exact: true }).click()
+    await form.waitFor({ state: 'hidden' })
     await expect.poll(() => workbench.locator('header strong').textContent()).toBe(title)
   }
   await addPaper('RT-2')
+  await workbench.getByRole('heading', { name: 'No original PDF yet', exact: true }).waitFor()
+  await compareOrRefreshGolden(EMPTY_EXPECTED, await captureStableAria(page, '[data-research-workbench]', scaffold.workspaceCwd), webSnapshotMode())
+  await page.reload({ waitUntil: 'load' })
+  await library.getByRole('button', { name: 'RT-2', exact: true }).click()
+  await workbench.getByRole('heading', { name: 'No original PDF yet', exact: true }).waitFor()
+  const pendingPaper = (await scaffold.ctx.workspaceController.researchList()).papers[0]
+  if (pendingPaper === undefined) throw new Error('the title-only paper must exist')
+  const pendingAgent = scaffold.ctx.agents.get(pendingPaper.sessionId)
+  if (pendingAgent === undefined) throw new Error('the title-only paper must have its Agent')
+  const server = createServer((_request, response) => { response.writeHead(200, { 'Content-Type': 'application/pdf' }); response.end(pdfFixture(3)) })
+  onTestFinished(() => new Promise<void>((resolve, reject) => {
+    server.close((error) => { if (error === undefined) resolve(); else reject(error) })
+    server.closeAllConnections()
+  }))
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('the PDF download fixture must listen on TCP')
+  const attached = await scaffold.ctx.tools.execute({ agent: pendingAgent, signal: new AbortController().signal,
+    callId: ToolCallId('research-download-original'), name: 'research_attach_pdf', arguments: { source: `http://127.0.0.1:${address.port}/paper.pdf` } })
+  expect(attached.isError).toBe(false)
+  const downloaded = await scaffold.ctx.workspaceController.researchList()
+  expect(downloaded.papers).toHaveLength(1)
+  expect(downloaded.papers[0]).toMatchObject({ id: pendingPaper.id, sessionId: pendingPaper.sessionId, directory: pendingPaper.directory })
   await workbench.getByRole('img', { name: 'PDF page 1', exact: true }).waitFor()
   const header = workbench.locator(':scope > header')
   expect(await header.getByRole('button', { name: 'Restore three panels', exact: true }).count()).toBe(0)
@@ -71,6 +101,41 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await compareOrRefreshGolden(DIRECTORY_EXPECTED, await captureStableAria(page, '[data-workspace-browser]', scaffold.workspaceCwd), webSnapshotMode())
   await mkdir(SHOTS, { recursive: true })
   await page.screenshot({ path: join(SHOTS, 'paper-light.png') })
+
+  const paperRecord = (await scaffold.ctx.workspaceController.researchList()).papers.find(paper => paper.title === 'RT-2')
+  if (paperRecord === undefined || paperRecord.directory === undefined) throw new Error('the imported paper must have a managed directory')
+  const paperAgent = scaffold.ctx.agents.get(paperRecord.sessionId)
+  if (paperAgent === undefined) throw new Error('the paper Agent must be available')
+  await workbench.getByRole('button', { name: 'AI notes', exact: true }).click()
+  const extracted = await scaffold.ctx.tools.execute({ agent: paperAgent, signal: new AbortController().signal,
+    callId: ToolCallId('research-read-original'), name: 'research_read_paper', arguments: { start_page: 1, page_count: 2 } })
+  expect(extracted.isError).toBe(false)
+  expect(extracted.content.some(block => block.type === 'text' && block.text.includes('Selectable PDF text'))).toBe(true)
+  const written = await scaffold.ctx.tools.execute({ agent: paperAgent, signal: new AbortController().signal,
+    callId: ToolCallId('research-write-notebook'), name: 'research_write_note',
+    arguments: { kind: 'ai', operation: 'section', heading: 'Key ideas', text: 'Original method, page 1.', expected_revision: 0 } })
+  expect(written.isError).toBe(false)
+  await workbench.getByRole('heading', { name: 'Key ideas', exact: true }).waitFor()
+  const aiPath = join(paperRecord.directory, 'notes', 'ai.md')
+  expect(await readFile(aiPath, 'utf8')).toContain('Original method, page 1.')
+  await writeFile(aiPath, '# External edit\n\nUpdated with a local editor.\n')
+  await workbench.getByRole('heading', { name: 'External edit', exact: true }).waitFor()
+  await workbench.getByRole('button', { name: 'Edit', exact: true }).click()
+  const aiEditor = workbench.getByRole('textbox', { name: 'AI notes', exact: true })
+  await aiEditor.fill('My unsaved AI notebook draft')
+  const updated = await scaffold.ctx.tools.execute({ agent: paperAgent, signal: new AbortController().signal,
+    callId: ToolCallId('research-append-notebook'), name: 'research_write_note',
+    arguments: { kind: 'ai', operation: 'append', text: '\nNew Agent analysis.\n', expected_revision: 2 } })
+  expect(updated.isError).toBe(false)
+  await workbench.getByRole('alert').filter({ hasText: 'draft' }).waitFor()
+  expect(await aiEditor.inputValue()).toBe('My unsaved AI notebook draft')
+  await workbench.getByRole('button', { name: 'View latest saved version', exact: true }).click()
+  await workbench.getByText('New Agent analysis.', { exact: true }).waitFor()
+  await page.screenshot({ path: join(SHOTS, 'paper-live-ai-notes.png') })
+  await workbench.getByRole('button', { name: 'Edit', exact: true }).click()
+  expect(await aiEditor.inputValue()).toBe('My unsaved AI notebook draft')
+  await workbench.getByRole('button', { name: 'Discard draft', exact: true }).click()
+  await workbench.getByRole('button', { name: 'Learning notes', exact: true }).click()
 
   const readOrder = () => workbench.locator('[data-research-panel]').evaluateAll(panels => panels.map(panel => panel.getAttribute('data-research-panel')))
   const beginDrag = async (source: string, target: string): Promise<void> => {
@@ -182,6 +247,17 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   const catalog = await scaffold.ctx.workspaceController.researchList()
   expect(new Set([...catalog.topics.map(item => item.sessionId), ...catalog.papers.map(item => item.sessionId)]).size).toBe(3)
   expect(catalog.papers.find(item => item.title === 'RT-2')?.learning.text).toContain('action token')
+
+  await library.getByRole('button', { name: 'Paper library directory', exact: true }).click()
+  const librarySettings = page.getByRole('dialog', { name: 'Paper library directory', exact: true })
+  const migratedDirectory = join(scaffold.workspaceCwd, 'migrated-papers')
+  await librarySettings.getByLabel('Library directory', { exact: true }).fill(migratedDirectory)
+  await librarySettings.getByLabel('Operation', { exact: true }).selectOption('migrate')
+  await librarySettings.getByRole('button', { name: 'Apply directory', exact: true }).click()
+  await librarySettings.waitFor({ state: 'hidden' })
+  await expect.poll(() => scaffold.ctx.workspaceController.researchList().then(value => value.directory)).toBe(migratedDirectory)
+  await expect.poll(() => notes.inputValue()).toContain('action token')
+  expect(await readFile(join(migratedDirectory, 'papers', paperRecord.id, 'notes', 'ai.md'), 'utf8')).toContain('New Agent analysis.')
 
   await openSettings(page, 'en')
   const settings = page.getByRole('dialog', { name: 'Settings', exact: true })

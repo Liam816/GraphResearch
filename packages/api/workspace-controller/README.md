@@ -44,20 +44,37 @@ Documents lookup holds the registry mutation queue, so other Workspace mutations
 
 -----
 
+<a id="research-catalog"></a>
 ### Research catalog
 
-The `research` storage domain owns stable Topic and paper identities, their independent Session bindings, PDF paths, repository links, and separately revisioned AI and learning notebooks. `researchList`, `researchCreateTopic`, `researchCreatePaper`, and `researchSaveNote` return complete revisioned catalogs. Entity Sessions must belong to the selected working directory and cannot be shared between entities. Creation retries with the same Session and metadata are idempotent. Notebook writes serialize on the Host and require `expectedRevision`; conflicts reject without modifying the saved notebook. Client `ctx.research` retains confirmed catalog data on read failures and accepts command replies in revision order. Refresh reloads external edits; notebook revision checks prevent another browser from overwriting them silently.
+The research library starts at `<launch-directory>/data`; `researchDirectory` configures its initial absolute Host path, and the UI's persisted directory selection takes precedence thereafter. `library.json` owns Topic and paper metadata. Each stable `papers/<paper-id>/` contains an optional `paper.pdf`, `paper.json`, `notes/ai.md`, `notes/learning.md`, `extracted/`, `code/`, and `assets/`. Markdown files own notebook text; the index records revisions and content digests. Topics have `topics/<topic-id>/notes.md`. Existing research-domain records migrate on first use; the domain then retains only the selected directory. Missing legacy PDFs leave their notebooks available and can be supplied at the managed `paper.pdf` path.
 
-`researchMentions` returns canonical Session references for up to three selected papers. These references remain draft text until the user sends a prompt; the existing Session-reference service owns context capture and logging. Catalog metadata and notebooks are not automatically model-visible, and the Session persistence format is unchanged.
+`researchImportPaper` creates a paper from its title, optionally copying a local PDF or downloading an HTTP(S) source. An absent original has an empty `pdfPath`. `researchAttachPdf` supplies an existing paper’s PDF without changing its identity, Session or notes; identical retries are safe and a different existing PDF is rejected. Explicit attachment preserves the target even when another paper has the same bytes. Matching arXiv/DOI identities or PDF bytes reuse the existing paper and add its Topic association. Versioned arXiv identifiers retain their version. Entity Sessions remain independent. `researchReadPaper` returns bounded original text with page numbers and caches the result beneath the paper; image-only pages require OCR. `researchProgress` saves a continuation point, and `researchTopicNote` saves a revision-checked comparison summary.
+
+`researchFollow` sends a full baseline and replacement snapshots for committed or externally observed notebook changes; reconnecting starts a new baseline. Browser drafts remain separate from confirmed text. Writes serialize across cooperating processes, check `expectedRevision`, and publish Markdown plus metadata through a recoverable journal. A stale edit writes nothing. An I/O failure can leave a pending journal: refresh completes recovery before retrying; conflicting external changes during recovery are reported rather than overwritten. Invalid metadata, missing notebook files, and watcher failures remain visible while the browser retains its last confirmed data. Managed paths reject symbolic links.
+
+`researchConfigure` opens another library or copies the current library into an empty directory and persists the selection after preparation. Migration retains the source. Research Sessions maintain `session.json` snapshots inside their entity directories using explicit reads of the existing persistence provider; native Session generations stay unchanged. Deployment limits are configurable through `researchMaxNoteBytes`, `researchMaxPdfBytes`, `researchDownloadTimeoutMs`, `researchMaxReadPages`, `researchMaxReadCharacters`, `researchLockTimeoutMs`, `researchWatchStabilityMs`, and `researchWatchPollMs`.
+
+`researchMentions` returns canonical Session references for up to three selected papers. These references remain draft text until the user sends a prompt; the existing Session-reference service owns context capture and logging. The Session persistence format is unchanged.
+
+Opening a copied library restores compatible `session.json` snapshots only when the native persistence provider has no matching Session, then repairs missing Workspace bindings. Existing native logs remain authoritative. Snapshots update after Session events; keep the Harness home when backing up attachments and other framework-owned state. Custom Host compositions must provide `agents`, `sessionController`, and `sessionPersistence` alongside the existing controller dependencies; the shipped Web profile supplies them.
 
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as Workspace organization is browser and Host control state and registers no prompt, tool, or session event.
+### Research context and notebooks
+
+#### What the model sees
+
+Ordinary Workspace organization contributes no prompt or tools. Research entity Agents receive scoped `research_context`, `research_import_paper`, `research_attach_pdf`, `research_read_paper`, `research_write_note`, `research_update_progress`, and `research_write_topic_note` tools. Their required runtime context names the selected library, paper directory, original PDF, notebook revisions, and continuation point. Existing prompt-context admission logs these facts; tool calls and results use normal Session tool events. Reading notebook text is explicit through `research_context`. Learning-note edits require an explicit user request.
+
+#### Token effect
+
+Research tools add schemas to each research Agent request. Required context adds paths, identifiers, revisions, and the saved continuation point; reading a notebook or PDF adds the requested content through tool results. PDF page and character limits bound each extraction.
 
 #### KV Cache effect
 
-No direct effect; Workspace mutations do not alter model requests.
+Ordinary Workspace mutations do not alter requests. Research notebook revisions, directory changes, and continuation points replace the logged runtime context at request admission; tool schemas remain scoped to research entity Agents.
 
 ## Known Limitations and Deferred Work
 
@@ -65,6 +82,7 @@ No direct effect; Workspace mutations do not alter model requests.
 
 - `follow()` replaces the whole projection after reconnect and has no durable cursor or incremental catch-up protocol.
 - Process-local deletion markers prevent delayed data from reviving a removed Workspace only for the lifetime of the Client model.
+- Session snapshot recovery preserves recorded working-directory paths. Moving a library between machines requires those original directories to remain accessible; automatic Session path rewriting is not supported.
 
 
 <a id="dev-note"></a>

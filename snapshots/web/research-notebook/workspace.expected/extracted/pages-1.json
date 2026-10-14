@@ -1,0 +1,11 @@
+{
+  "paperId": "fixture-paper",
+  "totalPages": 2,
+  "pages": [
+    {
+      "page": 1,
+      "text": "Selectable PDF text "
+    }
+  ],
+  "truncated": false
+}

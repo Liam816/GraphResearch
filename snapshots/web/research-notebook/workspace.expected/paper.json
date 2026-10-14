@@ -1,0 +1,19 @@
+{
+  "id": "fixture-paper",
+  "title": "Fixture paper",
+  "topicIds": [
+    "fixture-topic"
+  ],
+  "sessionId": "research-paper",
+  "pdfPath": "paper.pdf",
+  "repositoryUrl": "",
+  "progress": "",
+  "ai": {
+    "revision": 1,
+    "sha256": "7baa6a0fa8b82e89d496db38dcfa445f0eae2d34ea2874673496078ba313812e"
+  },
+  "learning": {
+    "revision": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

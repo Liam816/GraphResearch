@@ -12,7 +12,7 @@
   - strong: Agent chat
   - button "Arrange Agent chat"
   - button "Collapse Agent chat"
-  - button "Choose workspace": {{workspace}}
+  - button "Choose workspace": research-library
   - button "Standard mode"
   - textbox "Describe what you want to build, / commands, @ files or sessions"
   - button "Add files or run commands"

@@ -166,6 +166,10 @@ interface SessionActivity {
 
 [`dsh-workspace-controller`](../../packages/api/workspace-controller) serves workspace CRUD to GUI clients over `ctx.workspaceRegistry`, and [`dsh-session-controller`](../../packages/api/session-controller) performs the create-session-then-attach flow above. [dsh-agent-instructions](../../packages/context/agent-instructions) is **not** a consumer despite the name: it discovers AGENTS.md-style instruction files under an agent's own cwd and never touches `ctx.workspaceRegistry` — the shared word refers to the user's working directory, not to this registry's entities.
 
+## Research library
+
+The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -332,6 +336,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 
 ```ts cordis-catalog
 /**
+ * Prepare canonical references for selected paper sessions.
+ * @param paperIds - up to three paper identities.
+ * @returns canonical prompt references for the selected paper sessions.
+ */
+@Remote('researchMentions') async researchMentions(paperIds: readonly ResearchPaperId[]): Promise<readonly string[]>
+
+/**
  * Create or idempotently resolve one Workspace over an existing directory.
  * @param request - directory path to register.
  * @returns the Workspace and whether this call created it.
@@ -410,6 +421,94 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns baseline followed by ordered Workspace increments.
  */
 @Remote({ mode: 'stream' }) follow(signal: AbortSignal): AsyncIterable<WorkspaceFollowFrame>
+
+/**
+ * Read the confirmed research catalog.
+ * @returns the current durable topic, paper and notebook catalog.
+ */
+@Remote('researchList') async researchList(): Promise<ResearchCatalog>
+
+/**
+ * Apply the requested research operation.
+ * @param request - Topic metadata and its independent Session.
+ * @returns the committed catalog.
+ */
+@Remote('researchCreateTopic') async researchCreateTopic(request: ResearchCreateTopicRequest): Promise<ResearchCatalog>
+
+/**
+ * Apply the requested research operation.
+ * @param request - Paper metadata and its independent Session.
+ * @returns the committed catalog.
+ */
+@Remote('researchCreatePaper') async researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog>
+
+/**
+ * Apply the requested research operation.
+ * @param request - Notebook edit and acknowledged revision.
+ * @returns the committed catalog; conflicts preserve the previous notebook.
+ */
+@Remote('researchSaveNote') researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog>
+
+/**
+ * Read the confirmed in-memory library.
+ * @returns confirmed research context for scoped Agent prompt providers.
+ */
+researchCurrent(): ResearchCatalog
+
+/**
+ * Observe library and notebook changes.
+ * @param signal - caller lifetime.
+ * @returns full library snapshots and file-observation failures.
+ */
+@Remote({ mode: 'stream' }) researchFollow(signal: AbortSignal): AsyncIterable<ResearchFollowFrame>
+
+/**
+ * Select or migrate the managed library.
+ * @param request - absolute destination and open or migrate operation.
+ * @returns selected library after durable selection.
+ */
+@Remote('researchConfigure') researchConfigure(request: ResearchDirectoryRequest): Promise<ResearchCatalog>
+
+/**
+ * Register an independent Session and optionally import a local or downloaded PDF.
+ * @param request - Topic, title and optional original source.
+ * @param signal - caller cancellation.
+ * @returns selected paper identity and its complete library projection.
+ */
+@Remote('researchImportPaper') async researchImportPaper( request: ResearchImportPaperRequest, signal: AbortSignal, ): Promise<{ readonly catalog: ResearchCatalog; readonly paperId: ResearchPaperId }>
+
+/**
+ * Supply an existing paper's PDF while preserving its Session and notebooks.
+ * @param request - target paper and local or HTTP(S) PDF source.
+ * @param signal - caller cancellation.
+ * @returns committed library with the attached original.
+ */
+@Remote('researchAttachPdf') researchAttachPdf(request: ResearchAttachPdfRequest, signal: AbortSignal): Promise<ResearchCatalog>
+
+/**
+ * Read a bounded original page range.
+ * @param request - bounded original PDF page range.
+ * @param signal - cancellation.
+ * @returns extracted text with original page numbers.
+ */
+@Remote('researchReadPaper') researchReadPaper(request: ResearchReadPaperRequest, signal: AbortSignal): Promise<ResearchPaperText>
+
+/**
+ * Save the paper continuation point.
+ * @param paperId - owning paper.
+ * @param text - continuation point and questions.
+ * @returns committed library.
+ */
+@Remote('researchProgress') researchProgress(paperId: ResearchPaperId, text: string): Promise<ResearchCatalog>
+
+/**
+ * Save a revision-checked Topic summary.
+ * @param topicId - owning Topic.
+ * @param text - Markdown comparison.
+ * @param revision - last read revision.
+ * @returns committed library.
+ */
+@Remote('researchTopicNote') researchTopicNote(topicId: ResearchTopicId, text: string, revision: number): Promise<ResearchCatalog>
 ```
 
 Source: [`packages/api/workspace-controller/src/index.ts`](../../packages/api/workspace-controller/src/index.ts)

@@ -1,0 +1,10 @@
+version: 1
+scenario: research-notebook
+profile: web
+composition: web-research
+recording: authored
+header:
+  class: web-research
+  pin: true
+workspace:
+  final: true

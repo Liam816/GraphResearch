@@ -11,6 +11,7 @@ import type { WorkspaceFollowSink } from './model.ts'
 import { ClientWorkspaceModel } from './model.ts'
 import { WorkspaceController } from './service.ts'
 import { ClientResearchModel } from './research.ts'
+import type { ResearchFollowFrame } from '../research-types.ts'
 
 export { ClientWorkspaceModel } from './model.ts'
 export { ClientResearchModel } from './research.ts'
@@ -55,11 +56,20 @@ export function apply(ctx: Context): void {
   new WorkspaceController(ctx, model)
   const research = new ClientResearchModel(ctx.remote.workspace)
   ctx.effect(() => ctx.reflect.provide('research', research))
-  const refreshResearch = (): void => { void research.refresh().catch(() => {
-    // The model publishes the recoverable failure; the directory owns retry.
-  }) }
-  ctx.on('connection/reset', refreshResearch)
-  refreshResearch()
+  const researchStream = ctx.remote.$stream<ResearchFollowFrame>({
+    name: 'Research library stream', open: signal => ctx.remote.workspace.researchFollow(signal),
+    ended: accepted => accepted ? new RemoteStreamCarrierError('Research library stream ended') : new Error('Research stream ended before its baseline'),
+    carrierFailed: () => { research.failed() },
+  })
+  const researchControl = new RemoteSnapshotStream<Extract<ResearchFollowFrame, { type: 'baseline' }>, Exclude<ResearchFollowFrame, { type: 'baseline' }>>(researchStream, {
+    name: 'Research library stream',
+    isSnapshot: (frame): frame is Extract<ResearchFollowFrame, { type: 'baseline' }> => frame.type === 'baseline',
+    replace: (frame) => { research.replace(frame.catalog) },
+    update: (frame) => { if (frame.type === 'changed') research.accept(frame.catalog); else research.failed() },
+    failed: () => { research.failed() },
+  })
+  researchControl.start()
+  ctx.effect(() => async () => { await researchControl.dispose() }, 'workspace-controller.client.research')
   const control = createWorkspaceStateStream(ctx.remote, {
     accept: model,
     carrierFailed: () => { model.handleCarrierFailure() },

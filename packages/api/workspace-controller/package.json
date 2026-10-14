@@ -39,7 +39,11 @@
       "default": "./lib/typert.remote-client.js"
     },
     "./src/*": "./src/*",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./research-agent": {
+      "types": "./lib/types/research-agent.d.ts",
+      "default": "./lib/types/research-agent.js"
+    }
   },
   "dsh": {
     "client": {
@@ -69,11 +73,14 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/dsh-deque": "workspace:*",
     "@deepseek-ai/dsh-native-command": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
+    "chokidar": "^4.0.3",
+    "pdfjs-dist": "6.3.289",
     "zod": "^4.4.3",
-    "@deepseek-ai/dsh-brand": "workspace:*"
+    "@deepseek-ai/dsh-atomic-write": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
@@ -81,10 +88,16 @@
     "@deepseek-ai/dsh-client-connection": "workspace:*",
     "@deepseek-ai/dsh-host-directory-picker": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-session-reference": "workspace:*",
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/dsh-workspace": "workspace:*",
-    "@deepseek-ai/dsh-session-reference": "workspace:*"
+    "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-system-prompt": "workspace:*",
+    "@deepseek-ai/dsh-working-directory": "workspace:*",
+    "@deepseek-ai/dsh-session-persistence": "workspace:*",
+    "@deepseek-ai/dsh-api-session-controller": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
@@ -95,9 +108,17 @@
     "@deepseek-ai/dsh-host-directory-picker": "workspace:*",
     "@deepseek-ai/dsh-remote-mock": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-session-reference": "workspace:*",
     "@deepseek-ai/dsh-storage-domain": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/dsh-workspace": "workspace:*",
-    "@deepseek-ai/dsh-session-reference": "workspace:*"
+    "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-system-prompt": "workspace:*",
+    "@deepseek-ai/dsh-working-directory": "workspace:*",
+    "@deepseek-ai/dsh-session-persistence": "workspace:*",
+    "@deepseek-ai/dsh-api-session-controller": "workspace:*",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*"
   }
 }

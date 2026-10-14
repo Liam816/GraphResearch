@@ -1,7 +1,11 @@
 /** React-free research catalog, retaining the last confirmed data after failures. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { WorkspaceRemote } from './model.ts'
-import type { ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId } from '../research-types.ts'
+import type {
+  ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
+  ResearchDirectoryRequest, ResearchImportPaperRequest,
+} from '../research-types.ts'
 
 /** Confirmed catalog and explicit transport lifecycle. */
 export interface ResearchSnapshot {
@@ -12,12 +16,13 @@ export interface ResearchSnapshot {
 /** Host commands with revision-ordered response publication. */
 export class ClientResearchModel {
   /** Confirmed catalog and recoverable read status. */
-  readonly state = createSnapshotStore<ResearchSnapshot>({
+  readonly state: SnapshotStore<ResearchSnapshot> = createSnapshotStore<ResearchSnapshot>({
     phase: 'loading', catalog: { revision: 0, topics: [], papers: [] },
   })
 
   /** @param remote - generated Workspace namespace. */
-  constructor(private readonly remote: Pick<WorkspaceRemote, 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions'>) {}
+  constructor(private readonly remote: Pick<WorkspaceRemote,
+    'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper'>) {}
 
   /** Fetch current durable data; failures preserve existing catalog entries. */
   async refresh(): Promise<void> {
@@ -61,9 +66,44 @@ export class ClientResearchModel {
     this.accept(result.value)
   }
 
-  private accept(catalog: ResearchCatalog): void {
+  /**
+   * Accept confirmed data while ignoring stale mutation responses.
+   * @param catalog - full confirmed snapshot; stale mutation echoes cannot replace a newer snapshot.
+   */
+  accept(catalog: ResearchCatalog): void {
     const previous = this.state.getSnapshot().catalog
     this.state.set({ phase: 'ready', catalog: catalog.revision >= previous.revision ? catalog : previous })
+  }
+
+  /**
+   * Replace the catalog at stream reconnection.
+   * @param catalog - opening snapshot for a new transport generation.
+   */
+  replace(catalog: ResearchCatalog): void { this.state.set({ phase: 'ready', catalog }) }
+
+  /** Retain confirmed content while visibly reporting an observation failure. */
+  failed(): void { this.state.set({ ...this.state.getSnapshot(), phase: 'error' }) }
+
+  /**
+   * Open or migrate a managed library.
+   * @param request - selected absolute directory and explicit open or migration mode.
+   */
+  async configure(request: ResearchDirectoryRequest): Promise<void> {
+    const result = await this.remote.researchConfigure(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
+
+  /**
+   * Import a source into the managed library.
+   * @param request - PDF source and Topic.
+   * @returns selected paper, including reused imports.
+   */
+  async importPaper(request: ResearchImportPaperRequest): Promise<ResearchPaperId> {
+    const result = await this.remote.researchImportPaper(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value.catalog)
+    return result.value.paperId
   }
 
   /**

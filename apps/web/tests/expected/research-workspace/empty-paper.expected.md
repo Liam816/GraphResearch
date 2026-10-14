@@ -1,0 +1,43 @@
+- banner:
+  - button "Robot VLA"
+  - strong: RT-2
+  - text: Independent session
+  - group "Panel visibility":
+    - button "Agent chat" [pressed]
+    - button "Original PDF" [pressed]
+    - button "Reading notes" [pressed]
+  - button "Reference papers"
+- region "Agent chat":
+  - button "Reorder Agent chat"
+  - strong: Agent chat
+  - button "Arrange Agent chat"
+  - button "Collapse Agent chat"
+  - button "Choose workspace": research-library
+  - button "Standard mode"
+  - textbox "Describe what you want to build, / commands, @ files or sessions"
+  - button "Add files or run commands"
+  - 'button "Access mode, current: Workspace Write"': Workspace Write
+  - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
+  - button "Send message" [disabled]
+- separator "Resize Agent chat and Original PDF"
+- region "Original PDF":
+  - button "Reorder Original PDF"
+  - strong: Original PDF
+  - button "Arrange Original PDF"
+  - button "Collapse Original PDF"
+  - heading "No original PDF yet" [level=2]
+  - paragraph: Ask the paper’s Agent to download the original, or share a paper link in the chat. The PDF will appear here automatically when ready.
+- separator "Resize Original PDF and Reading notes"
+- region "Reading notes":
+  - button "Reorder Reading notes"
+  - strong: Reading notes
+  - button "Arrange Reading notes"
+  - button "Collapse Reading notes"
+  - group "Reading notes":
+    - button "Learning notes" [pressed]
+    - button "AI notes"
+  - status: Saved
+  - button "Preview"
+  - button "Save notes" [disabled]
+  - textbox "Learning notes":
+    - /placeholder: Record methods, findings, questions, and your understanding. Markdown is supported.

@@ -12,7 +12,10 @@ export function ResearchNotes({ paper, view, ...props }: Pick<ResearchSeats, 't'
   const kind = view.notebook
   const draft = view.drafts[kind]
   const text = draft?.text ?? paper[kind].text
-  const [preview, setPreview] = useState(false)
+  const [mode, setMode] = useState<'auto' | 'edit' | 'preview'>('auto')
+  const [latest, setLatest] = useState(false)
+  const preview = mode === 'preview' || (mode === 'auto' && kind === 'ai')
+  const conflict = draft !== undefined && draft.revision !== paper[kind].revision
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<'conflict' | 'failed'>()
   const save = async (): Promise<void> => {
@@ -28,19 +31,21 @@ export function ResearchNotes({ paper, view, ...props }: Pick<ResearchSeats, 't'
   return <div className={css.notebook}>
     <div className={css.noteTabs} role="group" aria-label={t('notes')}>
       {(['learning', 'ai'] as const).map(value => <button type="button" key={value} disabled={busy} aria-pressed={value === kind}
-        onClick={() => { actions.notebook(paper.id, value); setError(undefined) }}>{t(value)}</button>)}
+        onClick={() => { actions.notebook(paper.id, value); setMode('auto'); setLatest(false); setError(undefined) }}>{t(value)}</button>)}
     </div>
     <div className={css.noteToolbar}><span className={css.hint} role="status">{t(busy ? 'saving' : draft !== undefined ? 'unsaved' : 'saved')}</span>
-      <Button size="sm" onClick={() => { setPreview(!preview) }}>{t(preview ? 'edit' : 'preview')}</Button>
+      <Button size="sm" onClick={() => { setMode(preview ? 'edit' : 'preview'); setLatest(false) }}>{t(preview ? 'edit' : 'preview')}</Button>
       <Button size="sm" disabled={busy || draft === undefined} onClick={() => { void save() }}>{t('save')}</Button>
     </div>
     {kind === 'ai' && <p className={css.noteHint}>{t('aiHint')}</p>}
-    {error !== undefined && <div className={css.notice} role="alert">{t(error)}
-      {error === 'conflict' && <><Button size="sm" onClick={() => { void props.refresh().catch(() => { setError('failed') }) }}>{t('refresh')}</Button>
-        <Button size="sm" onClick={() => { actions.discard(paper.id, kind); setError(undefined) }}>{t('discard')}</Button></>}
+    {(error !== undefined || conflict) && <div className={css.notice} role="alert">{t(conflict ? 'conflict' : error ?? 'conflict')}
+      {(error === 'conflict' || conflict) && <>
+        <Button size="sm" onClick={() => { setLatest(true); setMode('preview') }}>{t('latestSaved')}</Button>
+        <Button size="sm" onClick={() => { void props.refresh().catch(() => { setError('failed') }) }}>{t('refresh')}</Button>
+        <Button size="sm" onClick={() => { actions.discard(paper.id, kind); setLatest(false); setError(undefined) }}>{t('discard')}</Button></>}
     </div>}
-    {preview ? <div className={css.notePreview}>{text === '' ? <p className={css.hint}>{t('emptyNote')}</p>
-      : <MarkdownText text={text} labels={{ code: { copyLabel: t('copy'), copiedLabel: t('copied') }, footnotes: t('footnotes') }} />}</div>
+    {preview ? <div className={css.notePreview} data-research-note-preview>{(latest ? paper[kind].text : text) === '' ? <p className={css.hint}>{t('emptyNote')}</p>
+      : <MarkdownText text={latest ? paper[kind].text : text} labels={{ code: { copyLabel: t('copy'), copiedLabel: t('copied') }, footnotes: t('footnotes') }} />}</div>
       : <textarea className={css.noteEditor} aria-label={t(kind)} placeholder={t('notePlaceholder')} value={text}
         onChange={(event) => { actions.edit(paper.id, kind, event.target.value, paper[kind].revision) }}
         onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === 's') { event.preventDefault(); void save() } }} />}

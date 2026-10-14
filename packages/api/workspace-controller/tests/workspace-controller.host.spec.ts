@@ -1,9 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import Storage from '@deepseek-ai/dsh-storage'
 import { DomainFacility } from '@deepseek-ai/dsh-storage-domain'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
@@ -14,6 +16,8 @@ import { DEFAULT_WORKSPACE_DIRECTORY } from '../src/default-workspace.ts'
 import { WorkspaceFeed } from '../src/feed.ts'
 import type { WorkspaceFollowFrame } from '../src/types.ts'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
+import { pdfFixture } from '../../../client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
+import { ResearchFiles, digest } from '../src/research-files.ts'
 
 // The controller relays whatever families the providers report; this suite merges its own.
 declare module '@deepseek-ai/dsh-workspace/types' {
@@ -50,7 +54,7 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve }
 }
 
-async function harness(options: { systemDocuments?: boolean } = {}) {
+async function harness(options: { systemDocuments?: boolean; nativeSessions?: boolean } = {}) {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dsh-workspace-controller-')))
   tempDirs.push(root)
   const ctx = new Context()
@@ -61,14 +65,17 @@ async function harness(options: { systemDocuments?: boolean } = {}) {
   const storageDomain = new DomainFacility(ctx, { backend: 'memory', routes: {} })
   ctx.storage.mount('domain', storageDomain)
   ctx.provide('storageDomain', storageDomain)
-  ctx.provide('sessionPersistence', { list: () => Promise.resolve([]) } as never)
+  if (options.nativeSessions === true) await ctx.plugin(JsonlSessionPersistence, { root: join(root, 'native-sessions'), compression: 'none' })
+  else ctx.provide('sessionPersistence', { list: () => Promise.resolve([]) } as never)
   await ctx.plugin(WorkspaceRegistry)
   const dispose = (): void => {}
   ctx.provide('typert', {
     lookups: { configure: () => dispose },
     contexts: { configureHost: () => dispose },
   } as never)
-  const controller = new WorkspaceController(ctx, options.systemDocuments === true ? {} : { documentsDirectory: root })
+  const controller = new WorkspaceController(ctx, {
+    ...options.systemDocuments === true ? {} : { documentsDirectory: root }, researchDirectory: join(root, 'data'),
+  })
   return { controller, ctx, root, storageDomain }
 }
 
@@ -480,10 +487,11 @@ describe('first-use Remote', () => {
 })
 
 describe('Research catalog', () => {
-  async function researchFixture() {
-    const fixture = await harness()
+  async function researchFixture(options: { nativeSessions?: boolean } = {}) {
+    const fixture = await harness(options)
     const { workspace } = await fixture.controller.create({ path: fixture.root })
     const owner = fixture.ctx.workspaceRegistry.get(workspace.workspaceId)!
+    writeFileSync(join(fixture.root, 'a.pdf'), '%PDF-1.7\nResearch fixture\n')
     for (const id of ['topic-agent', 'paper-a', 'paper-b']) {
       fixture.ctx.sessions.create(SessionId(id), { meta: { cwd: fixture.root } })
       await owner.attachSession(SessionId(id))
@@ -491,6 +499,48 @@ describe('Research catalog', () => {
     const catalog = await fixture.controller.researchCreateTopic({ title: 'Robot VLA', workspaceId: workspace.workspaceId, sessionId: SessionId('topic-agent') })
     return { ...fixture, topic: catalog.topics[0]!, workspace }
   }
+
+  it('creates distinct papers without PDFs and retains their empty original state after migration and reopening', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const first = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const second = await controller.researchCreatePaper({ topicId: topic.id, title: 'B', pdfPath: '  ', repositoryUrl: '', sessionId: SessionId('paper-b') })
+    expect(second.papers).toHaveLength(2)
+    expect(second.papers.every(paper => paper.pdfPath === '' && paper.pdfSha256 === undefined)).toBe(true)
+    const paper = first.papers[0]!
+    expect(existsSync(join(root, 'data', 'papers', paper.id, 'paper.pdf'))).toBe(false)
+    await expect(controller.researchReadPaper({ paperId: paper.id }, new AbortController().signal))
+      .rejects.toThrow('research_attach_pdf')
+    await controller.researchSaveNote({ paperId: paper.id, kind: 'learning', text: 'Questions before reading', expectedRevision: 0 })
+    const moved = await controller.researchConfigure({ directory: join(root, 'moved-data'), mode: 'migrate' })
+    expect(moved.papers[0]).toMatchObject({ id: paper.id, sessionId: paper.sessionId, pdfPath: '', learning: { text: 'Questions before reading' } })
+    await controller.researchConfigure({ directory: join(root, 'data'), mode: 'open' })
+    expect((await controller.researchList()).papers.map(item => item.pdfPath)).toEqual(['', ''])
+  })
+
+  it('attaches an original to the same paper and preserves notebooks on invalid sources, retries and replacement attempts', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]!, signal = new AbortController().signal
+    await controller.researchSaveNote({ paperId: paper.id, kind: 'ai', text: 'Existing analysis', expectedRevision: 0 })
+    writeFileSync(join(root, 'invalid.pdf'), '<html>Download page</html>')
+    await expect(controller.researchAttachPdf({ paperId: paper.id, source: join(root, 'invalid.pdf') }, signal))
+      .rejects.toMatchObject({ code: 'research/invalid' })
+    expect((await controller.researchList()).papers[0]?.pdfPath).toBe('')
+    const original = pdfFixture(3)
+    const source = join(root, 'data', 'papers', paper.id, 'download.pdf')
+    writeFileSync(source, original)
+    const attached = await controller.researchAttachPdf({ paperId: paper.id, source: 'download.pdf' }, signal)
+    expect(attached.papers).toHaveLength(1)
+    expect(attached.papers[0]).toMatchObject({ id: paper.id, sessionId: paper.sessionId, directory: paper.directory,
+      ai: { text: 'Existing analysis', revision: 1 }, pdfSha256: digest(original) })
+    expect(readFileSync(attached.papers[0]!.pdfPath)).toEqual(Buffer.from(original))
+    expect((await controller.researchReadPaper({ paperId: paper.id, startPage: 1, pageCount: 1 }, signal)).pages[0]?.text).toContain('Selectable PDF text')
+    expect(await controller.researchAttachPdf({ paperId: paper.id, source }, signal)).toEqual(attached)
+    writeFileSync(source, pdfFixture(4))
+    await expect(controller.researchAttachPdf({ paperId: paper.id, source }, signal)).rejects.toMatchObject({ code: 'research/invalid' })
+    expect(readFileSync(attached.papers[0]!.pdfPath)).toEqual(Buffer.from(original))
+    expect((await controller.researchList()).papers[0]?.ai.text).toBe('Existing analysis')
+  })
 
   it('keeps topic and paper sessions independent and rejects reusing another entity session', async () => {
     const { controller, topic } = await researchFixture()
@@ -525,5 +575,143 @@ describe('Research catalog', () => {
     const [mention] = await controller.researchMentions([catalog.papers[0]!.id])
     expect(mention).toBe('@[A](dsh-session:InBhcGVyLWEi)')
     await expect(controller.researchMentions(Array(4).fill(catalog.papers[0]!.id))).rejects.toMatchObject({ code: 'research/invalid' })
+  })
+
+  it('copies original PDFs and stores notebook bodies only in the managed Markdown files', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const source = join(root, 'a.pdf')
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: source,
+      repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]
+    if (paper === undefined) throw new Error('paper must be created')
+    expect(paper.directory).toBe(join(root, 'data', 'papers', paper.id))
+    expect(readFileSync(paper.pdfPath)).toEqual(readFileSync(source))
+    await controller.researchSaveNote({ paperId: paper.id, kind: 'ai', text: '# Agent notebook', expectedRevision: 0 })
+    expect(readFileSync(join(root, 'data', 'papers', paper.id, 'notes', 'ai.md'), 'utf8')).toBe('# Agent notebook')
+    expect(readFileSync(join(root, 'data', 'library.json'), 'utf8')).not.toContain('# Agent notebook')
+    expect(readFileSync(source, 'utf8')).toContain('Research fixture')
+  })
+
+  it('pushes external Markdown edits and rejects an edit based on the previous revision', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf',
+      repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]
+    if (paper === undefined) throw new Error('paper must be created')
+    const lifetime = new AbortController()
+    const stream = controller.researchFollow(lifetime.signal)[Symbol.asyncIterator]()
+    try {
+      expect((await stream.next()).value).toMatchObject({ type: 'baseline' })
+      const next = stream.next()
+      writeFileSync(join(root, 'data', 'papers', paper.id, 'notes', 'ai.md'), '# External notebook')
+      const update = await next
+      expect(update.value).toMatchObject({ type: 'changed', catalog: { papers: [{ ai: { text: '# External notebook', revision: 1 } }] } })
+      await expect(controller.researchSaveNote({ paperId: paper.id, kind: 'ai', text: 'Old draft', expectedRevision: 0 }))
+        .rejects.toMatchObject({ code: 'research/note-conflict' })
+      expect(readFileSync(join(root, 'data', 'papers', paper.id, 'notes', 'ai.md'), 'utf8')).toBe('# External notebook')
+    } finally { lifetime.abort(); await stream.return?.() }
+  })
+
+  it('migrates a library to an empty directory while retaining the source and paper identities', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf',
+      repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]
+    if (paper === undefined) throw new Error('paper must be created')
+    await controller.researchSaveNote({ paperId: paper.id, kind: 'learning', text: 'Portable notes', expectedRevision: 0 })
+    const moved = await controller.researchConfigure({ directory: join(root, 'moved-data'), mode: 'migrate' })
+    expect(moved.directory).toBe(join(root, 'moved-data'))
+    expect(moved.papers[0]).toMatchObject({ id: paper.id, sessionId: paper.sessionId, learning: { text: 'Portable notes' } })
+    expect(moved.papers[0]?.pdfPath).toBe(join(root, 'moved-data', 'papers', paper.id, 'paper.pdf'))
+    expect(readFileSync(join(root, 'data', 'papers', paper.id, 'notes', 'learning.md'), 'utf8')).toBe('Portable notes')
+    const reopened = await controller.researchConfigure({ directory: join(root, 'data'), mode: 'open' })
+    expect(reopened.papers[0]?.id).toBe(paper.id)
+    await expect(controller.researchConfigure({ directory: join(root, 'data', 'nested'), mode: 'migrate' }))
+      .rejects.toMatchObject({ code: 'research/invalid' })
+  })
+
+  it('reuses matching PDF bytes across topics and extracts original text with page numbers', async () => {
+    const { controller, topic, root, workspace, ctx } = await researchFixture()
+    writeFileSync(join(root, 'a.pdf'), pdfFixture(3))
+    const first = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf',
+      repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const nextTopic = await controller.researchCreateTopic({ title: 'Other topic', workspaceId: workspace.workspaceId, sessionId: SessionId('paper-b') })
+    const other = nextTopic.topics.find(item => item.title === 'Other topic')
+    const paper = first.papers[0]
+    if (other === undefined || paper === undefined) throw new Error('both research entities must exist')
+    ctx.sessions.create(SessionId('paper-c'), { meta: { cwd: root } })
+    const owner = ctx.workspaceRegistry.get(workspace.workspaceId)
+    if (owner === undefined) throw new Error('the fixture workspace must exist')
+    await owner.attachSession(SessionId('paper-c'))
+    const reused = await controller.researchCreatePaper({ topicId: other.id, title: 'Duplicate', pdfPath: 'a.pdf',
+      repositoryUrl: '', sessionId: SessionId('paper-c') })
+    expect(reused.papers).toHaveLength(1)
+    expect(reused.papers[0]?.topicIds).toEqual([topic.id, other.id])
+    const text = await controller.researchReadPaper({ paperId: paper.id, startPage: 1, pageCount: 2 }, new AbortController().signal)
+    expect(text.totalPages).toBe(2)
+    expect(text.pages.map(page => page.page)).toEqual([1, 2])
+    expect(text.pages.every(page => page.text.includes('Selectable PDF text'))).toBe(true)
+    expect(existsSync(join(root, 'data', 'papers', paper.id, 'extracted', 'pages-1.json'))).toBe(true)
+  })
+
+  it('restores a missing native Session from the library snapshot without replacing a stored log', async () => {
+    const { controller, topic, root, ctx } = await researchFixture({ nativeSessions: true })
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf',
+      repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0], existing = ctx.sessions.get(SessionId('paper-a'))
+    if (paper === undefined || existing === undefined) throw new Error('the paper Session must exist')
+    const detached = Session.fromRestore(existing.id, [], existing.header, SessionLogOffset(0), 'detached')
+    detached.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'Explain the method' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+    writeFileSync(join(root, 'data', 'papers', paper.id, 'session.json'), JSON.stringify({
+      header: detached.header, inheritedEventCount: 0, events: detached.snapshotEvents(),
+    }))
+    await controller.researchConfigure({ directory: join(root, 'empty-library'), mode: 'open' })
+    await controller.researchConfigure({ directory: join(root, 'data'), mode: 'open' })
+    const handle = await ctx.sessionPersistence.open(paper.sessionId, 'read')
+    try { expect((await handle.read()).events).toEqual(detached.snapshotEvents()) } finally { await handle.close() }
+    const before = await ctx.sessionPersistence.stat(paper.sessionId)
+    await controller.researchConfigure({ directory: join(root, 'empty-library'), mode: 'open' })
+    await controller.researchConfigure({ directory: join(root, 'data'), mode: 'open' })
+    expect((await ctx.sessionPersistence.stat(paper.sessionId))?.revision).toBe(before?.revision)
+  })
+
+  it('rejects an external edit made after a mutation read without overwriting its Markdown', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf',
+      repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]
+    if (paper === undefined) throw new Error('the paper must exist')
+    const path = join(root, 'data', 'papers', paper.id, 'notes', 'ai.md')
+    const files = await ResearchFiles.open(join(root, 'data'), { maxNoteBytes: 1024, lockTimeoutMs: 1000 })
+    await files.withLock(async () => {
+      const previous = await files.read()
+      writeFileSync(path, 'External editor text')
+      await expect(files.write({ ...previous, papers: previous.papers.map(item => ({ ...item, ai: { text: 'Stale Agent text', revision: 1 } })) }, previous))
+        .rejects.toMatchObject({ code: 'research/invalid-library' })
+      expect(readFileSync(path, 'utf8')).toBe('External editor text')
+    })
+  })
+
+  it('recovers interrupted notebook publication and retains conflicting external edits', async () => {
+    const { controller, topic, root } = await researchFixture()
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', pdfPath: 'a.pdf',
+      repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]
+    if (paper === undefined) throw new Error('the paper must exist')
+    const directory = join(root, 'data'), path = join(directory, 'papers', paper.id, 'notes', 'ai.md')
+    const files = await ResearchFiles.open(directory, { maxNoteBytes: 1024, lockTimeoutMs: 1000 })
+    await files.withLock(async () => {
+      const index: unknown = JSON.parse(readFileSync(join(directory, 'library.json'), 'utf8'))
+      const journalPath = join(directory, '.transaction.json')
+      const journal = { index, writes: [{ kind: 'ai', id: paper.id, previous: digest(''), text: 'Recovered analysis' }] }
+      writeFileSync(journalPath, JSON.stringify(journal))
+      expect((await files.read()).papers[0]?.ai.text).toBe('Recovered analysis')
+      expect(existsSync(journalPath)).toBe(false)
+      writeFileSync(journalPath, JSON.stringify(journal))
+      writeFileSync(path, 'External edit after the interrupted write')
+      await expect(files.read()).rejects.toMatchObject({ code: 'research/invalid-library' })
+      expect(readFileSync(path, 'utf8')).toBe('External edit after the interrupted write')
+      expect(existsSync(journalPath)).toBe(true)
+    })
   })
 })

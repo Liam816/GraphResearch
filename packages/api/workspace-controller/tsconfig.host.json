@@ -14,7 +14,11 @@
     "src/feed.ts",
     "src/default-directory.ts",
     "src/research-types.ts",
-    "src/research.ts"
+    "src/research.ts",
+    "src/research-files.ts",
+    "src/research-pdf.ts",
+    "src/research-agent.ts",
+    "src/research-session-backup.ts"
   ],
   "references": [
     {
@@ -49,6 +53,27 @@
     },
     {
       "path": "../../context/session-reference"
+    },
+    {
+      "path": "../../util/atomic-write"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../session/working-directory"
+    },
+    {
+      "path": "../../session/session-persistence"
+    },
+    {
+      "path": "../../api/session-controller/tsconfig.host.json"
     }
   ]
 }

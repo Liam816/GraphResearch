@@ -584,7 +584,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // never write the user's harness home.
     { id: 'storage-json', config: { root: join(workspaceCwd, '.dsh-storages') } },
     // First-use initialization must create directories only inside this scaffold's temporary world.
-    { id: 'workspace-controller', config: { documentsDirectory: join(workspaceCwd, 'Documents') } },
+    { id: 'workspace-controller', config: {
+      documentsDirectory: join(workspaceCwd, 'Documents'), researchDirectory: join(workspaceCwd, '.dsh-storages', 'research-library'),
+    } },
     // Skill discovery is model-visible input. Pin every host-level root inside
     // the owned temp world so ~/.dsh, ~/.agents, and a bundled-root env setting
     // cannot change replay requests or conversation goldens. Project roots stay

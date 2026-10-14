@@ -1,5 +1,6 @@
 .directory { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 12px; padding: 12px 4px 0 12px; color: var(--dsw-alias-label-primary); }
 .directoryHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.libraryLocation { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); font-size: 11px; margin: 0; }
 .directory strong, .workbench strong, .workbench h1, .workbench h2 { font-weight: 500; }
 .tree { flex: 1; min-height: 0; overflow: auto; padding-bottom: 12px; }
 .tree ul { list-style: none; padding: 0; margin: 0; }

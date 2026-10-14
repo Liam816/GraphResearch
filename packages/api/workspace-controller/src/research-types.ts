@@ -22,6 +22,8 @@ export interface ResearchTopic {
   readonly title: string
   readonly workspaceId: WorkspaceId
   readonly sessionId: SessionId
+  /** Browser projection of the topic's Markdown summary. */
+  readonly notes?: ResearchNote | undefined
 }
 
 /** A paper with its own Agent session, original PDF and notebooks. */
@@ -30,11 +32,21 @@ export interface ResearchPaper {
   readonly title: string
   readonly topicIds: readonly ResearchTopicId[]
   readonly sessionId: SessionId
-  /** Local PDF path resolved using this paper's Session workspace. */
+  /** Managed PDF path; empty until an original is attached. */
   readonly pdfPath: string
   readonly repositoryUrl: string
   readonly ai: ResearchNote
   readonly learning: ResearchNote
+  /** Absolute managed directory in the Host filesystem. */
+  readonly directory?: string | undefined
+  /** arXiv or DOI identity used to reuse an existing paper. */
+  readonly sourceId?: string | undefined
+  /** SHA-256 of the imported original PDF. */
+  readonly pdfSha256?: string | undefined
+  /** Original import location; the managed PDF is independent of it. */
+  readonly source?: string | undefined
+  /** Reader's continuation point and unresolved questions. */
+  readonly progress?: string | undefined
 }
 
 /** Complete durable research catalog; revisions order stream and command replies. */
@@ -42,6 +54,8 @@ export interface ResearchCatalog {
   readonly revision: number
   readonly topics: readonly ResearchTopic[]
   readonly papers: readonly ResearchPaper[]
+  /** Absolute managed library root. */
+  readonly directory?: string | undefined
 }
 
 /** Attach a newly created independent Session to a topic. */
@@ -51,14 +65,58 @@ export interface ResearchCreateTopicRequest {
   readonly sessionId: SessionId
 }
 
-/** Attach a newly created independent Session and a PDF to a paper. */
+/** Register a paper with an independent Session and an optional original. */
 export interface ResearchCreatePaperRequest {
   readonly topicId: ResearchTopicId
   readonly title: string
   readonly sessionId: SessionId
-  readonly pdfPath: string
+  readonly pdfPath?: string
   readonly repositoryUrl: string
+  /** Optional external paper identity. */
+  readonly sourceId?: string
 }
+
+/** Switch to an existing library or copy the current library into a new directory. */
+export interface ResearchDirectoryRequest {
+  readonly directory: string
+  readonly mode: 'open' | 'migrate'
+}
+
+/** Register a paper, optionally importing a local PDF or an HTTP(S) source. */
+export interface ResearchImportPaperRequest {
+  readonly topicId: ResearchTopicId
+  readonly title: string
+  readonly source?: string
+  readonly sourceId?: string
+  readonly repositoryUrl?: string
+}
+
+/** Supply an existing paper's missing PDF without changing its identity or Session. */
+export interface ResearchAttachPdfRequest {
+  readonly paperId: ResearchPaperId
+  readonly source: string
+}
+
+/** Page range read by the Agent; returned text retains original page numbers. */
+export interface ResearchReadPaperRequest {
+  readonly paperId: ResearchPaperId
+  readonly startPage?: number
+  readonly pageCount?: number
+}
+
+/** Extracted original text, cached beneath the owning paper. */
+export interface ResearchPaperText {
+  readonly paperId: ResearchPaperId
+  readonly totalPages: number
+  readonly pages: readonly { readonly page: number; readonly text: string }[]
+  readonly truncated: boolean
+}
+
+/** Complete library snapshots also carry file-observation failures without dropping confirmed data. */
+export type ResearchFollowFrame =
+  | { readonly type: 'baseline'; readonly catalog: ResearchCatalog }
+  | { readonly type: 'changed'; readonly catalog: ResearchCatalog }
+  | { readonly type: 'error'; readonly message: string }
 
 /** Save one notebook only if its acknowledged revision is still current. */
 export interface ResearchSaveNoteRequest {
@@ -76,5 +134,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'research/not-found': { readonly id: string }
     /** Another writer changed the notebook; the caller must retain its draft. */
     'research/note-conflict': { readonly paperId: ResearchPaperId; readonly kind: ResearchNoteKind; readonly revision: number }
+    /** Filesystem or download failure; refresh before retrying an interrupted write. */
+    'research/storage-failed': { readonly operation: string; readonly path: string }
+    /** A library directory contains invalid or unsupported metadata. */
+    'research/invalid-library': { readonly path: string }
   }
 }

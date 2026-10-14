@@ -302,8 +302,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-api-workspace-controller`
 
-- `inject`: `typert` · `workspaceRegistry`
-- `source`: [`packages/api/workspace-controller/src/index.ts:33`](../packages/api/workspace-controller/src/index.ts)
+- `inject`: `typert` · `workspaceRegistry` · `storageDomain` · `sessionController` · `agents` · `sessions` · `sessionPersistence`
+- `source`: [`packages/api/workspace-controller/src/index.ts:43`](../packages/api/workspace-controller/src/index.ts)
 
 ```ts config-catalog
 /** First-use directory policy for the Host account. */
@@ -312,6 +312,24 @@ export interface Config {
   documentsDirectory?: string
   /** Maximum duration of the operating system's Documents lookup. */
   documentsLookupTimeoutMs?: number
+  /** Absolute initial research library; the persisted selection takes precedence after first use. */
+  researchDirectory?: string
+  /** Maximum bytes in one Markdown notebook. */
+  researchMaxNoteBytes?: number
+  /** Maximum bytes in one imported PDF. */
+  researchMaxPdfBytes?: number
+  /** PDF download timeout in milliseconds. */
+  researchDownloadTimeoutMs?: number
+  /** Maximum pages in one Agent reading call. */
+  researchMaxReadPages?: number
+  /** Maximum original characters returned by one reading call. */
+  researchMaxReadCharacters?: number
+  /** Maximum wait for another library writer in milliseconds. */
+  researchLockTimeoutMs?: number
+  /** File must remain stable for this many milliseconds before external edits are published. */
+  researchWatchStabilityMs?: number
+  /** File stability polling interval in milliseconds. */
+  researchWatchPollMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-api-workspace-controller -->
