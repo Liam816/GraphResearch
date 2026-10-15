@@ -70,6 +70,21 @@ export class ChatReading {
     this.sampled = null
   }
 
+  /**
+   * Persist visible reading movement before navigation or page unload.
+   * @param onlyPending - detached views flush only movement not already checkpointed before navigation.
+   */
+  checkpoint(onlyPending = false): void {
+    if (!this.state.initialized || (onlyPending && !this.pending)) return
+    const scroll = this.viewport.readScroll()
+    if (scroll === null || this.follow.animating) return
+    if (!scroll.movedByReader && this.state.followingTail) return
+    const following = this.follow.nearBottom(scroll.metrics)
+    const position = following ? null : this.viewport.capturePosition()
+    if (following || position !== null) this.store.save(position)
+    this.cancelPending()
+  }
+
   /** Release bottom follow and pending sampling for an explicit navigation. */
   pauseFollowing(): void {
     this.cancelPending()

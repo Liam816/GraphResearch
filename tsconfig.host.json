@@ -66,6 +66,7 @@
     "apps/web/tests/document-preview.e2e.ts",
     "apps/web/tests/research-workspace.e2e.ts",
     "apps/web/tests/research-highlights.e2e.ts",
+    "apps/web/tests/research-reading.e2e.ts",
     "apps/web/tests/excel-opc.e2e.ts",
     "apps/web/tests/office-fixture.ts",
     "apps/web/tests/sidebar-browser.e2e.ts",

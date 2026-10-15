@@ -320,6 +320,22 @@ function lastOpening(open: MockInstance<UiWorkspaceService['openWorkspace']>): P
 }
 
 describe('UiWorkspaceService', () => {
+  it('checkpoints the current Session before acquiring the next history window or clearing an archived selection', () => {
+    const b = bench()
+    b.uiWorkspace.openSession(sid('first'))
+    const observed: SessionId[] = []
+    b.ctx.on('ui-workspace/before-session-change', (sessionId) => {
+      observed.push(sessionId)
+      expect(b.sessions.retained.at(-1)?.release).not.toHaveBeenCalled()
+      expect(b.sessions.retained.at(-1)?.reference.sessionId).toBe(sessionId)
+    })
+    b.uiWorkspace.openSession(sid('second'))
+    expect(observed).toEqual([sid('first')])
+    b.workspaces.list.set(workspaceState([], [sid('second')]))
+    expect(observed).toEqual([sid('first'), sid('second')])
+    expect(b.sessions.retained.at(-1)?.release).toHaveBeenCalledOnce()
+  })
+
   it('prepares and selects the default Workspace after both startup baselines', async () => {
     const b = bench({ configureWorkspaces: (workspaces) => {
       workspaces.initializeDefault.mockImplementation(async () => {

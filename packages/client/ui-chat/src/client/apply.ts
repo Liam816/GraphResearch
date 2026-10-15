@@ -22,7 +22,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {
-  ChatFlowDataInjected, ChatFlowInjected, ChatNodeInjected, ChatScrollPosition, ChatViewInjected,
+  ChatFlowDataInjected, ChatFlowInjected, ChatNodeInjected, ChatViewInjected,
   QuotaNoticeInjected, QuotaNoticeState, TurnTailOwnerProps,
 } from './contract/slots.ts'
 import type { ChatSnapshot } from './contract/snapshot.ts'
@@ -36,7 +36,7 @@ import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { QuotaNoticeHost } from './chat/QuotaNoticeHost.tsx'
 import { en, NS, zh } from './locale.ts'
 import { TranscriptViewRow, type TranscriptViewRowInjected } from './settings/TranscriptViewRow.tsx'
-import { createChatStore } from './stores.ts'
+import { createChatStore, createChatReadingStore } from './stores.ts'
 import { TranscriptViewPolicy } from './transcript-view.ts'
 import { derivePresentationPolicy } from './presentation-policy.ts'
 import { CHAT_SETTINGS_NAMESPACE, DEFAULT_LINK_OPENING, DEFAULT_TRANSCRIPT_VIEW_MODE, type ChatSettings } from '../chat-settings.ts'
@@ -134,7 +134,11 @@ export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-chat: dictionaries')
   const t = ctx.locale.bind(NS)
   const chatStore = createChatStore()
-  const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
+  const chatReading = createChatReadingStore().create()
+  const readingCheckpoints = new Map<SessionId, Set<() => void>>()
+  ctx.on('ui-workspace/before-session-change', (sessionId) => {
+    for (const checkpoint of readingCheckpoints.get(sessionId) ?? []) checkpoint()
+  })
   const chatSettings = ctx.configForms.get<ChatSettings>(CHAT_SETTINGS_NAMESPACE)
   const linkOpening = createSnapshotStore(chatSettings.getSnapshot().value?.linkOpening ?? DEFAULT_LINK_OPENING)
   ctx.effect(() => chatSettings.subscribe(() => {
@@ -277,11 +281,20 @@ export function apply(ctx: Context): void {
             { peek: (attachment: ImageAttachmentRef) => ctx.uiConversation.peekImageUrl(sessionId, attachment) },
           ),
           chatScroll: {
-            save: (position) => {
-              if (position === null) chatScrollPositions.delete(sessionId)
-              else chatScrollPositions.set(sessionId, position)
+            bindCheckpoint: (checkpoint) => {
+              let callbacks = readingCheckpoints.get(sessionId)
+              if (callbacks === undefined) {
+                callbacks = new Set()
+                readingCheckpoints.set(sessionId, callbacks)
+              }
+              callbacks.add(checkpoint)
+              return () => {
+                callbacks.delete(checkpoint)
+                if (callbacks.size === 0) readingCheckpoints.delete(sessionId)
+              }
             },
-            read: () => chatScrollPositions.get(sessionId) ?? null,
+            save: (position) => { chatReading.actions.save(sessionId, position) },
+            read: () => chatReading.getSnapshot().positions[sessionId] ?? null,
           },
           forkAt: (seq) => {
             const turn = [...chat.getSnapshot().timeline.turns.values()].find(turn => turn.end?.seq === seq)

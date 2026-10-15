@@ -2,6 +2,11 @@
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
 import type { ChatStoreState, TurnProcessViewEntry } from './contract/store.ts'
 import type { TurnProcessSpec } from './contract/turn-process.ts'
+import type { ChatScrollPosition } from './contract/slots.ts'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+
+type ChatReadingState = { positions: Record<SessionId, ChatScrollPosition> }
+type ChatReadingActions = { save: (draft: ChatReadingState, id: SessionId, position: ChatScrollPosition | null) => void }
 
 type ChatActions = {
   setTurnProcessOpen: (
@@ -49,6 +54,7 @@ export function turnProcessOpen(
  */
 export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions> {
   return defineStore({
+    persist: 'dsh.chat.view.v1',
     init: (): ChatStoreState => ({ turnProcesses: [] }),
     actions: {
       setTurnProcessOpen: (draft, turn, answerStep, open) => {
@@ -56,6 +62,23 @@ export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions
         const next = (open ? { turn, answerStep } : { turn, answerStep, collapsed: true }) satisfies TurnProcessViewEntry
         if (index < 0) draft.turnProcesses.push(next)
         else draft.turnProcesses[index] = next
+      },
+    },
+  })
+}
+
+/**
+ * Retain Session-specific semantic reading anchors through navigation and page reloads.
+ * @returns a root store declaration; following the tail removes only that Session's anchor.
+ */
+export function createChatReadingStore(): EngineStoreHandle<ChatReadingState, ChatReadingActions> {
+  return defineStore({
+    persist: 'dsh.chat.reading.v1',
+    init: () => ({ positions: {} as Record<SessionId, ChatScrollPosition> }),
+    actions: {
+      save: (draft, id: SessionId, position: ChatScrollPosition | null) => {
+        if (position === null) draft.positions = Object.fromEntries(Object.entries(draft.positions).filter(([key]) => key !== id))
+        else draft.positions[id] = position
       },
     },
   })

@@ -118,6 +118,14 @@ export interface UiWorkspace {
 }
 
 declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Save visible Session UI state before navigation releases its history window.
+     * @param sessionId - the currently selected Session being replaced or cleared.
+     * @mode emit
+     */
+    'ui-workspace/before-session-change'(sessionId: SessionId): void
+  }
   interface Context {
     /** Cross-Controller Workspace navigation and directory UI capability. */
     uiWorkspace: UiWorkspace
@@ -423,6 +431,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
 
   private clearMain(): void {
     const previous = this.mainReference
+    if (previous !== undefined) this.ctx.emit('ui-workspace/before-session-change', previous.sessionId)
     this.mainReference = undefined
     this.selection.set({})
     previous?.release()
@@ -436,6 +445,9 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     beforeOpen?: (sessionId: SessionId) => void,
   ): void {
     signal.throwIfAborted()
+    if (this.mainReference !== undefined) {
+      this.ctx.emit('ui-workspace/before-session-change', this.mainReference.sessionId)
+    }
     const reference = this.sessions.retain(target, { source: 'mainView' })
     try {
       signal.throwIfAborted()

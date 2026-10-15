@@ -11,7 +11,7 @@ import type { PanelPlacement, ResearchPanel } from '../src/client/research/store
 import { en } from '../src/client/research/locales.ts'
 import type { ResearchSeats } from '../src/client/research/contract.ts'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
 beforeEach(() => { localStorage.clear() })
 const paper = (id: string): ResearchPaper => ({
   id: id as ResearchPaperId, title: id, topicIds: [], sessionId: id as SessionId, pdfPath: `${id}.pdf`, repositoryUrl: '',
@@ -41,7 +41,7 @@ it('keeps drafts separate across paper and notebook switches and retains them af
   view.rerender(<Harness current={b} />)
   expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Learning notes' }).value).toBe('')
   view.rerender(<Harness current={a} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+  expect(screen.getByRole('button', { name: 'Preview' })).toBeTruthy()
   expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'AI notes' }).value).toBe('A AI draft')
   fireEvent.click(screen.getByRole('button', { name: 'Save notes' }))
   await waitFor(() => { expect(screen.getByRole('alert').textContent).toContain('another window') })
@@ -61,6 +61,35 @@ it('keeps edits typed during an in-flight save and advances their acknowledged b
   await act(async () => { resolve() })
   expect(store.getSnapshot().papers[a.id]!.drafts.learning).toEqual({ text: 'Newer unsaved text', revision: 1 })
   expect((editor as HTMLTextAreaElement).value).toBe('Newer unsaved text')
+})
+
+it('restores notebook mode, editor selection and both scroll positions across papers and reloads', async () => {
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400)
+  const { Harness, store } = fixture(vi.fn(async () => {}))
+  const a = { ...paper('A'), learning: { text: 'Reading paragraph\n'.repeat(100), revision: 0 },
+    ai: { text: '## AI section\n\nExplanation.\n\n'.repeat(40), revision: 0 } }
+  const b = paper('B')
+  const view = render(<Harness current={a} />)
+  const editor = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Learning notes' })
+  editor.setSelectionRange(32, 48, 'backward')
+  fireEvent.scroll(editor, { target: { scrollTop: 320, scrollLeft: 12 } })
+  fireEvent.click(screen.getByRole('button', { name: 'AI notes' }))
+  const preview = view.container.querySelector<HTMLElement>('[data-research-note-preview]')!
+  fireEvent.scroll(preview, { target: { scrollTop: 640 } })
+  view.rerender(<Harness current={b} />)
+  expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Learning notes' }).scrollTop).toBe(0)
+  view.rerender(<Harness current={a} />)
+  expect(view.container.querySelector<HTMLElement>('[data-research-note-preview]')!.scrollTop).toBe(640)
+  fireEvent.click(screen.getByRole('button', { name: 'Learning notes' }))
+  const restored = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Learning notes' })
+  expect([restored.scrollTop, restored.scrollLeft, restored.selectionStart, restored.selectionEnd, restored.selectionDirection])
+    .toEqual([320, 12, 32, 48, 'backward'])
+  expect(document.activeElement).not.toBe(restored)
+  store.actions.reset(a.id)
+  expect(createResearchViewStore().create().getSnapshot().papers[a.id]?.reading).toEqual({
+    learning: { editor: { top: 320, left: 12, start: 32, end: 48, direction: 'backward' } },
+    ai: { preview: { top: 640, left: 0 } },
+  })
 })
 
 it('recovers every closed panel without discarding notebook drafts and bounds keyboard resizing', () => {

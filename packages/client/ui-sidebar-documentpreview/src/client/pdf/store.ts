@@ -3,10 +3,20 @@ import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-sto
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { ZoomPreference } from '../zoom/types.ts'
 
-/** One tab's last visible page and optional PDF zoom preference. */
+/** Position inside the first visible page, independent of previously rendered page heights. */
+export interface PdfReadingPosition {
+  readonly page: number
+  /** Viewport top relative to the displayed page height; negative within the top gutter. */
+  readonly y: number
+  /** Horizontal fraction of the available scroll range. */
+  readonly x: number
+}
+
+/** One tab's last visible page and optional PDF zoom and precise reading preferences. */
 export interface PdfView {
   readonly page: number
   readonly zoom?: ZoomPreference
+  readonly position?: PdfReadingPosition
 }
 
 /** Page state isolated by the owning tab record. */
@@ -34,7 +44,7 @@ export function createPdfStore(): EngineStoreHandle<PdfState, PdfActions> {
       },
       /** @param draft - view state. @param tabId - owning tab. @param zoom - selected scale multiplier. */
       zoom: (draft, tabId: TabId, zoom: ZoomPreference) => {
-        draft.byTab[tabId] = { page: draft.byTab[tabId]?.page ?? 1, zoom }
+        draft.byTab[tabId] = { ...draft.byTab[tabId], page: draft.byTab[tabId]?.page ?? 1, zoom }
       },
       /** @param draft - view state. @param tabId - closed tab whose preferences are discarded. */
       forget: (draft, tabId: TabId) => {

@@ -4,10 +4,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it, onTestFinished } from 'vitest'
+import { chromium } from 'playwright'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { pdfFixture } from '../../../packages/client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
 import { assertFinalWorkspaceSnapshot, fixtureUserPrompts, launchWebScaffold } from './scaffold.ts'
+import { newEnglishPage } from './support.ts'
 
 const DIRECTORY = fileURLToPath(new URL('../../../snapshots/web/research-notebook', import.meta.url))
 const FIXTURE = join(DIRECTORY, 'session.v4.jsonl')
@@ -56,4 +58,17 @@ it('records research context, reads original pages, and saves the live AI notebo
   await expect.poll(async () => (JSON.parse(await readFile(join(paperDirectory, 'session.json'), 'utf8')) as { events: unknown[] }).events.length)
     .toBe(events.length)
   await assertFinalWorkspaceSnapshot(DIRECTORY, paperDirectory, { ignoredRootEntries: ['session.json'] })
+  const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+  const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
+  onTestFinished(() => browser.close())
+  const page = await newEnglishPage(browser)
+  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  await page.getByRole('region', { name: 'Research library', exact: true }).getByRole('button', { name: 'Fixture paper', exact: true }).click()
+  const workbench = page.locator('[data-research-workbench]')
+  await workbench.getByRole('button', { name: 'AI notes', exact: true }).click()
+  await workbench.getByRole('button', { name: 'Edit', exact: true }).click()
+  expect(await workbench.getByRole('textbox', { name: 'AI notes', exact: true }).inputValue()).toContain('The original page contains selectable text')
+  await page.reload({ waitUntil: 'load' })
+  await expect.poll(() => workbench.getByRole('textbox', { name: 'AI notes', exact: true }).inputValue())
+    .toContain('The original page contains selectable text')
 })

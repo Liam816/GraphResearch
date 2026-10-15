@@ -1,5 +1,5 @@
 /** Independent PDF factory, using the document preview package's existing renderer and file API. */
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineStore } from '@deepseek-ai/dsh-client-store'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -7,9 +7,9 @@ import type { FactoryComponentPropsOf } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PdfAnnotations } from './highlights.ts'
-import type { PdfView } from './store.ts'
+import type { PdfView, PdfReadingPosition } from './store.ts'
 import type { ZoomPreference } from '../zoom/types.ts'
-import { ZoomViewport, zoomSurfaceClass } from '../zoom/ZoomViewport.tsx'
+import { ZoomViewport, zoomSurfaceClass, fitWidthZoom } from '../zoom/ZoomViewport.tsx'
 import { LoadingIndicator } from '../LoadingIndicator.tsx'
 import type {} from './locales.ts'
 import css from './EmbeddedPdf.module.css'
@@ -23,8 +23,14 @@ export function createEmbeddedPdfStore() {
     persist: 'dsh.research.pdf.v1',
     init: () => ({ byPath: {} as Record<string, PdfView> }),
     actions: {
+      adopt: (draft, key: string, path: string) => { draft.byPath[key] ??= draft.byPath[path] ?? { page: 1 } },
       page: (draft, path: string, page: number) => { draft.byPath[path] = { ...draft.byPath[path], page } },
-      zoom: (draft, path: string, zoom: ZoomPreference) => { draft.byPath[path] = { page: draft.byPath[path]?.page ?? 1, zoom } },
+      zoom: (draft, path: string, zoom: ZoomPreference) => {
+        draft.byPath[path] = { ...draft.byPath[path], page: draft.byPath[path]?.page ?? 1, zoom }
+      },
+      position: (draft, path: string, position: PdfReadingPosition) => {
+        draft.byPath[path] = { ...draft.byPath[path], page: position.page, position }
+      },
     },
   })
 }
@@ -39,7 +45,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Selectable original PDF outside the right sidebar's tab system. */
     'document.pdf': {
       scope: 'session'
-      props: { readonly path: string; readonly annotations?: PdfAnnotations }
+      props: { readonly path: string; readonly viewKey?: string; readonly annotations?: PdfAnnotations }
       store: ReturnType<typeof createEmbeddedPdfStore>
       locale: 'sidebarPdf'
       inject: EmbeddedPdfInjected
@@ -54,11 +60,14 @@ type ReadState = { readonly path: string; readonly signal: AbortSignal } & (
 
 function EmbeddedPdf(props: FactoryComponentPropsOf<'document.pdf'>) {
   const { path, read, t, actions } = props
-  const view = props.useStore(value => value.byPath[path] ?? INITIAL_VIEW)
+  const key = props.viewKey ?? path
+  const view = props.useStore(value => value.byPath[key] ?? value.byPath[path] ?? INITIAL_VIEW)
+  useLayoutEffect(() => { actions.adopt(key, path) }, [actions, key, path])
   const [state, setState] = useState<ReadState>()
   const [attempt, setAttempt] = useState(0)
-  const onPage = useCallback((page: number) => { actions.page(path, page) }, [actions, path])
-  const onZoom = useCallback((zoom: ZoomPreference) => { actions.zoom(path, zoom) }, [actions, path])
+  const onPage = useCallback((page: number) => { actions.page(key, page) }, [actions, key])
+  const onZoom = useCallback((zoom: ZoomPreference) => { actions.zoom(key, zoom) }, [actions, key])
+  const onPosition = useCallback((position: PdfReadingPosition) => { actions.position(key, position) }, [actions, key])
   const scrollportRef = useCallback(() => {}, [])
   useEffect(() => {
     const lifetime = new AbortController()
@@ -77,7 +86,8 @@ function EmbeddedPdf(props: FactoryComponentPropsOf<'document.pdf'>) {
   if (state.kind === 'failed') return <div className={css.status} role="alert"><p>{t('failed', { message: state.message })}</p>
     <Button size="sm" onClick={() => { setAttempt(value => value + 1) }}>{t('retry')}</Button></div>
   return <div className={css.root}><Suspense fallback={loading}>
-    <Reader annotations={props.annotations} data={state.data} view={view} signal={state.signal} onPage={onPage} onZoom={onZoom} t={t}
+    <Reader annotations={props.annotations} data={state.data} view={view} signal={state.signal}
+      onPage={onPage} onZoom={onZoom} reading={{ save: onPosition, fitWidthZoom }} t={t}
       ZoomViewport={ZoomViewport} zoomSurfaceClass={zoomSurfaceClass} scrollportRef={scrollportRef} loading={loading} />
   </Suspense></div>
 }

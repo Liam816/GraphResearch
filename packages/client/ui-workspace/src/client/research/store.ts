@@ -10,6 +10,21 @@ export const DEFAULT_PANEL_ORDER: readonly ResearchPanel[] = ['agent', 'pdf', 'n
 export type PanelPlacement = 'before' | 'after'
 /** Draft retains the revision it started from until a durable save succeeds. */
 export interface NoteDraft { text: string; revision: number }
+/** One notebook surface's local scroll offsets. */
+export interface NoteScrollPosition { top: number; left: number }
+/** Editor caret and selection are restored without taking keyboard focus. */
+export interface NoteEditorPosition extends NoteScrollPosition {
+  start: number
+  end: number
+  direction: 'forward' | 'backward' | 'none'
+}
+/** Independent viewing mode and positions for AI and learning notebooks. */
+export interface NoteReadingView {
+  mode?: 'edit' | 'preview'
+  latest?: boolean
+  editor?: NoteEditorPosition
+  preview?: NoteScrollPosition
+}
 /** Paper-local layout and unsaved notebook edits. */
 export interface PaperView {
   /** Absent in older browser preferences; resolvePanelOrder supplies the reading order. */
@@ -19,6 +34,8 @@ export interface PaperView {
   active: ResearchPanel
   notebook: ResearchNoteKind
   drafts: Partial<Record<ResearchNoteKind, NoteDraft>>
+  /** Absent in earlier browser preferences. */
+  reading?: Partial<Record<ResearchNoteKind, NoteReadingView>>
 }
 
 /**
@@ -100,9 +117,25 @@ function researchViewDefinition() {
       },
       reset: (draft, id: ResearchPaperId) => {
         const previous = draft.papers[id] ?? defaultPaperView()
-        draft.papers[id] = { ...defaultPaperView(), drafts: previous.drafts, notebook: previous.notebook }
+        draft.papers[id] = { ...defaultPaperView(), drafts: previous.drafts, notebook: previous.notebook,
+          ...previous.reading === undefined ? {} : { reading: previous.reading } }
       },
       notebook: (draft, id: ResearchPaperId, kind: ResearchNoteKind) => { (draft.papers[id] ??= defaultPaperView()).notebook = kind },
+      noteMode: (draft, id: ResearchPaperId, kind: ResearchNoteKind, mode: 'edit' | 'preview', latest: boolean = false) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        const reading = view.reading ??= {}
+        reading[kind] = { ...reading[kind], mode, latest }
+      },
+      noteEditor: (draft, id: ResearchPaperId, kind: ResearchNoteKind, position: NoteEditorPosition) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        const reading = view.reading ??= {}
+        reading[kind] = { ...reading[kind], editor: position }
+      },
+      notePreview: (draft, id: ResearchPaperId, kind: ResearchNoteKind, position: NoteScrollPosition) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        const reading = view.reading ??= {}
+        reading[kind] = { ...reading[kind], preview: position }
+      },
       edit: (draft, id: ResearchPaperId, kind: ResearchNoteKind, text: string, revision: number) => {
         const view = draft.papers[id] ??= defaultPaperView()
         view.drafts[kind] = { text, revision: view.drafts[kind]?.revision ?? revision }

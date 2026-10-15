@@ -2,6 +2,7 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { ChatScrollPosition } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
+import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { createFlowMotion } from './flow-motion.ts'
 import { scrollMetrics, ScrollFollow, type ViewportMetrics } from './use-scroll-follow.ts'
 export type { ViewportMetrics } from './use-scroll-follow.ts'
@@ -20,6 +21,7 @@ export interface ViewportLanding {
 }
 
 interface ViewportEvents {
+  checkpoint?: (onlyPending: boolean) => void
   scroll: (event: ViewportScroll) => void
   scrollEnd: (outer: boolean) => void
   resize: () => void
@@ -45,6 +47,15 @@ interface PagingPosition {
 
 const READING_INTENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown', 'beforematch'] as const
 const SCROLL_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
+
+function positionMetadata(row: HTMLElement | null): Pick<ChatScrollPosition, 'seq' | 'turn'> {
+  if (row === null) return {}
+  const value = row.dataset.chatAnchorSeq ?? row.querySelector<HTMLElement>('[data-chat-anchor-seq]')?.dataset.chatAnchorSeq
+  const seq = value === undefined ? NaN : Number(value), turn = Number(row.dataset.chatTurn)
+  return Number.isFinite(seq) && seq >= 0 && Number.isSafeInteger(Math.floor(seq))
+    && Number.isSafeInteger(turn) && turn >= 0
+    ? { seq: SessionSeq(Math.floor(seq)), turn } : {}
+}
 
 /** Owns one Chat scrollport's DOM operations, event listeners, and size observer. */
 export class ChatViewport {
@@ -76,6 +87,9 @@ export class ChatViewport {
     this.elements = elements
     if (spacer !== null) spacer.style.height = ''
     scroller.addEventListener('scroll', this.onScroll, { passive: true })
+    window.addEventListener('pagehide', this.checkpoint)
+    document.addEventListener('pointerdown', this.leaveViewport, true)
+    document.addEventListener('focusin', this.leaveViewport, true)
     scroller.addEventListener('scrollend', this.onScrollEnd, { passive: true, capture: true })
     for (const type of READING_INTENTS) scroller.addEventListener(type, this.onIntent, { passive: true, capture: true })
     if (typeof ResizeObserver !== 'undefined') {
@@ -93,6 +107,10 @@ export class ChatViewport {
 
   /** Disconnect DOM resources and clear observations for the detached view. */
   detach(): void {
+    this.events?.checkpoint?.(true)
+    window.removeEventListener('pagehide', this.checkpoint)
+    document.removeEventListener('pointerdown', this.leaveViewport, true)
+    document.removeEventListener('focusin', this.leaveViewport, true)
     this.stopPreserving()
     this.motion.clear()
     if (this.elements !== null) this.elements.scroller.style.overflowAnchor = ''
@@ -105,6 +123,14 @@ export class ChatViewport {
     this.events = null
     this.turns = []
     this.observation = { top: 0, landing: null }
+  }
+
+  private readonly checkpoint = (): void => { this.events?.checkpoint?.(false) }
+
+  private readonly leaveViewport = (event: Event): void => {
+    if (event.target instanceof Node && this.elements !== null && !this.elements.scroller.contains(event.target)) {
+      this.events?.checkpoint?.(true)
+    }
   }
 
   /**
@@ -218,7 +244,8 @@ export class ChatViewport {
 
   private metrics(): ViewportMetrics | null {
     const scroller = this.elements?.scroller
-    if (scroller === undefined) return null
+    if (scroller === undefined || scroller.closest('[hidden]') !== null
+      || (typeof scroller.checkVisibility === 'function' && !scroller.checkVisibility())) return null
     return scrollMetrics(scroller)
   }
 
@@ -278,6 +305,7 @@ export class ChatViewport {
       anchorKey: key,
       anchorTop: anchor.getBoundingClientRect().top - viewport.top,
       scrollTop: scroller.scrollTop,
+      ...positionMetadata(anchor),
     }
   }
 
@@ -344,11 +372,13 @@ export class ChatViewport {
   /**
    * Restore a semantic anchor with a raw-position fallback.
    * @param position - semantic scroll memory; raw top is used only if its row is absent.
+   * @param requireAnchor - wait for history to mount its row instead of falling back to a pixel offset.
    * @returns the actual landing, or null while detached.
    */
-  restore(position: ChatScrollPosition): ViewportLanding | null {
+  restore(position: ChatScrollPosition, requireAnchor = false): ViewportLanding | null {
     const row = this.anchor(position.anchorKey)
     if (row !== null) return this.align(row, position.anchorTop, null)
+    if (requireAnchor) return null
     const metrics = this.metrics()
     return metrics === null ? null : this.write(position.scrollTop, metrics, null)
   }
@@ -497,6 +527,7 @@ export class ChatViewport {
         anchorKey: anchor.key,
         anchorTop: anchor.top - (actual - metrics.top),
         scrollTop: actual,
+        ...positionMetadata(this.anchor(anchor.key)),
       },
     }
     this.observation = { top: actual, landing }

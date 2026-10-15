@@ -5,6 +5,8 @@ import type { PropsLocale, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { DocumentPreviewProps } from '../document/contract.ts'
 import type { PdfStore, PdfView } from './store.ts'
+import { usePdfReadingPosition } from './reading.ts'
+import type { PdfReadingCallbacks } from './reading.ts'
 import { renderPdfPage, type PdfDocument } from './document.ts'
 import { openPdf } from './runtime.ts'
 import { PdfWorkerFailure } from './errors.ts'
@@ -64,6 +66,7 @@ export interface PdfReaderProps extends PropsLocale<'sidebarPdf'> {
   readonly signal: AbortSignal
   readonly onPage: (page: number) => void
   readonly onZoom: (zoom: ZoomPreference) => void
+  readonly reading?: PdfReadingCallbacks | undefined
   readonly ZoomViewport: ComponentType<ZoomViewportProps>
   readonly zoomSurfaceClass: string
   readonly scrollportRef: ZoomViewportProps['scrollportRef']
@@ -78,6 +81,8 @@ export function PdfReader(props: PdfReaderProps): ReactNode {
   const [renderZoom, setRenderZoom] = useState(1)
   const { data, view, signal, onPage: pageVisible, onZoom: setPreference, t, ZoomViewport, zoomSurfaceClass } = props
   const preference = view.zoom ?? FIT_WIDTH
+  const scrollportRef = usePdfReadingPosition({ data, pages: load?.kind === 'loaded' && load.data === data ? load.document.numPages : undefined,
+    width: pageWidth, view, scrollportRef: props.scrollportRef, reading: props.reading })
   const labels: ZoomLabels = {
     controls: t('zoomControls'), menu: t('zoomMenu'), out: t('zoomOut'), into: t('zoomIn'),
     fitWidth: t('zoomFitWidth'), value: percent => t('zoomValue', { percent }),
@@ -110,22 +115,26 @@ export function PdfReader(props: PdfReaderProps): ReactNode {
   const pages = <section className={css.body} data-pdf-preview>
     {Array.from({ length: load.document.numPages }, (_, index) => (
       <PdfPage key={index} document={load.document} page={index + 1}
-        requested={index === 0 || view.page === index + 1} onVisible={pageVisible} signal={signal}
+        restoreTarget={props.reading !== undefined && (view.position?.page ?? view.page) === index + 1}
+        requested={index === 0 || (view.position?.page ?? view.page) === index + 1} onVisible={pageVisible} signal={signal}
         onWidth={index === 0 ? setPageWidth : undefined} zoom={renderZoom} zoomSurfaceClass={zoomSurfaceClass}
         t={t} annotations={props.annotations} />
     ))}
   </section>
   return <ZoomViewport preference={preference} intrinsicWidth={pageWidth} horizontalInset={24} labels={labels}
-    signal={signal} scrollportRef={props.scrollportRef} onPreference={setPreference} onRenderZoom={setRenderZoom}>
+    signal={signal} scrollportRef={scrollportRef} onPreference={setPreference} onRenderZoom={setRenderZoom}>
     <AnnotatedPages annotations={props.annotations} t={t}>{pages}</AnnotatedPages>
   </ZoomViewport>
 }
 
-function PdfPage({ document, page, requested: initiallyRequested, onVisible, signal, onWidth, zoom, zoomSurfaceClass, t, annotations }: {
+function PdfPage({
+  document, page, requested: initiallyRequested, restoreTarget, onVisible, signal, onWidth, zoom, zoomSurfaceClass, t, annotations,
+}: {
   readonly annotations: PdfAnnotations | undefined
   readonly document: PdfDocument
   readonly page: number
   readonly requested: boolean
+  readonly restoreTarget: boolean
   readonly onVisible: (page: number) => void
   readonly signal: AbortSignal
   readonly onWidth: ((width: number) => void) | undefined
@@ -172,7 +181,7 @@ function PdfPage({ document, page, requested: initiallyRequested, onVisible, sig
   useEffect(() => {
     if (!requested) return
     setFailure(undefined)
-    if (renderedZoom.current !== undefined && (!visible || renderedZoom.current === zoom)) return
+    if (renderedZoom.current !== undefined && ((!visible && !restoreTarget) || renderedZoom.current === zoom)) return
     const node = canvas.current as HTMLCanvasElement
     const lifetime = new AbortController()
     const renderSignal = AbortSignal.any([lifetime.signal, signal])
@@ -208,8 +217,8 @@ function PdfPage({ document, page, requested: initiallyRequested, onVisible, sig
       }
     }).catch((error: unknown) => { if (!renderSignal.aborted) setFailure({ error }) })
     return () => { lifetime.abort(); newText?.cancel() }
-  }, [document, page, requested, visible, zoom, signal, attempt, onWidth])
-  return <div ref={host} className={css.page} data-pdf-page={page}>
+  }, [document, page, requested, restoreTarget, visible, zoom, signal, attempt, onWidth])
+  return <div ref={host} className={css.page} data-pdf-page={page} data-pdf-render-zoom={renderedZoom.current}>
     {failure === undefined && state !== 'ready' && (requested
       ? <div className={css.placeholder} role="status" aria-label={t('rendering')} />
       : <div className={css.placeholder} />)}

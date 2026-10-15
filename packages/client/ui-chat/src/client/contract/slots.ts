@@ -261,11 +261,13 @@ export type CommandRowProps = PropsRuntime<'conversation.chat.commandview'>
 /** Shared Chat store handle. */
 export type ChatStore = ReturnType<typeof createChatStore>
 
-/** In-memory reader position resilient to transcript reflow. */
+/** Browser-local reader position resilient to transcript reflow and history-window reopening. */
 export interface ChatScrollPosition {
   readonly anchorKey: string
   readonly anchorTop: number
   readonly scrollTop: number
+  readonly seq?: SessionSeq | undefined
+  readonly turn?: number | undefined
 }
 
 /** Shared settings source for the performance row, composer, and turn tail. */
@@ -302,6 +304,12 @@ export interface ChatViewInjected {
   loadThrough: (seq: SessionSeq) => Promise<void>
   loadImage: MessageImageLoader
   chatScroll: {
+    /**
+     * Register a visible-state checkpoint before Session navigation releases history.
+     * @param checkpoint - synchronous capture of the mounted view.
+     * @returns the registration disposer.
+     */
+    bindCheckpoint?: (checkpoint: () => void) => () => void
     save: (position: ChatScrollPosition | null) => void
     read: () => ChatScrollPosition | null
   }

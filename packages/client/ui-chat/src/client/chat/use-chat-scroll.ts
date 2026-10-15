@@ -94,7 +94,7 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     if (current.ready && !content.current.opened) {
       content.current.opened = true
       navigation.reset()
-      reading.restore()
+      if (!navigation.restore(current.chatScroll.read())) reading.restore()
       return
     }
     if (ownInput) {
@@ -121,6 +121,7 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
 
   useLayoutEffect(() => {
     const disconnectViewport = viewport.connect({
+      checkpoint: (onlyPending) => { reading.checkpoint(onlyPending) },
       scroll: (event) => {
         if (!content.current.opened) return
         if (!event.movedByReader && viewport.motion.foldActive()) return
@@ -156,6 +157,8 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
       content.current.applied = null
     }
   }, [viewport, reading, navigation, processContent, followAfterFold, cancelPendingFollow, clearPendingFollow])
+
+  useLayoutEffect(() => chatScroll.bindCheckpoint?.(() => { reading.checkpoint() }), [chatScroll, reading])
 
   useLayoutEffect(() => {
     const previous = content.current.input

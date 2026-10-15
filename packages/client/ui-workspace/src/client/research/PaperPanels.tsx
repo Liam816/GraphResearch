@@ -104,7 +104,7 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
         : panel === 'pdf' ? paper.pdfPath === ''
           ? <div className={css.allClosed}><h2>{t('pdfMissing')}</h2><p>{t('pdfMissingHint')}</p></div>
           : <><PaperMarkdownStatus paper={paper} t={t} extractMarkdown={props.extractMarkdown} />
-            {props.renderFactorySlot('document.pdf', { path: paper.pdfPath, annotations: {
+            {props.renderFactorySlot('document.pdf', { path: paper.pdfPath, viewKey: paper.id, annotations: {
               available: props.highlightAvailable,
               highlights: paper.highlights ?? [],
               change: change => props.highlight({ paperId: paper.id, change }),

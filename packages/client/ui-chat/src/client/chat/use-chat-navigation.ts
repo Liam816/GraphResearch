@@ -2,7 +2,7 @@
 import { useLayoutEffect, useState } from 'react'
 import type { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { ChatNode } from '../contract/chat-nodes.ts'
-import type { ChatViewSlotProps } from '../contract/slots.ts'
+import type { ChatViewSlotProps, ChatScrollPosition } from '../contract/slots.ts'
 import type { TurnRailItem } from './turn-rail-items.ts'
 import type { ChatReading, ReadingSample } from './use-chat-reading.ts'
 import type { ChatViewport } from './use-chat-viewport.ts'
@@ -20,6 +20,7 @@ interface TurnJump {
   phase: 'loading' | 'settled'
   landing: 'pending' | 'landed' | 'interrupted'
   repageHead: ChatNavigationInput['firstSeq']
+  readonly position?: ChatScrollPosition
 }
 
 /** Owns one replaceable turn jump and the anchor retained while history loads. */
@@ -90,6 +91,24 @@ export class ChatNavigation {
     this.request(jump)
   }
 
+  /**
+   * Load an older saved reading anchor through the existing navigation owner.
+   * @param position - browser-local semantic position, including its original turn and sequence.
+   * @returns whether history loading owns the initial landing.
+   */
+  restore(position: ChatScrollPosition | null): boolean {
+    if (position?.seq === undefined || position.turn === undefined || !this.input.hasMore
+      || (this.input.firstSeq !== null && this.input.firstSeq <= position.seq)) return false
+    this.cancel()
+    this.reading.pauseFollowing()
+    const jump: TurnJump = { turn: position.turn, seq: position.seq, position,
+      phase: 'loading', landing: 'pending', repageHead: null }
+    this.jump = jump
+    this.onBusyTurn(jump.turn)
+    this.request(jump)
+    return true
+  }
+
   /** Request one older page while retaining the current semantic position. */
   readonly loadEarlier = (): void => {
     this.cancel()
@@ -156,7 +175,7 @@ export class ChatNavigation {
       if (settle) { this.cancel(); return true }
       return false
     }
-    const landing = this.viewport.scrollToTurn(jump.turn)
+    const landing = jump.position === undefined ? this.viewport.scrollToTurn(jump.turn) : this.viewport.restore(jump.position, true)
     if (landing === null) return false
     this.reading.acceptNavigation(landing)
     if (settle) this.cancel()

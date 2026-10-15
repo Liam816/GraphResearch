@@ -69,7 +69,7 @@ Session 行渲染运行时的实时 `pendingInteraction` 分类：审批显示**
 
 -----
 
-`ctx.uiWorkspace.openSession(target)` 会同步替换其拥有的 `mainView` reference，并让主区域返回 Conversation，而不等待 `reference.ready`，因此历史加载会显示在已经选中的 Session 视图内。目标可以是已知 Session id，也可以是持久的直接父子 subagent 地址；显式地址不要求预先加载 parent catalog。`openWorkspace(id, beforeOpen?)` 仅在请求未被后续导航替代时打开工作区空白 Session；显式新会话操作会创建新的 Session。`forkSession(id)` 创建子会话，不导航，也不替代尚未完成的导航。可选的同步准备回调在目标被 retain 后执行，并且仅对仍有效的 Workspace 请求执行，因此过期请求不会搬移 composer 草稿。后续导航或 owner 释放会阻止晚到的 UI 提交，但不取消底层 Session 创建。启动恢复会 retain 主 reference，不改变已选面板，也不取消后续导航。归档主 Session 会释放其 reference 并清除主选择。选择失败时保留当前全局面板。Session 行读取 `usePanelInfo`，在全局面板活跃时不显示 Session 选中样式；仅把焦点移到搜索框或目录选择器不会离开该面板。
+`ctx.uiWorkspace.openSession(target)` 会同步替换其拥有的 `mainView` reference，并让主区域返回 Conversation，而不等待 `reference.ready`，因此历史加载会显示在已经选中的 Session 视图内。目标可以是已知 Session id，也可以是持久的直接父子 subagent 地址；显式地址不要求预先加载 parent catalog。`openWorkspace(id, beforeOpen?)` 仅在请求未被后续导航替代时打开工作区空白 Session；显式新会话操作会创建新的 Session。`forkSession(id)` 创建子会话，不导航，也不替代尚未完成的导航。可选的同步准备回调在目标被 retain 后执行，并且仅对仍有效的 Workspace 请求执行，因此过期请求不会搬移 composer 草稿。后续导航或 owner 释放会阻止晚到的 UI 提交，但不取消底层 Session 创建。启动恢复会 retain 主 reference，不改变已选面板，也不取消后续导航。导航在获取替换历史窗口或清空选中项前，以当前 Session id 广播 `ui-workspace/before-session-change`，让可见 UI 在历史释放前保存状态。归档主 Session 会释放其 reference 并清除主选择。选择失败时保留当前全局面板。Session 行读取 `usePanelInfo`，在全局面板活跃时不显示 Session 选中样式；仅把焦点移到搜索框或目录选择器不会离开该面板。
 
 导航和启动恢复通过所选 Session 的 `follow` 获取投影，不会另行刷新该 Session 或其父会话的投影。
 
@@ -210,6 +210,8 @@ AI 笔记和学习笔记分别保存到论文目录下的 Markdown 文件。AI �
 在 PDF 原文面板中选中文字，再选择高亮颜色。折叠面板、切换论文或刷新后，高亮仍然保留，并随论文资料库迁移。双击高亮可删除，也可聚焦删除控件后按 Enter。[PDF 渲染器](../ui-sidebar-documentpreview/README.zh.md#what-it-registers)负责选区和工具条交互，[科研控制器](../../api/workspace-controller/README.zh.md#research-catalog)负责持久化。
 
 PDF 面板显示已确认保存的正文 Markdown 文件名和原始页数。转换失败时，提示和重试入口显示在 PDF 旁边，原文和笔记仍可使用。[科研控制器](../../api/workspace-controller/README.zh.md#research-catalog)负责自动转换和文件发布。
+
+每篇论文在浏览器本地保存笔记类型、编辑／预览模式、滚动位置以及编辑器光标或选区。AI 笔记与学习笔记分别保存位置。重新打开论文或刷新时恢复这些偏好，但不抢占键盘焦点；恢复面板布局保留阅读状态。隐藏面板不会覆盖已保存的偏移量。PDF 的页内位置和缩放由文档工厂管理，对话的语义位置由 Chat 管理。偏好仅保存在当前浏览器，不通过论文资料库同步。
 
 PDF 预览仍是阅读界面。Host 提供论文作用域内的 Agent 工具，用于 PDF 下载、有页码的正文提取、笔记更新、续读位置和 Topic 对比总结。代码仓库链接在外部打开；Agent 使用已有 shell 工具将代码下载到论文目录的 code 子目录。
 
