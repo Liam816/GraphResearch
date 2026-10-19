@@ -62,7 +62,6 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
       instance.actions.topic(topic.id)
       const paper = ctx.research.state.getSnapshot().catalog.papers.find(item => item.id === paperId)
       if (paper === undefined) throw new Error('Imported paper is missing from the confirmed library')
-      instance.actions.expand(paper.id, true)
       open(paper.sessionId)
     },
   })

@@ -63,7 +63,12 @@ it('records research context, reads original pages, and saves the live AI notebo
   onTestFinished(() => browser.close())
   const page = await newEnglishPage(browser)
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-  await page.getByRole('region', { name: 'Research library', exact: true }).getByRole('button', { name: 'Fixture paper', exact: true }).click()
+  const library = page.getByRole('region', { name: 'Research library', exact: true })
+  await library.getByRole('button', { name: 'Fixture paper', exact: true }).click()
+  for (const label of ['Agent chat', 'Original PDF', 'Reading notes', 'Code repository']) {
+    expect(await library.getByText(label, { exact: true }).count()).toBe(0)
+  }
+  expect(await library.getByRole('button', { name: 'Collapse Fixture paper', exact: true }).count()).toBe(0)
   const workbench = page.locator('[data-research-workbench]')
   expect(await workbench.getByRole('region', { name: 'Reading notes', exact: true }).isVisible()).toBe(false)
   await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'Reading notes', exact: true }).click()

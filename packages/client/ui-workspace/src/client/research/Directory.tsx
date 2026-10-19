@@ -1,9 +1,8 @@
-/** Topic → paper → resource directory, with durable creation through injected commands. */
+/** Topic → paper directory, with durable creation through injected commands. */
 import { useState } from 'react'
 import { Button, Input, Modal, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconFolderCloseRegular, IconSearchOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchDirectoryProps } from './contract.ts'
-import type { ResearchPanel } from './store.ts'
 import { ResearchLibrarySettings } from './LibrarySettings.tsx'
 import css from './Research.module.css'
 
@@ -40,9 +39,6 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
       setError(true)
     } finally { setBusy(false) }
   }
-  const openResource = (topicId: ResearchTopicId, paper: typeof catalog.papers[number], panel: ResearchPanel): void => {
-    actions.topic(topicId); actions.expand(paper.id, true); actions.focus(paper.id, panel); props.open(paper.sessionId)
-  }
 
   return <section className={css.directory} aria-label={t('research')}>
     <div className={css.directoryHeader}><strong>{t('research')}</strong>
@@ -76,27 +72,12 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
               <IconFolderCloseRegular size={16} /><span>{topic.title}</span><small>{papers.length}</small>
             </button>
           </div>
-          {expanded && <ul className={css.children}>{papers.map((paper) => {
-            const open = filter !== '' || view.expanded[paper.id] === true
-            const Arrow = open ? IconChevronDownOutlineRegular : IconChevronRightOutlineRegular
-            return <li key={paper.id}>
-              <div className={css.treeRow}>
-                <button type="button" className={css.chevron} aria-expanded={open} aria-label={t(open ? 'fold' : 'expand', { title: paper.title })}
-                  onClick={() => { actions.expand(paper.id, !open) }}><Arrow size={14} /></button>
-                <button type="button" className={css.treeTitle} aria-current={current === paper.sessionId ? 'page' : undefined}
-                  onClick={() => { actions.topic(topic.id); actions.expand(paper.id, true); props.open(paper.sessionId) }}>
-                  <span>{paper.title}</span>
-                </button>
-              </div>
-              {open && <ul className={css.resources}>
-                {(['agent', 'pdf', 'notes'] as const).map(panel => <li key={panel}>
-                  <button type="button" onClick={() => { openResource(topic.id, paper, panel) }}>{t(panel)}</button>
-                </li>)}
-                <li>{paper.repositoryUrl !== '' ? <a href={paper.repositoryUrl} target="_blank" rel="noreferrer">{t('repository')}</a>
-                  : <span title={t('codeMissing')}>{t('repository')}</span>}</li>
-              </ul>}
-            </li>
-          })}<li><button type="button" className={css.addPaper} onClick={() => { start(topic.id) }}>{t('addPaper')}</button></li></ul>}
+          {expanded && <ul className={css.children}>{papers.map(paper => <li key={paper.id} className={`${css.treeRow} ${css.paperRow}`}>
+            <button type="button" className={css.treeTitle} aria-current={current === paper.sessionId ? 'page' : undefined}
+              onClick={() => { actions.topic(topic.id); props.open(paper.sessionId) }}>
+              <span>{paper.title}</span>
+            </button>
+          </li>)}<li><button type="button" className={css.addPaper} onClick={() => { start(topic.id) }}>{t('addPaper')}</button></li></ul>}
         </li>
       })}</ul>
     </nav>
