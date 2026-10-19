@@ -65,6 +65,8 @@ it('records research context, reads original pages, and saves the live AI notebo
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   await page.getByRole('region', { name: 'Research library', exact: true }).getByRole('button', { name: 'Fixture paper', exact: true }).click()
   const workbench = page.locator('[data-research-workbench]')
+  expect(await workbench.getByRole('region', { name: 'Reading notes', exact: true }).isVisible()).toBe(false)
+  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'Reading notes', exact: true }).click()
   await workbench.getByRole('button', { name: 'AI notes', exact: true }).click()
   await workbench.getByRole('button', { name: 'Edit', exact: true }).click()
   expect(await workbench.getByRole('textbox', { name: 'AI notes', exact: true }).inputValue()).toContain('The original page contains selectable text')

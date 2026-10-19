@@ -5,7 +5,7 @@
   - group "Panel visibility":
     - button "Agent chat" [pressed]
     - button "Original PDF" [pressed]
-    - button "Reading notes" [pressed]
+    - button "Reading notes"
   - button "Reference papers"
 - region "Agent chat":
   - button "Reorder Agent chat"
@@ -27,17 +27,3 @@
   - button "Collapse Original PDF"
   - heading "No original PDF yet" [level=2]
   - paragraph: Ask the paper’s Agent to download the original, or share a paper link in the chat. The PDF will appear here automatically when ready.
-- separator "Resize Original PDF and Reading notes"
-- region "Reading notes":
-  - button "Reorder Reading notes"
-  - strong: Reading notes
-  - button "Arrange Reading notes"
-  - button "Collapse Reading notes"
-  - group "Reading notes":
-    - button "Learning notes" [pressed]
-    - button "AI notes"
-  - status: Saved
-  - button "Preview"
-  - button "Save notes" [disabled]
-  - textbox "Learning notes":
-    - /placeholder: Record methods, findings, questions, and your understanding. Markdown is supported.

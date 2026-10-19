@@ -76,12 +76,12 @@ export function reorderPanels(
 }
 
 /**
- * Create independent default panel preferences.
+ * Create independent default panel preferences with the notebook folded.
  * @returns fresh panel preferences.
  */
 export function defaultPaperView(): PaperView {
   return {
-    panels: { agent: true, pdf: true, notes: true }, widths: { agent: 38, pdf: 38, notes: 24 },
+    panels: { agent: true, pdf: true, notes: false }, widths: { agent: 38, pdf: 38, notes: 24 },
     active: 'agent', notebook: 'learning', drafts: {},
   }
 }
@@ -117,7 +117,8 @@ function researchViewDefinition() {
       },
       reset: (draft, id: ResearchPaperId) => {
         const previous = draft.papers[id] ?? defaultPaperView()
-        draft.papers[id] = { ...defaultPaperView(), drafts: previous.drafts, notebook: previous.notebook,
+        draft.papers[id] = { ...defaultPaperView(), panels: { agent: true, pdf: true, notes: true },
+          drafts: previous.drafts, notebook: previous.notebook,
           ...previous.reading === undefined ? {} : { reading: previous.reading } }
       },
       notebook: (draft, id: ResearchPaperId, kind: ResearchNoteKind) => { (draft.papers[id] ??= defaultPaperView()).notebook = kind },

@@ -54,6 +54,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
     await form.getByRole('button', { name: 'Create', exact: true }).click()
     await form.waitFor({ state: 'hidden' })
     await expect.poll(() => workbench.locator('header strong').textContent()).toBe(title)
+    expect(await workbench.getByRole('region', { name: 'Reading notes', exact: true }).isVisible()).toBe(false)
   }
   await addPaper('RT-2')
   await workbench.getByRole('heading', { name: 'No original PDF yet', exact: true }).waitFor()
@@ -95,6 +96,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await pdfToggle.press('Enter')
   await expect.poll(() => pdfToggle.getAttribute('aria-pressed')).toBe('true')
   await expect.poll(async () => (await workbench.getByRole('img', { name: 'PDF page 1', exact: true }).boundingBox())?.width).toBeGreaterThan(100)
+  await panelControls.getByRole('button', { name: 'Reading notes', exact: true }).click()
   const notes = workbench.getByRole('textbox', { name: 'Learning notes', exact: true })
   await notes.fill('# RT-2\n\nUnderstand the action token representation.')
   await workbench.getByRole('button', { name: 'Save notes', exact: true }).click()
@@ -223,6 +225,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
 
   await notes.fill('Unsaved RT-2 draft')
   await addPaper('OpenVLA')
+  await panelControls.getByRole('button', { name: 'Reading notes', exact: true }).click()
   await workbench.getByRole('textbox', { name: 'Learning notes', exact: true }).fill('OpenVLA draft')
   await library.getByRole('button', { name: 'RT-2', exact: true }).click()
   await expect.poll(() => notes.inputValue()).toBe('Unsaved RT-2 draft')

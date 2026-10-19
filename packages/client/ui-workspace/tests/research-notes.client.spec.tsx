@@ -96,6 +96,7 @@ it('recovers every closed panel without discarding notebook drafts and bounds ke
   const store = createResearchViewStore().create()
   const id = paper('A').id
   store.actions.edit(id, 'learning', 'Preserved draft', 0)
+  store.actions.focus(id, 'notes')
   for (const panel of ['agent', 'pdf', 'notes'] as const) store.actions.panel(id, panel)
   expect(Object.values(store.getSnapshot().papers[id]!.panels)).toEqual([false, false, false])
   store.actions.reset(id)
@@ -137,7 +138,6 @@ it.each(layouts)('persists the $name panel permutation and keeps the other paper
   store.actions.focus(a, 'pdf')
   store.actions.edit(a, 'learning', 'Retained draft', 4)
   store.actions.widths(a, 'agent', 'pdf', 5)
-  store.actions.panel(a, 'notes')
   for (const [source, target, placement] of moves) store.actions.place(a, source, target, placement)
   store.actions.focus(b, 'agent')
   expect(store.getSnapshot().papers[a]).toMatchObject({
