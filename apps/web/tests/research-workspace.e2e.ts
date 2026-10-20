@@ -46,8 +46,21 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await workbench.getByRole('heading', { name: 'Robot VLA', exact: true }).waitFor()
   expect(await workbench.getByRole('region', { name: 'Original PDF', exact: true }).count()).toBe(0)
 
+  const addPaperButton = library.getByRole('button', { name: 'Add paper to Robot VLA', exact: true })
+  await library.getByRole('button', { name: 'Collapse Robot VLA', exact: true }).click()
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Tab')
+  await expect.poll(() => addPaperButton.evaluate(element => element === document.activeElement)).toBe(true)
+  await page.getByRole('tooltip', { name: 'Add paper to Robot VLA', exact: true }).waitFor()
+  await addPaperButton.press('Enter')
+  const addPaperDialog = page.getByRole('dialog', { name: 'Add paper', exact: true })
+  await addPaperDialog.waitFor()
+  await addPaperDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect.poll(() => library.getByRole('button', { name: 'Expand Robot VLA', exact: true }).getAttribute('aria-expanded')).toBe('false')
+  await library.getByRole('button', { name: 'Expand Robot VLA', exact: true }).click()
+
   const addPaper = async (title: string): Promise<void> => {
-    await library.getByRole('button', { name: 'Add paper', exact: true }).click()
+    await library.getByRole('button', { name: 'Add paper to Robot VLA', exact: true }).click()
     const form = page.getByRole('dialog', { name: 'Add paper', exact: true })
     await form.getByLabel('Title', { exact: true }).fill(title)
     if (title !== 'RT-2') await form.getByLabel('PDF file path', { exact: true }).fill(join(scaffold.workspaceCwd, 'openvla.pdf'))

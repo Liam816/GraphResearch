@@ -1,6 +1,9 @@
 /** Topic → paper directory, with durable creation through injected commands. */
 import { useState } from 'react'
-import { Button, Input, Modal, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconFolderCloseRegular, IconSearchOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  Button, Input, Modal, Tooltip, IconPlusOutlineRegular,
+  IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconFolderCloseRegular, IconSearchOutlineRegular,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchDirectoryProps } from './contract.ts'
 import { ResearchLibrarySettings } from './LibrarySettings.tsx'
@@ -71,13 +74,17 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
               onClick={() => { actions.topic(topic.id); props.open(topic.sessionId) }}>
               <IconFolderCloseRegular size={16} /><span>{topic.title}</span><small>{papers.length}</small>
             </button>
+            <Tooltip label={t('addPaperToTopic', { title: topic.title })} side="right" portal>
+              <button type="button" className={css.addPaper} aria-label={t('addPaperToTopic', { title: topic.title })}
+                onClick={() => { start(topic.id) }}><IconPlusOutlineRegular size={16} /></button>
+            </Tooltip>
           </div>
           {expanded && <ul className={css.children}>{papers.map(paper => <li key={paper.id} className={`${css.treeRow} ${css.paperRow}`}>
             <button type="button" className={css.treeTitle} aria-current={current === paper.sessionId ? 'page' : undefined}
               onClick={() => { actions.topic(topic.id); props.open(paper.sessionId) }}>
               <span>{paper.title}</span>
             </button>
-          </li>)}<li><button type="button" className={css.addPaper} onClick={() => { start(topic.id) }}>{t('addPaper')}</button></li></ul>}
+          </li>)}</ul>}
         </li>
       })}</ul>
     </nav>

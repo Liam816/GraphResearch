@@ -9,8 +9,7 @@
       - listitem:
         - button "Collapse Robot VLA" [expanded]
         - button "Robot VLA 1"
+        - button "Add paper to Robot VLA"
         - list:
           - listitem:
             - button "RT-2"
-          - listitem:
-            - button "Add paper"

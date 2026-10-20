@@ -29,7 +29,7 @@ it('highlights selected original text across pages and restores the markers afte
   await topicForm.waitFor({ state: 'hidden' })
   const workbench = page.locator('[data-research-workbench]')
   await workbench.getByRole('heading', { name: 'Highlight study', exact: true }).waitFor()
-  await library.getByRole('button', { name: 'Add paper', exact: true }).click()
+  await library.getByRole('button', { name: 'Add paper to Highlight study', exact: true }).click()
   const paperForm = page.getByRole('dialog', { name: 'Add paper', exact: true })
   await paperForm.getByLabel('Title', { exact: true }).fill('Selected original')
   await paperForm.getByLabel('PDF file path', { exact: true }).fill(join(scaffold.workspaceCwd, 'highlight.pdf'))

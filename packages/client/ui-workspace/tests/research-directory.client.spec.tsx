@@ -14,7 +14,7 @@ import { en } from '../src/client/research/locales.ts'
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 beforeEach(() => { localStorage.clear() })
 
-function fixture(managed: boolean) {
+function fixture(managed: boolean, collapsed = false) {
   const view = createResearchViewStore().create()
   const research = createSnapshotStore<ResearchSnapshot>({ phase: 'ready', catalog: { revision: 1,
     ...managed ? { directory: '/library' } : {}, papers: [],
@@ -31,8 +31,9 @@ function fixture(managed: boolean) {
     highlight: vi.fn(async () => {}), extractMarkdown: vi.fn(async () => {}), saveNote: vi.fn(async () => {}),
     configureDirectory: vi.fn(async () => {}), mentions: vi.fn(async () => []),
   }
+  if (collapsed) view.actions.expand('fixture-topic', false)
   render(<ResearchDirectory {...props} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Add paper' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Add paper to Robotics' }))
   const dialog = within(screen.getByRole('dialog', { name: 'Add paper' }))
   fireEvent.change(dialog.getByRole('textbox', { name: 'Title' }), { target: { value: 'pi0.7' } })
   return { props, dialog }
@@ -47,7 +48,9 @@ it('explains that the legacy backend needs a restart and prevents unsupported cr
 })
 
 it('creates a title-only paper when the managed library backend is available', async () => {
-  const { props, dialog } = fixture(true)
+  const { props, dialog } = fixture(true, true)
+  expect(screen.getByRole('button', { name: 'Expand Robotics' }).getAttribute('aria-expanded')).toBe('false')
+  expect(props.open).not.toHaveBeenCalled()
   fireEvent.click(dialog.getByRole('button', { name: 'Create' }))
   await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
   expect(props.createPaper).toHaveBeenCalledWith({ topicId: 'fixture-topic', title: 'pi0.7', pdfPath: '', repositoryUrl: '' })
