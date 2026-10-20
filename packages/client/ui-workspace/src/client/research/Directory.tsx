@@ -1,7 +1,7 @@
 /** Topic → paper directory, with durable creation through injected commands. */
 import { useState } from 'react'
 import {
-  Button, Input, Modal, Tooltip, IconPlusOutlineRegular,
+  Button, Input, Modal, Tooltip, IconPlusOutlineRegular, IconNewChatOutlineMedium,
   IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconFolderCloseRegular, IconSearchOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -44,11 +44,14 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
   }
 
   return <section className={css.directory} aria-label={t('research')}>
-    <div className={css.directoryHeader}><strong>{t('research')}</strong>
-      <Button size="sm" onClick={() => { start('topic') }}>{t('createTopic')}</Button>
-      <ResearchLibrarySettings directory={catalog.directory} t={t} configureDirectory={props.configureDirectory} />
+    <div className={css.directoryHeading}>
+      <div className={css.directoryHeader}><strong>{t('research')}</strong>
+        <ResearchLibrarySettings directory={catalog.directory} t={t} configureDirectory={props.configureDirectory} />
+      </div>
+      {catalog.directory !== undefined && <p className={css.libraryLocation} title={catalog.directory}>{catalog.directory}</p>}
     </div>
-    {catalog.directory !== undefined && <p className={css.libraryLocation} title={catalog.directory}>{catalog.directory}</p>}
+    <Button variant="outline" className={css.createTopic} icon={<IconNewChatOutlineMedium size={14} />}
+      aria-haspopup="dialog" onClick={() => { start('topic') }}>{t('createTopic')}</Button>
     <Input icon={<IconSearchOutlineRegular size={16} />} aria-label={t('search')} placeholder={t('search')}
       value={query} onChange={(event) => { setQuery(event.target.value) }} />
     {phase === 'loading' && <p className={css.hint} role="status">{t('loading')}</p>}
