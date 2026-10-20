@@ -49,6 +49,8 @@ it.skipIf(webSnapshotMode() === 'record')('edits an interrupted question without
   const page = await newEnglishPage(browser)
   onTestFailed(() => saveFailureShot(page, 'edit-question'))
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  await page.getByText('Research library', { exact: true }).waitFor()
+  expect(await page.getByText('DSH Local Build', { exact: true }).count()).toBe(0)
   const newSession = page.locator('[data-sidebar-new-session]')
   await newSession.first().waitFor({ state: 'attached' })
   for (const button of await newSession.all()) expect(await button.isVisible()).toBe(false)

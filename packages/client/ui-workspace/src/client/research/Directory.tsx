@@ -44,11 +44,9 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
   }
 
   return <section className={css.directory} aria-label={t('research')}>
-    <div className={css.directoryHeading}>
-      <div className={css.directoryHeader}><strong>{t('research')}</strong>
-        <ResearchLibrarySettings directory={catalog.directory} t={t} configureDirectory={props.configureDirectory} />
-      </div>
+    <div className={css.directoryHeader}>
       {catalog.directory !== undefined && <p className={css.libraryLocation} title={catalog.directory}>{catalog.directory}</p>}
+      <ResearchLibrarySettings directory={catalog.directory} t={t} configureDirectory={props.configureDirectory} />
     </div>
     <Button variant="outline" className={css.createTopic} icon={<IconNewChatOutlineMedium size={14} />}
       aria-haspopup="dialog" onClick={() => { start('topic') }}>{t('createTopic')}</Button>
