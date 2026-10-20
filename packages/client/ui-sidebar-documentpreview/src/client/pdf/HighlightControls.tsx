@@ -5,7 +5,8 @@ import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Button, MenuSurface, Tooltip, useAnchoredPosition } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ResearchHighlight, ResearchHighlightColor, ResearchHighlightId } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import { collectPdfSelection, highlightAtPoint, type PdfAnnotations, type PdfSelection } from './highlights.ts'
+import { collectPdfSelection, highlightAtPoint, type PdfAnnotations, type PdfSelection, type PdfTranslation } from './highlights.ts'
+import { TranslationCard } from './TranslationCard.tsx'
 import type {} from './locales.ts'
 import css from './HighlightControls.module.css'
 
@@ -13,8 +14,9 @@ const COLORS: readonly ResearchHighlightColor[] = ['yellow', 'green', 'blue', 'p
 type PendingChange = Parameters<PdfAnnotations['change']>[0]
 
 /** @param props - reader pages, paper-owned confirmed annotations, and locale. @returns selectable pages and a portalled color toolbar. */
-export function AnnotatedPages({ annotations, t, children }: PropsLocale<'sidebarPdf'> & {
+export function AnnotatedPages({ annotations, translation, t, children }: PropsLocale<'sidebarPdf'> & {
   readonly annotations: PdfAnnotations | undefined
+  readonly translation?: PdfTranslation | undefined
   readonly children: ReactNode
 }): ReactNode {
   const root = useRef<HTMLDivElement>(null)
@@ -22,22 +24,34 @@ export function AnnotatedPages({ annotations, t, children }: PropsLocale<'sideba
   const [selection, setSelection] = useState<PdfSelection>()
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<PendingChange>()
+  const [pinned, setPinned] = useState(false)
+  const [editing, setEditing] = useState<{ highlight: ResearchHighlight; anchor: PdfSelection['anchor'] }>()
   const operation = useRef(false)
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true
     return () => { mounted.current = false }
   }, [])
-  const dismiss = (): void => { if (!operation.current) { setSelection(undefined); setFailure(undefined) } }
+  const dismiss = (): void => {
+    if (!operation.current) { setSelection(undefined); setEditing(undefined); setFailure(undefined); setPinned(false) }
+  }
   useEffect(() => {
-    if (selection === undefined) return
+    if (selection === undefined && editing === undefined) return
     const outside = (event: PointerEvent): void => {
-      if (!operation.current && event.target instanceof Node && !toolbar.current?.contains(event.target)) setSelection(undefined)
+      if (!operation.current && !pinned && event.target instanceof Node && !toolbar.current?.contains(event.target)) {
+        setSelection(undefined); setEditing(undefined)
+      }
     }
     const escape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !operation.current) { setSelection(undefined); window.getSelection()?.removeAllRanges() }
+      if (event.key === 'Escape' && !operation.current) {
+        setSelection(undefined); setEditing(undefined); setPinned(false); window.getSelection()?.removeAllRanges()
+      }
     }
-    const moved = (): void => { if (!operation.current) setSelection(undefined) }
+    const moved = (event: Event): void => {
+      if (!operation.current && !pinned && !(event.target instanceof Node && toolbar.current?.contains(event.target))) {
+        setSelection(undefined); setEditing(undefined)
+      }
+    }
     document.addEventListener('pointerdown', outside, true)
     document.addEventListener('keydown', escape)
     window.addEventListener('scroll', moved, true)
@@ -48,7 +62,7 @@ export function AnnotatedPages({ annotations, t, children }: PropsLocale<'sideba
       window.removeEventListener('scroll', moved, true)
       window.removeEventListener('resize', moved)
     }
-  }, [selection])
+  }, [selection, editing, pinned])
   const apply = async (change: PendingChange): Promise<void> => {
     if (annotations === undefined || !annotations.available || operation.current) return
     operation.current = true; setBusy(true); setFailure(undefined)
@@ -56,6 +70,7 @@ export function AnnotatedPages({ annotations, t, children }: PropsLocale<'sideba
       await annotations.change(change)
       if (mounted.current) {
         setSelection(undefined)
+        setEditing(undefined)
         window.getSelection()?.removeAllRanges()
       }
     } catch (error: unknown) {
@@ -67,20 +82,23 @@ export function AnnotatedPages({ annotations, t, children }: PropsLocale<'sideba
     }
   }
   const capture = (): void => {
-    if (annotations === undefined || operation.current || root.current === null) return
-    setSelection(collectPdfSelection(root.current, window.getSelection()))
+    if ((annotations === undefined && translation === undefined) || operation.current || root.current === null) return
+    const next = collectPdfSelection(root.current, window.getSelection())
+    if (next === undefined && pinned) return
+    setSelection(next); setEditing(undefined); setPinned(false)
   }
   return <div ref={root} className={css.pages} onClick={(event) => {
     const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-pdf-highlight]') : null
     const highlight = annotations?.highlights.find(item => item.id === button?.dataset['pdfHighlight'])
     if (highlight !== undefined) void apply({ type: 'remove', id: highlight.id })
-  }} onPointerUp={capture} onKeyUp={(event) => { if (event.key !== 'Escape') capture() }}
-  onDoubleClickCapture={(event) => {
-    if (annotations === undefined || root.current === null || operation.current) return
+  }} onPointerUp={(event) => {
+    if (event.target instanceof Node && !root.current?.contains(event.target)) return
+    capture()
+    if (annotations === undefined || root.current === null || operation.current || !window.getSelection()?.isCollapsed) return
     const hit = highlightAtPoint(root.current, annotations.highlights, event.clientX, event.clientY)
-    if (hit === undefined) return
-    event.preventDefault()
-    void apply({ type: 'remove', id: hit.id })
+    if (hit !== undefined) setEditing({ highlight: hit, anchor: { x: event.clientX, y: event.clientY } })
+  }} onKeyUp={(event) => {
+    if (event.key !== 'Escape' && event.target instanceof Node && root.current?.contains(event.target)) capture()
   }}>
     {children}
     {failure !== undefined && <div className={css.failure} role="alert">
@@ -88,34 +106,67 @@ export function AnnotatedPages({ annotations, t, children }: PropsLocale<'sideba
       <Button size="sm" disabled={busy} onClick={() => { void apply(failure) }}>{t('retry')}</Button>
       <Button size="sm" variant="ghost" disabled={busy} onClick={dismiss}>{t('highlightDismiss')}</Button>
     </div>}
-    {selection !== undefined && annotations !== undefined && <SelectionToolbar key={`${selection.anchor.x}:${selection.anchor.y}`} selection={selection} busy={busy || failure?.type === 'add'}
-      available={annotations.available} toolbarRef={toolbar} t={t} onCancel={dismiss} onPick={(color) => {
+    {selection !== undefined && <SelectionToolbar key={JSON.stringify([selection.anchor, selection.start, selection.end, selection.text])}
+      selection={selection} busy={busy || failure?.type === 'add'} translation={translation} pinned={pinned} onPin={() => { setPinned(value => !value) }}
+      available={annotations?.available === true} toolbarRef={toolbar} t={t} onCancel={dismiss} onPick={(color) => {
         void apply({ type: 'add', highlight: { id: randomUUID() as ResearchHighlightId, color, text: selection.text, rects: selection.rects } })
       }} />}
+    {editing !== undefined && selection === undefined && <HighlightMenu anchor={editing.anchor} toolbarRef={toolbar} t={t} busy={busy}
+      available={annotations?.available === true} onCancel={dismiss} onRemove={() => { void apply({ type: 'remove', id: editing.highlight.id }) }} />}
   </div>
 }
 
-function SelectionToolbar({ selection, busy, available, toolbarRef, t, onPick, onCancel }: PropsLocale<'sidebarPdf'> & {
+function SelectionToolbar({ selection, busy, available, toolbarRef, t, onPick, onCancel, translation, pinned, onPin }: PropsLocale<'sidebarPdf'> & {
   readonly selection: PdfSelection
   readonly busy: boolean
   readonly available: boolean
   readonly toolbarRef: RefObject<HTMLDivElement>
   readonly onPick: (color: ResearchHighlightColor) => void
   readonly onCancel: () => void
+  readonly translation: PdfTranslation | undefined
+  readonly pinned: boolean
+  readonly onPin: () => void
+}): ReactNode {
+  const anchor = useRef<HTMLSpanElement>(null)
+  const [translated, setTranslated] = useState(false)
+  const position = useAnchoredPosition({ open: true, anchorRef: anchor, panelRef: toolbarRef, side: translated ? 'bottom' : 'top', gap: 8, margin: 12 })
+  return createPortal(<>
+    <span ref={anchor} className={css.anchor} aria-hidden="true" style={{ left: selection.anchor.x, top: selection.anchor.y }} />
+    <MenuSurface ref={toolbarRef} compact className={`${css.toolbar} ${translated ? css.withTranslation : ''}`}
+      style={{ ...position, visibility: position === null ? 'hidden' : 'visible' }}>
+      <div className={css.selectionActions} role="toolbar" aria-label={t('highlightColors')} aria-busy={busy}
+        onPointerDown={(event) => { event.preventDefault() }}>
+        {COLORS.map(color => <Tooltip key={color} label={t(color)} side="top" portal>
+          <button type="button" className={css.swatch} data-highlight-color={color} aria-label={t(color)}
+            disabled={busy || !available} onClick={() => { onPick(color) }} />
+        </Tooltip>)}
+        {translation !== undefined && <Button size="sm" variant={translated ? 'primary' : 'ghost'} disabled={busy || selection.start === undefined || selection.end === undefined}
+          onClick={() => { setTranslated(true) }}>{t('translate')}</Button>}
+        {translated && <Button size="sm" variant="ghost" aria-pressed={pinned} onClick={onPin}>{t(pinned ? 'translationUnpin' : 'translationPin')}</Button>}
+        <Button size="sm" variant="ghost" disabled={busy} onClick={onCancel}>{t('highlightDismiss')}</Button>
+      </div>
+      <span className={css.hint} role={available ? undefined : 'alert'}>{t(available ? 'highlightDeleteHint' : 'highlightRestartRequired')}</span>
+      {translated && translation !== undefined && <TranslationCard selection={selection} translation={translation} t={t} />}
+    </MenuSurface>
+  </>, document.body)
+}
+
+function HighlightMenu({ anchor: point, toolbarRef, t, busy, available, onCancel, onRemove }: PropsLocale<'sidebarPdf'> & {
+  readonly anchor: PdfSelection['anchor']
+  readonly toolbarRef: RefObject<HTMLDivElement>
+  readonly busy: boolean
+  readonly available: boolean
+  readonly onCancel: () => void
+  readonly onRemove: () => void
 }): ReactNode {
   const anchor = useRef<HTMLSpanElement>(null)
   const position = useAnchoredPosition({ open: true, anchorRef: anchor, panelRef: toolbarRef, side: 'top', gap: 8, margin: 12 })
   return createPortal(<>
-    <span ref={anchor} className={css.anchor} aria-hidden="true" style={{ left: selection.anchor.x, top: selection.anchor.y }} />
-    <MenuSurface ref={toolbarRef} compact className={css.toolbar} role="toolbar" aria-label={t('highlightColors')}
-      aria-busy={busy} style={{ ...position, visibility: position === null ? 'hidden' : 'visible' }}
-      onPointerDown={(event) => { event.preventDefault() }}>
-      {COLORS.map(color => <Tooltip key={color} label={t(color)} side="top" portal>
-        <button type="button" className={css.swatch} data-highlight-color={color} aria-label={t(color)}
-          disabled={busy || !available} onClick={() => { onPick(color) }} />
-      </Tooltip>)}
+    <span ref={anchor} className={css.anchor} aria-hidden="true" style={{ left: point.x, top: point.y }} />
+    <MenuSurface ref={toolbarRef} compact className={css.toolbar} role="toolbar" aria-label={t('highlightActions')}
+      style={{ ...position, visibility: position === null ? 'hidden' : 'visible' }}>
+      <Button size="sm" disabled={busy || !available} onClick={onRemove}>{t('highlightDelete')}</Button>
       <Button size="sm" variant="ghost" disabled={busy} onClick={onCancel}>{t('highlightDismiss')}</Button>
-      <span className={css.hint} role={available ? undefined : 'alert'}>{t(available ? 'highlightDeleteHint' : 'highlightRestartRequired')}</span>
     </MenuSurface>
   </>, document.body)
 }

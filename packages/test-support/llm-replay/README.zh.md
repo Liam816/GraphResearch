@@ -27,6 +27,8 @@ kind: "package-reference"
 
 本包让无密钥测试拥有带固定模型 transcript 的真实 agent：把它挂载到真实 LLM 适配器的位置，指向已记录的 fixture，然后就像模型真的产生了已记录输出那样运行场景。
 
+记录的 `research/translation-result` 事件将已验证解释作为一次独立文本响应回放。请求携带所属论文 Session id，因此辅助翻译与该会话共用回放游标，但不创建对话轮次。
+
 ### 挂载它
 
 已准备调用要求使用路由适配器模式。将 `models[].reasoningEfforts` 按可选强度从低到高排列。配置函数在准备期间接收该顺序；`defaultReasoningEffort` 仍独立于首个条目。

@@ -69,6 +69,8 @@ function deferred<T>(): Deferred<T> {
 }
 
 class FakeWorkspaceRemote implements WorkspaceRemote {
+  readonly researchTranslate = vi.fn<WorkspaceRemote['researchTranslate']>()
+  readonly researchSaveTranslation = vi.fn<WorkspaceRemote['researchSaveTranslation']>()
   readonly researchHighlight = vi.fn<WorkspaceRemote['researchHighlight']>()
   readonly researchExtractMarkdown = vi.fn<WorkspaceRemote['researchExtractMarkdown']>()
   readonly researchConfigure = vi.fn<WorkspaceRemote['researchConfigure']>()

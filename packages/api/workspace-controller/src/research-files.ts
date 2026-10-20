@@ -47,6 +47,8 @@ export const researchCatalogSchema: z.ZodType<ResearchCatalog> = z.object({
 })
 
 const noteIndex = z.object({ revision: z.number().int().nonnegative(), sha256: z.string() })
+const folderName = z.string().min(1).refine(value => value !== '.' && value !== '..'
+  && !/[\\/\u0000-\u001f<>:"|?*]/u.test(value) && !/[. ]$/.test(value) && Buffer.byteLength(value) <= 255)
 const indexSchema = z.object({
   version: z.literal(1), revision: z.number().int().nonnegative(),
   topics: z.array(topic.omit({ notes: true }).extend({ notes: noteIndex })),
@@ -114,6 +116,20 @@ export class ResearchFiles {
       }
     }
     return target
+  }
+
+  /**
+   * Resolve a paper's recorded directory, retaining UUID paths only for unmigrated legacy data.
+   * @param paper - identity and absolute managed directory from the catalog.
+   * @param parts - relative child components.
+   * @returns a link-checked path beneath the paper directory.
+   */
+  async paperPath(paper: Pick<ResearchPaper, 'id' | 'directory'>, ...parts: string[]): Promise<string> {
+    const folder = paper.directory === undefined ? paper.id : relative(join(this.directory, 'papers'), paper.directory)
+    if (!folderName.safeParse(folder).success) {
+      throw new RemoteError('research/invalid-library', 'Paper directory must be a direct child of the library papers directory', { path: folder })
+    }
+    return this.path('papers', folder, ...parts)
   }
 
   /**

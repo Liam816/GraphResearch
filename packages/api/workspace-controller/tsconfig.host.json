@@ -19,7 +19,10 @@
     "src/research-pdf.ts",
     "src/research-agent.ts",
     "src/research-session-backup.ts",
-    "src/research-markdown.ts"
+    "src/research-markdown.ts",
+    "src/research-translation-types.ts",
+    "src/research-text-index.ts",
+    "src/research-translation.ts"
   ],
   "references": [
     {
@@ -78,6 +81,9 @@
     },
     {
       "path": "../../subprocess/subprocess"
+    },
+    {
+      "path": "../../llm/llm"
     }
   ]
 }

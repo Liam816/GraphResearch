@@ -12,6 +12,7 @@ import { delimiter as pathDelimiter } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-compaction'
 import type {} from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/types'
 import { SESSION_FORMAT_VERSION, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type { SessionLogOffset as SessionLogOffsetType } from '@deepseek-ai/dsh-session'
 import {
@@ -472,6 +473,15 @@ export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
     script.push({ kind: 'chunks', chunks })
   }
   for (const event of events) {
+    if (event.type === 'research/translation-result') {
+      const block = { type: 'text' as const, text: JSON.stringify(event.data.translation.result) }
+      script.push({ kind: 'chunks', chunks: [
+        { type: 'block-start', index: 0, blockType: 'text' },
+        { type: 'block-end', index: 0, block },
+        { type: 'finish', reason: { kind: 'stop' } },
+      ] })
+      continue
+    }
     if (event.type === 'compaction/summary') {
       // JSONL decoding crosses an untyped durable boundary, so retain its wider
       // shape even though current in-process producers enforce this correlation.

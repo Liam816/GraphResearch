@@ -8,6 +8,8 @@ import { DirectoryPickerController } from './directory-picker.ts'
 import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
 import { ResearchCatalogHost } from './research.ts'
+import { PaperTranslations } from './research-translation.ts'
+import type { ResearchTranslation, ResearchTranslationRequest } from './research-translation-types.ts'
 import { resolve } from 'node:path'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -72,6 +74,22 @@ export interface Config {
   researchWatchStabilityMs?: number
   /** File stability polling interval in milliseconds. */
   researchWatchPollMs?: number
+  /** Auxiliary paper-translation deadline in milliseconds. */
+  researchTranslationTimeoutMs?: number
+  /** Maximum characters in the complete selected sentence context. */
+  researchTranslationMaxContextCharacters?: number
+  /** Maximum generated tokens in one structured explanation. */
+  researchTranslationMaxOutputTokens?: number
+  /** Maximum serialized model or dictionary response bytes. */
+  researchTranslationMaxResponseBytes?: number
+  /** Maximum translation-history bytes per paper. */
+  researchTranslationMaxStoredBytes?: number
+  /** Maximum derived PDF text-index bytes per paper. */
+  researchTranslationMaxIndexBytes?: number
+  /** English dictionary endpoint; empty disables external phonetic lookup. */
+  researchDictionaryEndpoint?: string
+  /** Optional phonetic-lookup deadline in milliseconds. */
+  researchDictionaryTimeoutMs?: number
 }
 
 /** Directory policy after schema defaults have been applied. */
@@ -120,12 +138,21 @@ export class WorkspaceController extends TypertRemoteService {
     researchLockTimeoutMs: z.natural().min(1).default(10_000),
     researchWatchStabilityMs: z.natural().min(1).default(250),
     researchWatchPollMs: z.natural().min(1).default(100),
+    researchTranslationTimeoutMs: z.natural().min(1).default(60_000),
+    researchTranslationMaxContextCharacters: z.natural().min(1).default(16_000),
+    researchTranslationMaxOutputTokens: z.natural().min(1).default(2048),
+    researchTranslationMaxResponseBytes: z.natural().min(1).default(256 * 1024),
+    researchTranslationMaxStoredBytes: z.natural().min(1).default(8 * 1024 * 1024),
+    researchTranslationMaxIndexBytes: z.natural().min(1).default(32 * 1024 * 1024),
+    researchDictionaryEndpoint: z.string().default('https://api.dictionaryapi.dev/api/v2/entries/en'),
+    researchDictionaryTimeoutMs: z.natural().min(1).default(4000),
   })
 
   private readonly config: ResolvedConfig
   private readonly commands: WorkspaceCommands
   private readonly feed: WorkspaceFeed
   private readonly research: ResearchCatalogHost
+  private readonly translations: PaperTranslations
   private readonly researchAgents = new WeakSet<Agent>()
 
   /**
@@ -136,6 +163,12 @@ export class WorkspaceController extends TypertRemoteService {
     super(ctx, 'workspaceController', { namespace: 'workspace' })
     this.config = WorkspaceController.Config(config)
     if (this.config.documentsDirectory !== undefined) validateDocumentsDirectory(this.config.documentsDirectory)
+    if (this.config.researchDictionaryEndpoint !== '') {
+      const url = new URL(this.config.researchDictionaryEndpoint)
+      if (!['http:', 'https:'].includes(url.protocol) || url.username !== '' || url.password !== '' || url.search !== '' || url.hash !== '') {
+        throw new Error('researchDictionaryEndpoint must be an HTTP(S) URL without credentials, query or fragment')
+      }
+    }
     this.commands = new WorkspaceCommands(ctx)
     this.feed = new WorkspaceFeed(ctx)
     this.research = new ResearchCatalogHost(ctx, {
@@ -148,6 +181,14 @@ export class WorkspaceController extends TypertRemoteService {
       lockTimeoutMs: this.config.researchLockTimeoutMs,
       watchStabilityMs: this.config.researchWatchStabilityMs, watchPollMs: this.config.researchWatchPollMs,
     })
+    this.translations = new PaperTranslations(ctx, {
+      timeoutMs: this.config.researchTranslationTimeoutMs, maxContextCharacters: this.config.researchTranslationMaxContextCharacters,
+      maxOutputTokens: this.config.researchTranslationMaxOutputTokens, maxResponseBytes: this.config.researchTranslationMaxResponseBytes,
+      maxStoredBytes: this.config.researchTranslationMaxStoredBytes, maxIndexBytes: this.config.researchTranslationMaxIndexBytes,
+      maxPdfBytes: this.config.researchMaxPdfBytes,
+      dictionaryEndpoint: this.config.researchDictionaryEndpoint, dictionaryTimeoutMs: this.config.researchDictionaryTimeoutMs,
+      maxNoteBytes: this.config.researchMaxNoteBytes, lockTimeoutMs: this.config.researchLockTimeoutMs,
+    }, { read: () => this.research.read(), saveNote: request => this.research.saveNote(request) })
     ctx.on('agent/created', async ({ agent }) => {
       const catalog = this.research.current()
       if (catalog.topics.some(item => item.sessionId === agent.id) || catalog.papers.some(item => item.sessionId === agent.id)) {
@@ -332,6 +373,28 @@ export class WorkspaceController extends TypertRemoteService {
    */
   @Remote('researchHighlight')
   researchHighlight(request: ResearchHighlightRequest): Promise<ResearchCatalog> { return this.research.highlight(request) }
+
+  /**
+   * Explain an explicitly selected original passage with two surrounding sentences on each side.
+   * @param request - paper identity, selected text and PDF text-item positions.
+   * @param signal - caller cancellation.
+   * @returns a durably recorded explanation; failures retain the original and notebooks.
+   */
+  @Remote('researchTranslate')
+  researchTranslate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation> {
+    return this.translations.translate(request, signal)
+  }
+
+  /**
+   * Append a confirmed translation and original-page link to learning notes exactly once.
+   * @param paperId - owning paper.
+   * @param key - saved translation occurrence key.
+   * @returns confirmed catalog; a conflict preserves the notebook and can be retried.
+   */
+  @Remote('researchSaveTranslation')
+  researchSaveTranslation(paperId: ResearchPaperId, key: string): Promise<ResearchCatalog> {
+    return this.translations.saveNote(paperId, key)
+  }
 
   /**
    * Retry full-text Markdown conversion while retaining the attached PDF and notebooks.

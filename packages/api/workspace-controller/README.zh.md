@@ -66,6 +66,15 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 打开复制的资料库时，仅在原生持久化提供方没有对应 Session 的情况下恢复兼容的 `session.json` 快照，并修复缺失的 Workspace 关联。已有原生日志仍是依据。快照在 Session 事件后更新；备份附件和其他框架状态时仍需保留 Harness home。自定义 Host 组合除已有控制器依赖外，还必须提供 `agents`、`sessionController` 和 `sessionPersistence`；项目自带的 Web profile 已包含这些服务。
 
+<a id="paper-translation"></a>
+#### 论文划词翻译
+
+`researchTranslate` 接收用户明确选择的 PDF 原文，以非空 PDF.js 文字项序号和 UTF-16 偏移定位。Host 将选区与托管原文核对，重建常见双栏阅读顺序，在同一正文、标题、图注或参考文献块内提取所在完整句子以及前后各至多两句。正文句子可跨页连接。重复的页边文字会被排除，上下文不足时明确提示。图片原文需要 OCR；复杂排版可能需要重新选择，这是基于规则的阅读顺序重建。
+
+`cache/text-index.json` 可从原文重建，并关联原文 SHA-256。`translations.json` 保存已验证结果，缓存区分 PDF 内容、选区位置、原文上下文、论文名、模型路线、提示词和词典地址。独立模型请求使用论文 Agent 选定的模型，不启动会话轮次或提供工具。调用前将完整已准备输入写入并刷新 `research/translation-request`；验证结果后写入并刷新 `research/translation-result`，再发布结果文件。失败或取消时保留原文、笔记及已有结果。只有 `researchSaveTranslation` 才会将带页码引用的 Markdown 加入学习笔记，同一结果只追加一次，并检查当前笔记版本。冲突时保留已有内容，允许用户重试。
+
+`researchTranslationTimeoutMs`、`researchTranslationMaxContextCharacters`、`researchTranslationMaxOutputTokens`、`researchTranslationMaxResponseBytes`、`researchTranslationMaxStoredBytes` 和 `researchTranslationMaxIndexBytes` 限制单次处理及完整保存结果，默认分别为 60 秒、16,000 个上下文字符、2,048 个输出 token、256 KiB 响应、8 MiB 历史记录和 32 MiB 文字索引。可选的[词典接口](https://dictionaryapi.dev/)提供英语音标，模型不生成音标；`researchDictionaryEndpoint` 默认使用其英语词条地址，设为空字符串可关闭查询。`researchDictionaryTimeoutMs` 默认为四秒。词条缺失或查询失败时，解释仍然可用，并明确显示暂无音标。设备朗读由阅读器负责。[Session 兼容性说明](../../../docs/upgrade-guide/v0.2.1-alpha.2/paper-translation/guide.zh.md)介绍新增审计记录。
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -82,6 +91,20 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 #### KV Cache 影响
 
 普通 Workspace 变更不会改变请求。科研笔记版本、目录变化和续读位置在请求准入时替换已记录的运行上下文；工具 schema 仅属于科研实体的 Agent 作用域。
+
+### 论文划词翻译
+
+#### 模型会看到什么
+
+辅助请求包含论文名、准确选区、所在完整句子、前后各至多两句原文、原始页码和上下文不足标记。固定的[翻译提示词](src/research-translation.ts)要求输出中文 JSON 解释，区分基本词义与语境解释，并禁止编造音标和论文结论。[记录的请求](../../../snapshots/web/research-translation/session.v4.jsonl)逐字固定这些指令。请求不携带论文之前的对话或工具。主会话消息保持原样；辅助请求和结果均作为 Session 审计事件持久化。
+
+#### Token 影响
+
+每个未命中缓存的选区消耗一次独立模型请求，受输入与输出预算限制。匹配的已保存结果直接复用论文文件，无需再次请求模型。音标查询不消耗模型 token。保存到学习笔记后，Markdown 可供之后显式读取笔记时使用。
+
+#### KV Cache 影响
+
+独立请求复用固定指令前缀，原文随选区位置变化，供应商缓存由供应商负责。辅助结果通过用户发送的提问或之后的笔记读取进入主会话上下文。
 
 ## 已知限制与延期工作
 

@@ -41,6 +41,18 @@ export function selectionPdfFixture(): Uint8Array {
   ])
 }
 
+/** @returns a selectable paper paragraph with two sentences before and after its vocabulary target. */
+export function translationPdfFixture(): Uint8Array {
+  const sentences = ['First context sentence.', 'Second context sentence.', 'The policy predicts actions.', 'Next context sentence.', 'Last context sentence.']
+  const stream = sentences.map((text, index) => `BT /F1 12 Tf 40 ${700 - index * 24} Td (${text}) Tj ET`).join('\n')
+  return pdfObjects([
+    '<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ])
+}
+
 function pdfObjects(objects: readonly string[]): Uint8Array {
   let text = '%PDF-1.7\n'
   const offsets = [0]

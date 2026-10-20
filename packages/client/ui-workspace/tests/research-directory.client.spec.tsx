@@ -29,6 +29,7 @@ function fixture(managed: boolean, collapsed = false) {
     useResource: () => ({ status: 'none', value: undefined, failure: undefined, reload: () => {} }),
     refresh: vi.fn(async () => {}), open: vi.fn(), createTopic: vi.fn(async () => {}), createPaper: vi.fn(async () => {}),
     highlight: vi.fn(async () => {}), extractMarkdown: vi.fn(async () => {}), saveNote: vi.fn(async () => {}),
+    translate: vi.fn(), saveTranslation: vi.fn(async () => {}),
     configureDirectory: vi.fn(async () => {}), mentions: vi.fn(async () => []),
   }
   if (collapsed) view.actions.expand('fixture-topic', false)

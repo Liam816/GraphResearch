@@ -109,14 +109,15 @@ it('retains failed additions and retries the same identity instead of creating a
   expect(view.change.mock.calls[1]).toEqual(view.change.mock.calls[0])
 })
 
-it('keeps confirmed markers on deletion failure and supports double-click and keyboard removal', async () => {
+it('keeps confirmed markers on deletion failure and supports a click menu and keyboard removal', async () => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   const highlight: ResearchHighlight = { id: 'selection' as ResearchHighlightId, color: 'pink', text: 'First selected line',
     rects: [{ page: 1, x: 0.1, y: 0.25, width: 0.4, height: 0.1 }] }
   const view = fixture([highlight])
   expect(highlightAtPoint(view.container, [highlight], 40, 70)).toEqual(highlight)
   view.change.mockRejectedValueOnce(new Error('storage unavailable'))
-  fireEvent.doubleClick(view.first.parentElement!, { clientX: 40, clientY: 70 })
+  fireEvent.pointerUp(view.first.parentElement!, { clientX: 40, clientY: 70 })
+  fireEvent.click(screen.getByRole('button', { name: en.highlightDelete }))
   await waitFor(() => { expect(screen.getByRole('alert')).toBeDefined() })
   const marker = screen.getByRole('button', { name: 'Remove highlight: First selected line' })
   expect(marker).toBeDefined()

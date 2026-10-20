@@ -1,0 +1,716 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:research/translation-request",
+      "kind": "event",
+      "event": "research/translation-request",
+      "surface": false,
+      "digest": "66b61758b8461fa45f5d65f8186b42a2479793e9dcc6920c2bcac76171d6516e",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 19,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 36,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "key",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "modelRequest",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "paperId",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "config",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "messages",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "system",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "maxTokens",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "model",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "reasoningEffort",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "stop",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "temperature",
+                "type": 5,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "array",
+            "element": 8
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "role",
+                "type": 35,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 10
+          },
+          {
+            "kind": "union",
+            "types": [
+              11,
+              21,
+              24,
+              26,
+              28,
+              31,
+              33
+            ]
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "offloaded",
+                "type": 19,
+                "optional": true
+              },
+              {
+                "name": "type",
+                "type": 20,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "height",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "mediaType",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "originalDimensions",
+                "type": 18,
+                "optional": true
+              },
+              {
+                "name": "width",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "image/gif"
+          },
+          {
+            "kind": "literal",
+            "value": "image/jpeg"
+          },
+          {
+            "kind": "literal",
+            "value": "image/png"
+          },
+          {
+            "kind": "literal",
+            "value": "image/webp"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "height",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "width",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "image"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 22,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 23,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "file"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 25,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "reasoning"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 27,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "text"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "tool",
+                "type": 29,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 30,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "never"
+          },
+          {
+            "kind": "literal",
+            "value": "tool-addition"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "toolName",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 32,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-removal"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "arguments",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 34,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-call"
+          },
+          {
+            "kind": "literal",
+            "value": "user"
+          },
+          {
+            "kind": "literal",
+            "value": "research/translation-request"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:research/translation-result",
+      "kind": "event",
+      "event": "research/translation-result",
+      "surface": false,
+      "digest": "e1937ad7cebbb7af09b7c53896033f0d6e03abf3ec52c1e7be996b4470b66e1a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 17,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 18,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "requestSeq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "translation",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "context",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "key",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "paperId",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "pronunciation",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "result",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "sourceSha256",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "after",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "before",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "endPage",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "limited",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "selected",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "selectionStart",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "sentence",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "startPage",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 6
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "phonetics",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "sourceUrl",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "status",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "ready"
+          },
+          {
+            "kind": "literal",
+            "value": "unavailable"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "contextualMeaning",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "explanation",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "lemma",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "meanings",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "partOfSpeech",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "translation",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              14,
+              15,
+              16
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "phrase"
+          },
+          {
+            "kind": "literal",
+            "value": "sentence"
+          },
+          {
+            "kind": "literal",
+            "value": "word"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "research/translation-result"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

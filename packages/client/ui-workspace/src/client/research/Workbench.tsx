@@ -107,6 +107,19 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
     </div> : <ResearchPaperPanels key={paper.id} paper={paper} view={view} id={panelId} phase={phase} hero={hero}
       t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote}
       highlight={props.highlight} extractMarkdown={props.extractMarkdown}
+      translate={props.translate} saveTranslation={props.saveTranslation}
+      translationAvailable={catalog.capabilities?.pdfTranslations === true}
+      askTranslation={(translation) => {
+        const input = props.inputActions
+        if (input === undefined) throw new Error('The paper composer is not ready')
+        const { context, result } = translation
+        const question = t('translationQuestion', { selected: context.selected,
+          page: context.startPage, context: [...context.before, context.sentence, ...context.after].join(' '),
+          meaning: result.contextualMeaning, explanation: result.explanation, translation: result.translation })
+        if (!input.insertText(question, input.captureInsertion())) throw new Error('The paper composer changed')
+        actions.focus(paper.id, 'agent')
+        return Promise.resolve()
+      }}
       highlightAvailable={catalog.capabilities?.pdfHighlights === true} refresh={props.refresh} />}
     <Modal open={referencesOpen} title={t('context')} description={t('contextHint')} closeLabel={t('close')}
       onClose={() => { if (!referenceBusy) setReferencesOpen(false) }} footer={<>

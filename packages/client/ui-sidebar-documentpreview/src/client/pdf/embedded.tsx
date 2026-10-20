@@ -6,7 +6,7 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FactoryComponentPropsOf } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { PdfAnnotations } from './highlights.ts'
+import type { PdfAnnotations, PdfTranslation } from './highlights.ts'
 import type { PdfView, PdfReadingPosition } from './store.ts'
 import type { ZoomPreference } from '../zoom/types.ts'
 import { ZoomViewport, zoomSurfaceClass, fitWidthZoom } from '../zoom/ZoomViewport.tsx'
@@ -45,7 +45,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     /** Selectable original PDF outside the right sidebar's tab system. */
     'document.pdf': {
       scope: 'session'
-      props: { readonly path: string; readonly viewKey?: string; readonly annotations?: PdfAnnotations }
+      props: {
+        readonly path: string
+        readonly viewKey?: string
+        readonly annotations?: PdfAnnotations
+        readonly translation?: PdfTranslation
+      }
       store: ReturnType<typeof createEmbeddedPdfStore>
       locale: 'sidebarPdf'
       inject: EmbeddedPdfInjected
@@ -86,7 +91,7 @@ function EmbeddedPdf(props: FactoryComponentPropsOf<'document.pdf'>) {
   if (state.kind === 'failed') return <div className={css.status} role="alert"><p>{t('failed', { message: state.message })}</p>
     <Button size="sm" onClick={() => { setAttempt(value => value + 1) }}>{t('retry')}</Button></div>
   return <div className={css.root}><Suspense fallback={loading}>
-    <Reader annotations={props.annotations} data={state.data} view={view} signal={state.signal}
+    <Reader annotations={props.annotations} translation={props.translation} data={state.data} view={view} signal={state.signal}
       onPage={onPage} onZoom={onZoom} reading={{ save: onPosition, fitWidthZoom }} t={t}
       ZoomViewport={ZoomViewport} zoomSurfaceClass={zoomSurfaceClass} scrollportRef={scrollportRef} loading={loading} />
   </Suspense></div>

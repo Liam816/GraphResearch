@@ -3788,6 +3788,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the committed library snapshot.',
       },
       {
+        signature: '@Remote(\'researchTranslate\') researchTranslate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation>',
+        description: 'Explain an explicitly selected original passage with two surrounding sentences on each side.',
+        parameters: [{ name: 'request', description: 'paper identity, selected text and PDF text-item positions.' }, { name: 'signal', description: 'caller cancellation.' }],
+        returns: 'a durably recorded explanation; failures retain the original and notebooks.',
+      },
+      {
+        signature: '@Remote(\'researchSaveTranslation\') researchSaveTranslation(paperId: ResearchPaperId, key: string): Promise<ResearchCatalog>',
+        description: 'Append a confirmed translation and original-page link to learning notes exactly once.',
+        parameters: [{ name: 'paperId', description: 'owning paper.' }, { name: 'key', description: 'saved translation occurrence key.' }],
+        returns: 'confirmed catalog; a conflict preserves the notebook and can be retried.',
+      },
+      {
         signature: '@Remote(\'researchExtractMarkdown\') researchExtractMarkdown(paperId: ResearchPaperId): Promise<ResearchCatalog>',
         description: 'Retry full-text Markdown conversion while retaining the attached PDF and notebooks.',
         parameters: [{ name: 'paperId', description: 'paper with an attached original.' }],
@@ -6593,7 +6605,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchCatalog',
-    declaration: 'export interface ResearchCatalog {\n    readonly revision: number;\n    readonly topics: readonly ResearchTopic[];\n    readonly papers: readonly ResearchPaper[];\n    readonly capabilities?: {\n        readonly pdfHighlights: true;\n    } | undefined;\n    readonly directory?: string | undefined;\n}',
+    declaration: 'export interface ResearchCatalog {\n    readonly revision: number;\n    readonly topics: readonly ResearchTopic[];\n    readonly papers: readonly ResearchPaper[];\n    readonly capabilities?: {\n        readonly pdfHighlights: true;\n        readonly pdfTranslations?: true;\n    } | undefined;\n    readonly directory?: string | undefined;\n}',
   },
   {
     name: 'ResearchCreatePaperRequest',
@@ -6664,6 +6676,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResearchPaperText {\n    readonly paperId: ResearchPaperId;\n    readonly totalPages: number;\n    readonly pages: readonly {\n        readonly page: number;\n        readonly text: string;\n    }[];\n    readonly truncated: boolean;\n}',
   },
   {
+    name: 'ResearchPronunciation',
+    declaration: 'export interface ResearchPronunciation {\n    readonly status: \'ready\' | \'unavailable\';\n    readonly phonetics: readonly string[];\n    readonly sourceUrl: string;\n}',
+  },
+  {
     name: 'ResearchReadPaperRequest',
     declaration: 'export interface ResearchReadPaperRequest {\n    readonly paperId: ResearchPaperId;\n    readonly startPage?: number;\n    readonly pageCount?: number;\n}',
   },
@@ -6672,12 +6688,32 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResearchSaveNoteRequest {\n    readonly paperId: ResearchPaperId;\n    readonly kind: ResearchNoteKind;\n    readonly text: string;\n    readonly expectedRevision: number;\n}',
   },
   {
+    name: 'ResearchTextPosition',
+    declaration: 'export interface ResearchTextPosition {\n    readonly page: number;\n    readonly item: number;\n    readonly offset: number;\n}',
+  },
+  {
     name: 'ResearchTopic',
     declaration: 'export interface ResearchTopic {\n    readonly id: ResearchTopicId;\n    readonly title: string;\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n    readonly notes?: ResearchNote | undefined;\n}',
   },
   {
     name: 'ResearchTopicId',
     declaration: 'export type ResearchTopicId = Branded<\'ResearchTopicId\'>;',
+  },
+  {
+    name: 'ResearchTranslation',
+    declaration: 'export interface ResearchTranslation {\n    readonly key: string;\n    readonly paperId: ResearchPaperId;\n    readonly sourceSha256: string;\n    readonly context: ResearchTranslationContext;\n    readonly result: ResearchTranslationExplanation;\n    readonly pronunciation: ResearchPronunciation;\n}',
+  },
+  {
+    name: 'ResearchTranslationContext',
+    declaration: 'export interface ResearchTranslationContext {\n    readonly selected: string;\n    readonly sentence: string;\n    readonly selectionStart: number;\n    readonly before: readonly string[];\n    readonly after: readonly string[];\n    readonly startPage: number;\n    readonly endPage: number;\n    readonly limited: boolean;\n}',
+  },
+  {
+    name: 'ResearchTranslationExplanation',
+    declaration: 'export interface ResearchTranslationExplanation {\n    readonly kind: \'word\' | \'phrase\' | \'sentence\';\n    readonly lemma: string;\n    readonly partOfSpeech: string;\n    readonly meanings: readonly string[];\n    readonly contextualMeaning: string;\n    readonly explanation: string;\n    readonly translation: string;\n}',
+  },
+  {
+    name: 'ResearchTranslationRequest',
+    declaration: 'export interface ResearchTranslationRequest {\n    readonly paperId: ResearchPaperId;\n    readonly text: string;\n    readonly start: ResearchTextPosition;\n    readonly end: ResearchTextPosition;\n}',
   },
   {
     name: 'ResolvedAlwaysRetryPolicy',

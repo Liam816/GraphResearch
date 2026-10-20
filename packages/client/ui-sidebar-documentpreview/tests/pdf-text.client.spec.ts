@@ -35,7 +35,12 @@ it('aligns selectable text to the displayed width and removes its observer and D
   const page = { streamTextContent: () => text } as PDFPageProxy
   const task = pdfTextRenderer(host)(page, viewport)
   await task.promise
-  expect(api.create).toHaveBeenCalledWith({ pdfPage: page })
+  expect(api.create.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ pdfPage: page }))
+  const options = api.create.mock.calls[0]![0] as { onAppend(root: HTMLElement): void }
+  const layer = host.firstElementChild as HTMLElement
+  layer.innerHTML = '<span class="markedContent"><span role="presentation">First</span><br role="presentation"><span role="presentation">Second</span></span>'
+  options.onAppend(layer)
+  expect(Array.from(layer.querySelectorAll('span[role="presentation"]'), span => (span as HTMLElement).dataset['pdfTextItem'])).toEqual(['0', '1'])
   expect(api.render).toHaveBeenCalledWith({ viewport })
   expect(observe).toHaveBeenCalledWith(host)
   expect((host.firstElementChild as HTMLElement).style.scale).toBe('0.5')

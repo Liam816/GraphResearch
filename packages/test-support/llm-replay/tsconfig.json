@@ -28,6 +28,9 @@
     },
     {
       "path": "../../session/session-format-catalog"
+    },
+    {
+      "path": "../../api/workspace-controller/tsconfig.host.json"
     }
   ]
 }

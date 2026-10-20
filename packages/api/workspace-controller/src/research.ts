@@ -512,7 +512,7 @@ export class ResearchCatalogHost {
   }
 
   private accept(catalog: ResearchCatalog): ResearchCatalog {
-    const confirmed: ResearchCatalog = { ...catalog, capabilities: { pdfHighlights: true } }
+    const confirmed: ResearchCatalog = { ...catalog, capabilities: { pdfHighlights: true, pdfTranslations: true } }
     if (catalog.revision !== this.snapshot.revision || catalog.directory !== this.snapshot.directory) {
       this.snapshot = confirmed
       for (const follower of this.followers) follower.push({ type: 'changed', catalog: confirmed })

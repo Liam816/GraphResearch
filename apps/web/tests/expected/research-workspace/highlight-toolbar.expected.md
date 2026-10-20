@@ -4,5 +4,5 @@
   - button "Blue highlight"
   - button "Pink highlight"
   - button "Orange highlight"
+  - button "Translate"
   - button "Cancel"
-  - text: Double-click a highlight to remove it

@@ -47,7 +47,7 @@ it('highlights selected original text across pages and restores the markers afte
   await toolbar.waitFor()
   await mkdir('.artifacts/research-ui', { recursive: true })
   await page.screenshot({ path: '.artifacts/research-ui/highlight-toolbar-light.png' })
-  expect(await toolbar.getByRole('button').count()).toBe(6)
+  expect(await toolbar.getByRole('button').count()).toBe(7)
   await compareOrRefreshGolden(EXPECTED,
     await captureStableAria(page, '[role="toolbar"][aria-label="Choose highlight color"]', scaffold.workspaceCwd), webSnapshotMode())
   await toolbar.getByRole('button', { name: 'Yellow highlight', exact: true }).click()
@@ -121,7 +121,8 @@ it('highlights selected original text across pages and restores the markers afte
   const left = Math.max(marked.x, viewport.x), right = Math.min(marked.x + marked.width, viewport.x + viewport.width)
   const top = Math.max(marked.y, viewport.y), bottom = Math.min(marked.y + marked.height, viewport.y + viewport.height)
   expect(right).toBeGreaterThan(left); expect(bottom).toBeGreaterThan(top)
-  await page.mouse.dblclick((left + right) / 2, (top + bottom) / 2)
+  await page.mouse.click((left + right) / 2, (top + bottom) / 2)
+  await page.getByRole('toolbar', { name: 'Highlight actions', exact: true }).getByRole('button', { name: 'Remove highlight', exact: true }).click()
   await expect.poll(() => marker.count()).toBe(1)
   const remaining = (await scaffold.ctx.workspaceController.researchList()).papers[0]?.highlights
   expect(remaining).toHaveLength(1)

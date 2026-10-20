@@ -17,6 +17,7 @@ export { ClientWorkspaceModel } from './model.ts'
 export { ClientResearchModel } from './research.ts'
 export type { ResearchSnapshot } from './research.ts'
 export type * from '../research-types.ts'
+export type * from '../research-translation-types.ts'
 export type {
   WorkspaceFollowSink, WorkspaceListPhase, WorkspaceRemote, WorkspaceSnapshot,
 } from './model.ts'

@@ -1,0 +1,7 @@
+version: 1
+scenario: research-translation
+profile: web
+composition: web-research-translation
+recording: authored
+workspace:
+  final: true

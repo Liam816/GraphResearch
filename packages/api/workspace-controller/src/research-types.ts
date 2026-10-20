@@ -95,7 +95,7 @@ export interface ResearchCatalog {
   readonly topics: readonly ResearchTopic[]
   readonly papers: readonly ResearchPaper[]
   /** Runtime capabilities of the responding Host; absent in older backends and never persisted. */
-  readonly capabilities?: { readonly pdfHighlights: true } | undefined
+  readonly capabilities?: { readonly pdfHighlights: true; readonly pdfTranslations?: true } | undefined
   /** Absolute managed library root. */
   readonly directory?: string | undefined
 }

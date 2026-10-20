@@ -27,6 +27,8 @@ English | [中文](README.zh.md)
 
 This package gives a keyless test a real agent with a fixed model transcript: mount it in place of a real LLM adapter, point it at a recorded fixture, and run the scenario exactly as if the model had produced the recorded output.
 
+Recorded `research/translation-result` events replay the validated explanation as one independent text response. Calls retain the owning paper Session id, so auxiliary translations share its replay cursor without creating conversation turns.
+
 ### Mounting it
 
 Prepared callers require the routed adapter mode. Configure `models[].reasoningEfforts` from least to greatest selectable effort. Configuration functions receive that order during preparation; `defaultReasoningEffort` remains independent of the first entry.

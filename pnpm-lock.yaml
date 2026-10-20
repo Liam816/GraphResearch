@@ -11653,6 +11653,9 @@ importers:
         specifier: workspace:*
         version: link:../../../apps/cli
     devDependencies:
+      '@deepseek-ai/dsh-api-workspace-controller':
+        specifier: workspace:*
+        version: link:../../api/workspace-controller
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
@@ -14365,6 +14368,9 @@ importers:
         specifier: workspace:*
         version: link:../../util/values
     devDependencies:
+      '@deepseek-ai/dsh-api-workspace-controller':
+        specifier: workspace:*
+        version: link:../../api/workspace-controller
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis

@@ -301,7 +301,7 @@ export interface Config {
 ## `@deepseek-ai/dsh-api-workspace-controller`
 
 - `inject`: `typert` · `workspaceRegistry` · `storageDomain` · `sessionController` · `agents` · `sessions` · `sessionPersistence`
-- `source`: [`packages/api/workspace-controller/src/index.ts:44`](../packages/api/workspace-controller/src/index.ts)
+- `source`: [`packages/api/workspace-controller/src/index.ts:46`](../packages/api/workspace-controller/src/index.ts)
 
 ```ts config-catalog
 /** First-use directory policy for the Host account. */
@@ -336,6 +336,22 @@ export interface Config {
   researchWatchStabilityMs?: number
   /** File stability polling interval in milliseconds. */
   researchWatchPollMs?: number
+  /** Auxiliary paper-translation deadline in milliseconds. */
+  researchTranslationTimeoutMs?: number
+  /** Maximum characters in the complete selected sentence context. */
+  researchTranslationMaxContextCharacters?: number
+  /** Maximum generated tokens in one structured explanation. */
+  researchTranslationMaxOutputTokens?: number
+  /** Maximum serialized model or dictionary response bytes. */
+  researchTranslationMaxResponseBytes?: number
+  /** Maximum translation-history bytes per paper. */
+  researchTranslationMaxStoredBytes?: number
+  /** Maximum derived PDF text-index bytes per paper. */
+  researchTranslationMaxIndexBytes?: number
+  /** English dictionary endpoint; empty disables external phonetic lookup. */
+  researchDictionaryEndpoint?: string
+  /** Optional phonetic-lookup deadline in milliseconds. */
+  researchDictionaryTimeoutMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-api-workspace-controller -->
@@ -2044,7 +2060,7 @@ export type PiAiThinkingTokenBudgetField = NonNullable<OpenAICompletionsCompat['
 
 - `inject`: `llm`
 - `refs`: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · [`SystemPromptUpdate`](../packages/llm/llm/src/index.ts) · [`ToolUpdate`](../packages/llm/llm/src/index.ts)
-- `source`: [`packages/test-support/llm-replay/src/index.ts:1129`](../packages/test-support/llm-replay/src/index.ts)
+- `source`: [`packages/test-support/llm-replay/src/index.ts:1139`](../packages/test-support/llm-replay/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the {@link ReplayConfig} inputs, each defaulting to its `DSH_SNAPSHOT_*` env var in `apply`. */

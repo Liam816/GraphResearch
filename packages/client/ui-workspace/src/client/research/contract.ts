@@ -2,6 +2,7 @@
 import type { HostObservable, PropsHooks, PropsLocale, PropsRenderFactories, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ResearchSnapshot, ResearchCreateTopicRequest, ResearchCreatePaperRequest, ResearchSaveNoteRequest, ResearchPaperId, ResearchDirectoryRequest, ResearchHighlightRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ResearchTranslation, ResearchTranslationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchViewStore } from './store.ts'
 import type { ResearchKey } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -16,6 +17,8 @@ export interface ResearchInjected {
   createPaper: (request: Omit<ResearchCreatePaperRequest, 'sessionId'>) => Promise<void>
   highlight: (request: ResearchHighlightRequest) => Promise<void>
   extractMarkdown: (paperId: ResearchPaperId) => Promise<void>
+  translate: (request: ResearchTranslationRequest, signal: AbortSignal) => Promise<ResearchTranslation>
+  saveTranslation: (paperId: ResearchPaperId, key: string) => Promise<void>
   saveNote: (request: ResearchSaveNoteRequest) => Promise<void>
   configureDirectory: (request: ResearchDirectoryRequest) => Promise<void>
   mentions: (paperIds: readonly ResearchPaperId[]) => Promise<readonly string[]>

@@ -11186,6 +11186,716 @@
       }
     },
     {
+      "key": "event:research/translation-request",
+      "kind": "event",
+      "event": "research/translation-request",
+      "surface": false,
+      "digest": "66b61758b8461fa45f5d65f8186b42a2479793e9dcc6920c2bcac76171d6516e",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 19,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 36,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "key",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "modelRequest",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "paperId",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "config",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "messages",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "system",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "maxTokens",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "model",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "reasoningEffort",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "stop",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "temperature",
+                "type": 5,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "array",
+            "element": 8
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "content",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "role",
+                "type": 35,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 10
+          },
+          {
+            "kind": "union",
+            "types": [
+              11,
+              21,
+              24,
+              26,
+              28,
+              31,
+              33
+            ]
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "offloaded",
+                "type": 19,
+                "optional": true
+              },
+              {
+                "name": "type",
+                "type": 20,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "height",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "mediaType",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "originalDimensions",
+                "type": 18,
+                "optional": true
+              },
+              {
+                "name": "width",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              14,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "image/gif"
+          },
+          {
+            "kind": "literal",
+            "value": "image/jpeg"
+          },
+          {
+            "kind": "literal",
+            "value": "image/png"
+          },
+          {
+            "kind": "literal",
+            "value": "image/webp"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "height",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "width",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "image"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 22,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 23,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "file"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 25,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "reasoning"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 27,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "text"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "tool",
+                "type": 29,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 30,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "never"
+          },
+          {
+            "kind": "literal",
+            "value": "tool-addition"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "toolName",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 32,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-removal"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "arguments",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 34,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-call"
+          },
+          {
+            "kind": "literal",
+            "value": "user"
+          },
+          {
+            "kind": "literal",
+            "value": "research/translation-request"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:research/translation-result",
+      "kind": "event",
+      "event": "research/translation-result",
+      "surface": false,
+      "digest": "e1937ad7cebbb7af09b7c53896033f0d6e03abf3ec52c1e7be996b4470b66e1a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 17,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 18,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "requestSeq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "translation",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "context",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "key",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "paperId",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "pronunciation",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "result",
+                "type": 12,
+                "optional": false
+              },
+              {
+                "name": "sourceSha256",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "after",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "before",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "endPage",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "limited",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "selected",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "selectionStart",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "sentence",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "startPage",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 6
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "primitive",
+            "type": "boolean"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "phonetics",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "sourceUrl",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "status",
+                "type": 9,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              10,
+              11
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "ready"
+          },
+          {
+            "kind": "literal",
+            "value": "unavailable"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "contextualMeaning",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "explanation",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "kind",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "lemma",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "meanings",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "partOfSpeech",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "translation",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              14,
+              15,
+              16
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "phrase"
+          },
+          {
+            "kind": "literal",
+            "value": "sentence"
+          },
+          {
+            "kind": "literal",
+            "value": "word"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "research/translation-result"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:sandbox/mode",
       "kind": "event",
       "event": "sandbox/mode",
@@ -22109,6 +22819,11 @@
       ]
     },
     {
+      "digest": "0a17eb17f76b614ae7a66620bbe0c77bed6e0b02328b14aad57dd8e1716cd938",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "0a30c3be336cdd4f8f34e66543a3d46d611c43986edd9b3ce6cbb9b721d3b5d3",
       "names": [],
       "sources": [
@@ -22197,6 +22912,11 @@
       "sources": []
     },
     {
+      "digest": "0edf790f85c4d7520d482644273ac01d5fd1a28edbbc47374e57a94396799776",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "0eeb17e1df89b1ebc2902116fe7145e0d321ef0db26e6bdebc802cb8513a01c1",
       "names": [],
       "sources": []
@@ -22246,6 +22966,11 @@
       "sources": [
         "packages/interaction/user-approval/src/index.ts:40"
       ]
+    },
+    {
+      "digest": "12136401bae0866e06990ddfd9ea529eac10ebf7b7905085fe6ebf6fa856e238",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "124aa62078ca3311353b39cc3bf6c75da281338be6bbf672f8b361d828cddca3",
@@ -22617,6 +23342,15 @@
       "sources": []
     },
     {
+      "digest": "27836fd07fda3ddd5c832b86f552027af335d814d4c197d4038da59e0ac41b44",
+      "names": [
+        "packages/api/workspace-controller/src/research-translation-types.ts#ResearchTranslation"
+      ],
+      "sources": [
+        "packages/api/workspace-controller/src/research-translation-types.ts:52"
+      ]
+    },
+    {
       "digest": "287211846beea1eccb5f9acee00d20388a38fcb2e95858fa2332d6f58529379a",
       "names": [],
       "sources": [
@@ -22666,6 +23400,13 @@
       "sources": []
     },
     {
+      "digest": "2b64b82387d5c151eb7c75e8b5eeb17d32a2828cca7a09b286656e04369fa0a8",
+      "names": [],
+      "sources": [
+        "packages/api/workspace-controller/src/research-translation-types.ts:65"
+      ]
+    },
+    {
       "digest": "2c4c21f19f426a58f2dac914e34313aa43f8408972de857a486d1f086d5adb6c",
       "names": [],
       "sources": []
@@ -22708,6 +23449,13 @@
       ],
       "sources": [
         "packages/experimental/agent-team/src/types.ts:129"
+      ]
+    },
+    {
+      "digest": "2ebc18d4f9fda63e87ee5528008c981a5ee4d40e643a20be4a3ab842358c7a9f",
+      "names": [],
+      "sources": [
+        "packages/api/workspace-controller/src/research-translation-types.ts:83"
       ]
     },
     {
@@ -22791,6 +23539,15 @@
       ],
       "sources": [
         "packages/core/session/src/types.ts:462"
+      ]
+    },
+    {
+      "digest": "34781a31fba38f2732d53fbd976f7981f51edc540d48048a0f84c2446c394cd1",
+      "names": [
+        "packages/llm/llm/src/types.ts#RequestUserInput"
+      ],
+      "sources": [
+        "packages/llm/llm/src/types.ts:487"
       ]
     },
     {
@@ -23113,6 +23870,7 @@
       "digest": "4cd48f3e5108bd6ebedf7301c3638839b8b2b9db8dbd493974177fbdeb91a01b",
       "names": [
         "packages/api/session-controller/src/types.ts#SessionRequestId",
+        "packages/api/workspace-controller/src/research-types.ts#ResearchPaperId",
         "packages/attachment/attachment/src/brand.ts#AttachmentId",
         "packages/compaction/compaction/src/brand.ts#CompactionId",
         "packages/core/session/src/types.ts#SessionId",
@@ -23138,6 +23896,7 @@
       ],
       "sources": [
         "packages/api/session-controller/src/types.ts:403",
+        "packages/api/workspace-controller/src/research-types.ts:9",
         "packages/attachment/attachment/src/brand.ts:6",
         "packages/compaction/compaction/src/brand.ts:4",
         "packages/core/session/src/types.ts:20",
@@ -23520,6 +24279,11 @@
       ]
     },
     {
+      "digest": "66b61758b8461fa45f5d65f8186b42a2479793e9dcc6920c2bcac76171d6516e",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "66ba70f6f068da443f969a0b947a013c3addd776b9b60a0a393759c19825e9a2",
       "names": [
         "packages/llm/llm/src/types.ts#ToolSchema"
@@ -23552,12 +24316,22 @@
       "sources": []
     },
     {
+      "digest": "685f14f03b0dee46a2e774e04accc801ecac9e54080bc6dbb00eae51e33da92b",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "688e853dc149f0d30b31765c12ec7e3be74169bdf1a4c6463a10b945d50cc1b8",
       "names": [],
       "sources": []
     },
     {
       "digest": "68f44f59e91c41395076cb77265981a601680ec8a381bbbeb6ab754ffdc94573",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "68fe195a386e90a6c4995236c96fc86403195e8248f859bef1800fb0bcf30387",
       "names": [],
       "sources": []
     },
@@ -23769,6 +24543,15 @@
       ]
     },
     {
+      "digest": "79998beddac54f1530d47cd87029f3fbbb95d9bf56659c0bc3d5e81bfef19254",
+      "names": [
+        "packages/api/workspace-controller/src/research-translation-types.ts#ResearchPronunciation"
+      ],
+      "sources": [
+        "packages/api/workspace-controller/src/research-translation-types.ts:45"
+      ]
+    },
+    {
       "digest": "79ddc907312f97cf9553d4841e8b3fc937097bd8d97900a790efad3c05255e99",
       "names": [],
       "sources": [
@@ -23923,6 +24706,11 @@
       "sources": [
         "packages/skill/tool-skill/src/index.ts:41"
       ]
+    },
+    {
+      "digest": "831db61e87fff198d286b3bec54ad1b2c201ecd6aaac746a61247bbc492b2188",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "8338ee303e2bd448e9e6144069942f63e3cfd5868962bddc9347d7009e8919d6",
@@ -24418,6 +25206,15 @@
       "names": [],
       "sources": [
         "packages/experimental/agent-team/src/types.ts:232"
+      ]
+    },
+    {
+      "digest": "a41d6b2bd7f966af88bde79e01a8120e3d5cf837c553b1020979cad7d5fa5ed2",
+      "names": [
+        "packages/api/workspace-controller/src/research-translation-types.ts#ResearchTranslationContext"
+      ],
+      "sources": [
+        "packages/api/workspace-controller/src/research-translation-types.ts:21"
       ]
     },
     {
@@ -25150,6 +25947,15 @@
       ]
     },
     {
+      "digest": "da877af1420e83bf73d3003d625b93ad3f18972704f9f4664ff4cf1246a33cc1",
+      "names": [
+        "packages/api/workspace-controller/src/research-translation-types.ts#ResearchTranslationRequestRecord"
+      ],
+      "sources": [
+        "packages/api/workspace-controller/src/research-translation-types.ts:62"
+      ]
+    },
+    {
       "digest": "dacf3d5f3e4ff619c1320e64a48dec5e7ecd7870bece65fbd449a0e63adfa521",
       "names": [],
       "sources": []
@@ -25197,6 +26003,15 @@
       "sources": []
     },
     {
+      "digest": "dde5a81f784c23e2111dcb2db2d3c6cab971118690c17455976f2b299f789c0d",
+      "names": [
+        "packages/api/workspace-controller/src/research-translation-types.ts#ResearchTranslationExplanation"
+      ],
+      "sources": [
+        "packages/api/workspace-controller/src/research-translation-types.ts:34"
+      ]
+    },
+    {
       "digest": "de25352d2dc4196309bd84b5bac6319f6d5c898ea0e82bb5ae66c5738d0d426f",
       "names": [],
       "sources": []
@@ -25232,6 +26047,11 @@
     },
     {
       "digest": "e0a787e6ec76c7c94fecbc501b489164ab0293db05bc947914077ad01e674f05",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "e1937ad7cebbb7af09b7c53896033f0d6e03abf3ec52c1e7be996b4470b66e1a",
       "names": [],
       "sources": []
     },
@@ -25346,6 +26166,11 @@
       "sources": []
     },
     {
+      "digest": "e83029b2a6769523c5bcece89803e2f0b82d6cb157ebe4ee99d9145cfde47b96",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "e8de0f457fed5b9ff94dc4950b59ef75fd8ba8af665cc7899485924a62653367",
       "names": [],
       "sources": []
@@ -25385,6 +26210,11 @@
       "sources": [
         "packages/core/session/src/types.ts:228"
       ]
+    },
+    {
+      "digest": "eca4fd41dc866048b15b6d6cdab296f91b3384dd0bb93708a5205535f2979bf4",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "edbbfff1128099fda7b792c56330d2cb04debc9790988e66d1c3f4026e813e0e",
@@ -25521,6 +26351,11 @@
     },
     {
       "digest": "f6605d6c57933aeaaf10911b5fbd6c61e655baa181af7192d3240f49d255b90d",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "f661661036aabca533834fa07b35c0dc13c2654fafe77071060c7ff44704db00",
       "names": [],
       "sources": []
     },

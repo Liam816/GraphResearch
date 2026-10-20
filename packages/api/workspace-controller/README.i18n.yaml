@@ -21,8 +21,11 @@
   en: e1006f8a02931052
   zh: 2b1bcdeb3cc18760
 /workspace-controller/use-this-package/research-catalog:
-  en: aaae81e1aafd354f
-  zh: 4ba53c79bef889b1
+  en: 8ebf9251101ff44b
+  zh: 745e1e6c026f1638
+/workspace-controller/use-this-package/research-catalog/paper-translation:
+  en: 26ceb273ddc7bd45
+  zh: 0635c400c298a893
 /workspace-controller/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -38,6 +41,18 @@
 /workspace-controller/model-experience/research-context-and-notebooks/kv-cache-effect:
   en: 5b4f3e4222a971e3
   zh: 5f3b3e126255f0fe
+/workspace-controller/model-experience/paper-translation:
+  en: 44eb1e496b8076cc
+  zh: bbf3df3f50ff28fb
+/workspace-controller/model-experience/paper-translation/what-the-model-sees:
+  en: fba2fd1c74e561c6
+  zh: 0be005b49ab087d3
+/workspace-controller/model-experience/paper-translation/token-effect:
+  en: bc0fd0588af2478a
+  zh: 60216d3db0a64afe
+/workspace-controller/model-experience/paper-translation/kv-cache-effect:
+  en: 8eccd0ee6fc00cfe
+  zh: 94e02f564ea2b792
 /workspace-controller/known-limitations-and-deferred-work:
   en: 73c33b332ce53f92
   zh: f5fd69220e0a14fa

@@ -5,14 +5,19 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from deepseek_harness import DeepSeekHarness
 
 
-EXPECTED = Path(__file__).parent / "expected" / "cot-translation-projection.json"
+AUDIT_TYPES = ("plugin:translator/request", "plugin:translator/result",
+               "research/translation-request", "research/translation-result")
 
 
-def test_common_translation_records_retain_raw_audit_and_original_main_response(tmp_path: Path) -> None:
-    expected = json.loads(EXPECTED.read_text(encoding="utf-8"))
+@pytest.mark.parametrize("fixture_name", ["cot", "paper"])
+def test_translation_records_retain_raw_audit_and_original_main_response(tmp_path: Path, fixture_name: str) -> None:
+    expected_path = Path(__file__).parent / "expected" / f"{fixture_name}-translation-projection.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
     script = tmp_path / "audit_runtime.py"
     script.write_text(
         """
@@ -58,11 +63,11 @@ for line in sys.stdin:
         result = harness.run("Keep the original response.", session_id="sdk-audit")
     audit_notifications = [notification for notification in result.notifications
                            if notification.method == "session.event"
-                           and notification.payload["event"]["type"] in ("plugin:translator/request", "plugin:translator/result")]
+                           and notification.payload["event"]["type"] in AUDIT_TYPES]
     assert all(notification.payload["sessionId"] == result.session_id for notification in audit_notifications)
     projection = {
         "finalResponse": result.final_response,
-        "auditEvents": [event for event in result.events if event["type"] in ("plugin:translator/request", "plugin:translator/result")],
+        "auditEvents": [event for event in result.events if event["type"] in AUDIT_TYPES],
         "auditNotifications": [{"method": notification.method, "event": notification.payload["event"]}
                                for notification in audit_notifications],
         "assistantTexts": [block["text"] for event in result.events if event["type"] == "assistant/message"

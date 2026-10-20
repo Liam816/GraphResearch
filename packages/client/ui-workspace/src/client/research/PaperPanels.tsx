@@ -14,7 +14,7 @@ import {
   IconChevronsUpDownOutlineRegular, IconChevronLeftOutlineRegular, IconChevronRightOutlineRegular,
   IconEllipsisOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ResearchPaper } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchPaper, ResearchTranslation } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchWorkbenchProps } from './contract.ts'
 import { isResearchPanel, reorderPanels, resolvePanelOrder } from './store.ts'
 import type { PaperView, PanelPlacement, ResearchPanel } from './store.ts'
@@ -22,10 +22,12 @@ import { ResearchNotes } from './Notes.tsx'
 import { PaperMarkdownStatus } from './MarkdownStatus.tsx'
 import css from './Research.module.css'
 
-type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'refresh' | 'highlight' | 'extractMarkdown'>
+type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'refresh' | 'highlight' | 'extractMarkdown' | 'translate' | 'saveTranslation'>
 interface PaperPanelsProps extends PanelSeats {
   paper: ResearchPaper
   highlightAvailable: boolean
+  translationAvailable: boolean
+  askTranslation: (translation: ResearchTranslation) => Promise<void>
   view: PaperView
   id: string
   phase: 'settling' | 'hero' | 'active'
@@ -104,11 +106,16 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
         : panel === 'pdf' ? paper.pdfPath === ''
           ? <div className={css.allClosed}><h2>{t('pdfMissing')}</h2><p>{t('pdfMissingHint')}</p></div>
           : <><PaperMarkdownStatus paper={paper} t={t} extractMarkdown={props.extractMarkdown} />
-            {props.renderFactorySlot('document.pdf', { path: paper.pdfPath, viewKey: paper.id, annotations: {
-              available: props.highlightAvailable,
-              highlights: paper.highlights ?? [],
-              change: change => props.highlight({ paperId: paper.id, change }),
-            } })}</>
+            {props.renderFactorySlot('document.pdf', { path: paper.pdfPath, viewKey: paper.id,
+              ...props.translationAvailable ? { translation: {
+                translate: (selection, signal) => props.translate({ ...selection, paperId: paper.id }, signal),
+                save: result => props.saveTranslation(paper.id, result.key),
+                ask: props.askTranslation,
+              } } : {}, annotations: {
+                available: props.highlightAvailable,
+                highlights: paper.highlights ?? [],
+                change: change => props.highlight({ paperId: paper.id, change }),
+              } })}</>
           : <ResearchNotes paper={paper} view={view} t={t} actions={actions} saveNote={props.saveNote} refresh={props.refresh} />}
     </div>
   </section>

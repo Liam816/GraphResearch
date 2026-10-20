@@ -12,7 +12,8 @@
     "src/default-workspace.ts",
     "src/types.ts",
     "src/research-types.ts",
-    "src/client/research.ts"
+    "src/client/research.ts",
+    "src/research-translation-types.ts"
   ],
   "references": [
     {
@@ -41,6 +42,9 @@
     },
     {
       "path": "../../util/brand"
+    },
+    {
+      "path": "../../llm/llm"
     }
   ]
 }

@@ -1,5 +1,13 @@
 /** Page-relative PDF selection geometry shared by marker rendering and persistence callbacks. */
 import type { ResearchHighlight, ResearchHighlightRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchTextPosition, ResearchTranslation, ResearchTranslationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
+
+/** Paper-owned translation and notebook commands; the generic reader supplies only selection positions. */
+export interface PdfTranslation {
+  readonly translate: (selection: Omit<ResearchTranslationRequest, 'paperId'>, signal: AbortSignal) => Promise<ResearchTranslation>
+  readonly save: (translation: ResearchTranslation) => Promise<void>
+  readonly ask: (translation: ResearchTranslation) => Promise<void>
+}
 
 /** Confirmed annotations and the paper owner's idempotent mutation callback. */
 export interface PdfAnnotations {
@@ -14,6 +22,8 @@ export interface PdfSelection {
   readonly text: string
   readonly rects: ResearchHighlight['rects']
   readonly anchor: { readonly x: number; readonly y: number }
+  readonly start?: ResearchTextPosition
+  readonly end?: ResearchTextPosition
 }
 
 /**
@@ -32,6 +42,7 @@ export function collectPdfSelection(root: HTMLElement, selection: Selection | nu
   const rects: ResearchHighlight['rects'][number][] = []
   const fragments: string[] = []
   let anchor: PdfSelection['anchor'] | undefined
+  let startPosition: ResearchTextPosition | undefined, endPosition: ResearchTextPosition | undefined
   for (const page of root.querySelectorAll<HTMLElement>('[data-pdf-page]')) {
     const surface = page.querySelector<HTMLElement>('[data-document-zoom-surface]')
     const layer = page.querySelector('[data-pdf-text]')
@@ -47,6 +58,12 @@ export function collectPdfSelection(root: HTMLElement, selection: Selection | nu
       if (range.compareBoundaryPoints(Range.END_TO_END, fragment) < 0) fragment.setEnd(range.endContainer, range.endOffset)
       if (fragment.collapsed) continue
       fragments.push(fragment.toString())
+      const item = node.parentElement?.closest<HTMLElement>('[data-pdf-text-item]')
+      if (item !== null && item !== undefined) {
+        const position = { page: Number(page.dataset['pdfPage']), item: Number(item.dataset['pdfTextItem']) }
+        startPosition ??= { ...position, offset: fragment.startOffset }
+        endPosition = { ...position, offset: fragment.endOffset }
+      }
       for (const box of Array.from(fragment.getClientRects())) {
         const left = Math.max(bounds.left, box.left), top = Math.max(bounds.top, box.top)
         const right = Math.min(bounds.right, box.right), bottom = Math.min(bounds.bottom, box.bottom)
@@ -59,7 +76,8 @@ export function collectPdfSelection(root: HTMLElement, selection: Selection | nu
   }
   const text = fragments.join(' ').replace(/\s+/g, ' ').trim()
   if (rects.length === 0 || text === '' || anchor === undefined) return
-  return { text, rects, anchor }
+  return { text, rects, anchor, ...startPosition === undefined ? {} : { start: startPosition },
+    ...endPosition === undefined ? {} : { end: endPosition } }
 }
 
 /**

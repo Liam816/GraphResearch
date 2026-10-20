@@ -12,7 +12,12 @@ import type { RenderPdfText } from './document.ts'
 export function pdfTextRenderer(host: HTMLDivElement): RenderPdfText {
   return (page, viewport) => {
     // cancel() releases the builder's shared selection listener after the last page leaves.
-    const layer = new TextLayerBuilder({ pdfPage: page })
+    const layer = new TextLayerBuilder({ pdfPage: page, onAppend: (root: HTMLElement) => {
+      // Nonempty presentation spans follow the engine's text-item order, including marked content.
+      Array.from(root.querySelectorAll<HTMLElement>('span[role="presentation"]')).forEach((span, index) => {
+        span.dataset['pdfTextItem'] = String(index)
+      })
+    } })
     const container = layer.div
     container.style.setProperty('--total-scale-factor', String(viewport.scale * viewport.userUnit))
     container.style.setProperty('--scale-round-x', '1px')

@@ -168,7 +168,7 @@ interface SessionActivity {
 
 ## Research library
 
-The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, page-relative text highlights, whole-paper Markdown publication status, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
+The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, page-relative text highlights, whole-paper Markdown publication status, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [translation types](../../packages/api/workspace-controller/src/research-translation-types.ts) define PDF text-item positions, original sentence windows, structured vocabulary explanations and auxiliary request/result audit events. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -455,6 +455,22 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the committed library snapshot.
  */
 @Remote('researchHighlight') researchHighlight(request: ResearchHighlightRequest): Promise<ResearchCatalog>
+
+/**
+ * Explain an explicitly selected original passage with two surrounding sentences on each side.
+ * @param request - paper identity, selected text and PDF text-item positions.
+ * @param signal - caller cancellation.
+ * @returns a durably recorded explanation; failures retain the original and notebooks.
+ */
+@Remote('researchTranslate') researchTranslate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation>
+
+/**
+ * Append a confirmed translation and original-page link to learning notes exactly once.
+ * @param paperId - owning paper.
+ * @param key - saved translation occurrence key.
+ * @returns confirmed catalog; a conflict preserves the notebook and can be retried.
+ */
+@Remote('researchSaveTranslation') researchSaveTranslation(paperId: ResearchPaperId, key: string): Promise<ResearchCatalog>
 
 /**
  * Retry full-text Markdown conversion while retaining the attached PDF and notebooks.

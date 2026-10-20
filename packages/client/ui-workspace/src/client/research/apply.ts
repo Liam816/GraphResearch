@@ -37,6 +37,8 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     refresh: () => ctx.research.refresh(),
     highlight: request => ctx.research.highlight(request),
     extractMarkdown: id => ctx.research.extractMarkdown(id),
+    translate: (request, signal) => ctx.research.translate(request, signal),
+    saveTranslation: (id, key) => ctx.research.saveTranslation(id, key),
     saveNote: request => ctx.research.saveNote(request),
     configureDirectory: request => ctx.research.configure(request),
     mentions: ids => ctx.research.mentions(ids),

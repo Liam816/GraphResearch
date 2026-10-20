@@ -209,7 +209,9 @@ AI 笔记和学习笔记分别保存到论文目录下的 Markdown 文件。AI �
 拖动面板标题旁的手柄，可将该栏插入另一栏之前或之后。标题浮层和插入标记预览待执行的位置，Escape 取消移动。使用空格、左右方向键、空格也可完成键盘排序；各栏的排列菜单提供**向左移动**与**向右移动**，窄工作区同样可用。完整的三栏顺序按论文保存，头部按钮遵循同一顺序。折叠面板保留原位置，宽度随面板移动，排序保留已挂载的阅读内容、PDF 位置和笔记草稿。旧偏好未记录顺序时使用 Agent → PDF → 笔记，并保留其他已保存字段。
 
 
-在 PDF 原文面板中选中文字，再选择高亮颜色。折叠面板、切换论文或刷新后，高亮仍然保留，并随论文资料库迁移。双击高亮可删除，也可聚焦删除控件后按 Enter。[PDF 渲染器](../ui-sidebar-documentpreview/README.zh.md#what-it-registers)负责选区和工具条交互，[科研控制器](../../api/workspace-controller/README.zh.md#research-catalog)负责持久化。
+在 PDF 原文面板中选中文字，再选择高亮颜色。折叠面板、切换论文或刷新后，高亮仍然保留，并随论文资料库迁移。点击已高亮文字打开删除菜单，也可聚焦删除控件后按 Enter。[PDF 渲染器](../ui-sidebar-documentpreview/README.zh.md#what-it-registers)负责选区和工具条交互，[科研控制器](../../api/workspace-controller/README.zh.md#research-catalog)负责持久化。
+
+划词工具条还提供**翻译**按钮，只有激活后才请求解释。卡片展示当前选区、基本词义、可用音标、语境含义、原句译文和可展开的前后句。**加入学习笔记**保存带 PDF 页码链接的 Markdown；**继续问 Agent**将原文上下文和解释插入该论文输入框，供用户补充问题后发送。保存的结果随论文资料库迁移。[控制器](../../api/workspace-controller/README.zh.md#paper-translation)负责原文定位、模型调用、缓存和笔记版本冲突。
 
 PDF 面板显示已确认保存的正文 Markdown 文件名和原始页数。转换失败时，提示和重试入口显示在 PDF 旁边，原文和笔记仍可使用。[科研控制器](../../api/workspace-controller/README.zh.md#research-catalog)负责自动转换和文件发布。
 

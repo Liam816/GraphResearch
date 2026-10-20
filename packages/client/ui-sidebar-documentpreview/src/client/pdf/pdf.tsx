@@ -10,7 +10,7 @@ import type { PdfReadingCallbacks } from './reading.ts'
 import { renderPdfPage, type PdfDocument } from './document.ts'
 import { openPdf } from './runtime.ts'
 import { PdfWorkerFailure } from './errors.ts'
-import type { PdfAnnotations } from './highlights.ts'
+import type { PdfAnnotations, PdfTranslation } from './highlights.ts'
 import { AnnotatedPages, HighlightLayer } from './HighlightControls.tsx'
 import { pdfTextRenderer } from './text.ts'
 import type { ZoomViewportProps } from '../zoom/ZoomViewport.tsx'
@@ -61,6 +61,7 @@ export function PdfBody(props: PdfBodyProps & { readonly loading: ReactNode }): 
 /** Generic PDF reader shared by document tabs and independent research panels. */
 export interface PdfReaderProps extends PropsLocale<'sidebarPdf'> {
   readonly annotations?: PdfAnnotations | undefined
+  readonly translation?: PdfTranslation | undefined
   readonly data: Uint8Array<ArrayBuffer> | undefined
   readonly view: PdfView
   readonly signal: AbortSignal
@@ -123,7 +124,7 @@ export function PdfReader(props: PdfReaderProps): ReactNode {
   </section>
   return <ZoomViewport preference={preference} intrinsicWidth={pageWidth} horizontalInset={24} labels={labels}
     signal={signal} scrollportRef={scrollportRef} onPreference={setPreference} onRenderZoom={setRenderZoom}>
-    <AnnotatedPages annotations={props.annotations} t={t}>{pages}</AnnotatedPages>
+    <AnnotatedPages annotations={props.annotations} translation={props.translation} t={t}>{pages}</AnnotatedPages>
   </ZoomViewport>
 }
 

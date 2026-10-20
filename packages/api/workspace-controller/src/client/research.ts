@@ -2,6 +2,7 @@
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { WorkspaceRemote } from './model.ts'
+import type { ResearchTranslation, ResearchTranslationRequest } from '../research-translation-types.ts'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
   ResearchDirectoryRequest, ResearchImportPaperRequest, ResearchHighlightRequest,
@@ -22,7 +23,30 @@ export class ClientResearchModel {
 
   /** @param remote - generated Workspace namespace. */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown'>) {}
+    'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+
+  /**
+   * Translate one explicit PDF selection without replacing catalog state.
+   * @param request - owning paper and original text-item positions.
+   * @param signal - current selection's lifetime.
+   * @returns a confirmed explanation; failures retain the caller's selection.
+   */
+  async translate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation> {
+    const result = await this.remote.researchTranslate(request, signal)
+    if (!result.ok) throw result.error
+    return result.value
+  }
+
+  /**
+   * Append one saved explanation to learning notes and publish the acknowledged revision.
+   * @param paperId - owning paper.
+   * @param key - confirmed translation occurrence.
+   */
+  async saveTranslation(paperId: ResearchPaperId, key: string): Promise<void> {
+    const result = await this.remote.researchSaveTranslation(paperId, key)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
 
   /** Fetch current durable data; failures preserve existing catalog entries. */
   async refresh(): Promise<void> {

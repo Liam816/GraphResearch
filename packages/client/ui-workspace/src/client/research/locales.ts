@@ -1,5 +1,6 @@
 /** Product and accessibility copy for the research workspace. */
 export const zh = {
+  translationQuestion: '请进一步解释这篇论文第 {page} 页中的「{selected}」。\n\n原文上下文：\n{context}\n\n当前语境释义：{meaning}\n{explanation}\n\n原句译文：{translation}\n\n我的问题：',
   librarySettings: '论文资料目录', libraryDirectory: '资料目录', directoryMode: '操作方式', applyDirectory: '应用目录',
   openLibrary: '打开另一资料库', migrateLibrary: '迁移当前资料库',
   openLibraryHint: '输入后端所在机器的绝对路径。已有资料库会直接打开，空目录会初始化为新的资料库。',
@@ -50,6 +51,7 @@ export const zh = {
 export type ResearchKey = keyof typeof zh
 /** English research dictionary. */
 export const en = {
+  translationQuestion: 'Help me understand “{selected}” on PDF page {page} of this paper.\n\nOriginal context:\n{context}\n\nContextual meaning: {meaning}\n{explanation}\n\nSentence translation: {translation}\n\nMy question: ',
   librarySettings: 'Paper library directory', libraryDirectory: 'Library directory', directoryMode: 'Operation', applyDirectory: 'Apply directory',
   openLibrary: 'Open another library', migrateLibrary: 'Migrate current library',
   openLibraryHint: 'Enter an absolute path on the Host machine. Existing libraries open directly; empty directories become new libraries.',
