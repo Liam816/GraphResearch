@@ -59,6 +59,7 @@ Check this table before writing a control in a feature package. A plugin cannot 
 | `Modal` | Centered dialog over a page mask. A nested dialog can intercept keys with `onKeyDownCapture` before document Escape handlers. The tint and dialog fade in while backdrop blur stays fully applied, honoring reduced motion. Set `backdropBlur={false}` when the caller already blurs the source page. |
 | `RiskConfirmation` | Sensitive action gated behind an explicit checkbox. |
 | `Tooltip` | Hover and keyboard-focus text anchored to a cloned child; optional `delayMs` controls hover delay and `focusDelayMs` controls keyboard-focus delay, both defaulting to 0 ms. Optional `portal` rendering escapes clipping containers and ancestor stacking contexts that cap the bubble's z-index. |
+| `NavigationRail` | Virtual short-line navigation with stable destination keys, localized labels, hover/focus previews, active and busy marks, and independent activation/scroll controls. Left and right placement mirror marks and previews; the owner supplies placement and visibility. |
 | `HoverCard` | Hover preview the pointer can rest on and select from; optional copy button. |
 | `ImageLightbox` | Shared image modal with focus restoration and Escape dismissal. |
 | `Toast` | Transient top-center banner held for the owner's `holdMs`. |
@@ -74,6 +75,8 @@ Check this table before writing a control in a feature package. A plugin cannot 
 | `GuideArtworkBrowser`/`Files` | Fixed-palette 36×36 browser and folder artwork for sidebar guide entries. |
 | `FileTypeIcon`, `classifyFileType`, `fileExtension` | A category-colored 28px file or folder glyph and the shared case-insensitive filename mapping behind it. Code and configuration files use detailed full-color technology glyphs; use `LinkIconMedium` for link-leading glyphs and image previews for image content. |
 | `languageForPath`, `CODE_HIGHLIGHT_EXTENSIONS`, `useCodeHighlighter` | The lazy line-token highlighter shared by code preview and diff review. The filename grammar selection is re-exported from `@deepseek-ai/dsh-util-code-language`, the single extension table also behind the read card's persisted short-id `lang` hint. |
+
+`NavigationRail` uses a fixed 10px pitch, scrolls overflow without chaining into the page, retains focused marks during virtualization, and follows the active item only outside the fade-free band when the pointer is elsewhere. Escape dismisses its preview. `className` positions its frame; `--navigation-preview-width`, `--navigation-title-lines` and `--navigation-description-lines` customize the bounded preview. Reduced motion disables its transitions, animations and smooth scrolling.
 
 Four pairs are easy to confuse:
 

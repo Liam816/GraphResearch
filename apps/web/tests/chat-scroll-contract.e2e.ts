@@ -95,6 +95,8 @@ interface ScrollWorld {
 
 interface ScrollWorldOptions {
   readonly failureShot: string
+  /** Restore the first seeded Session without requiring the ordinary Session browser. */
+  readonly restoreFirstSeed?: boolean
   readonly paceMs?: number
   readonly replay?: ReplayOverrideDoc
   readonly seeds: readonly { fixture: ChatScrollFixture; id: string }[]
@@ -191,13 +193,21 @@ async function launchScrollWorld(options: ScrollWorldOptions): Promise<ScrollWor
     scaffold.ctx.on('agent/assistant-stream', ({ frame }) => { assistantFrames.push(frame) })
     page = await newEnglishPage(browser, 900)
     const tripwire = watchConsole(page)
+    if (options.restoreFirstSeed === true) {
+      const seed = options.seeds[0]
+      if (seed === undefined) throw new Error('Restored scroll scenarios require a seeded Session')
+      await page.addInitScript((sessionId) => {
+        localStorage.setItem('dsh.sessions.current', JSON.stringify({ sessionId }))
+      }, seed.id)
+    }
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // Session-list bootstrap can replace the controlled search state. Wait
     // for the seeded baseline before openSeed starts the lazy content query
     // (the compact layout dropped group session counts; the Ungrouped bucket
     // row is the barrier).
-    await page.getByText('Ungrouped', { exact: true }).waitFor({ timeout: 30_000 })
+    if (options.restoreFirstSeed === true) await page.getByRole('tab', { name: 'Chat', exact: true }).waitFor()
+    else await page.getByText('Ungrouped', { exact: true }).waitFor({ timeout: 30_000 })
     return {
       assistantFrames,
       events,
@@ -518,7 +528,8 @@ let browser: Browser
 
 describe('web e2e: long Chat scroll contract', () => {
   beforeAll(async () => {
-    browser = await chromium.launch()
+    const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+    browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
   })
 
   afterAll(async () => {
@@ -1225,8 +1236,10 @@ describe('web e2e: long Chat scroll contract', () => {
     await withScrollWorld({
       failureShot: 'web-e2e-turn-rail-jump',
       seeds: [{ fixture: HISTORY_FIXTURE, id: RAIL_SESSION_ID }],
+      restoreFirstSeed: true,
     }, async (world) => {
-      await openSeed(world.page, HISTORY_FIXTURE, HISTORY_FIXTURE.markers.assistant(HISTORY_FIXTURE.turns))
+      await world.page.getByText(HISTORY_FIXTURE.markers.assistant(HISTORY_FIXTURE.turns), { exact: false }).last().waitFor()
+      await nextPaint(world.page)
       await expectBottom(world.page)
 
       const rail = world.page.getByRole('navigation', { name: 'Turn navigation' })

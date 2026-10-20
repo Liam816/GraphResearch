@@ -116,3 +116,6 @@ export {
 export { GuideArtworkBrowser, GuideArtworkFiles } from './guide-artwork.tsx'
 export { ImageLightbox } from './ImageLightbox.tsx'
 export type { ImageLightboxLabels } from './ImageLightbox.tsx'
+
+export { NavigationRail } from './NavigationRail.tsx'
+export type { NavigationRailItem, NavigationRailProps, NavigationRailHandle } from './NavigationRail.tsx'

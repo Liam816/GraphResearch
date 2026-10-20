@@ -59,6 +59,7 @@ kind: "package-library"
 | `Modal` | 页面遮罩之上的居中对话框。嵌套对话框可通过 `onKeyDownCapture` 在文档级 Escape 处理器之前拦截按键。 色层与弹窗淡入，背景模糊始终完整生效，并遵循减少动态效果偏好。调用方已模糊源页面时设置 `backdropBlur={false}`。 |
 | `RiskConfirmation` | 以显式复选框把关的敏感操作确认。 |
 | `Tooltip` | 锚定在克隆子元素上的悬停与键盘聚焦提示；可选的 `delayMs` 控制悬停延迟，`focusDelayMs` 控制键盘聚焦延迟，均默认为 0 毫秒。可通过 `portal` 渲染到外层，避免被容器裁剪，或受祖先层叠上下文限制其 z-index。 |
+| `NavigationRail` | 虚拟化短线导航，使用稳定的目标标识、本地化标签、悬停与聚焦预览、当前项与忙碌刻度，并分别提供激活和滚动控制。左右布局镜像刻度及预览，位置与可见性由使用方提供。 |
 | `HoverCard` | 指针可停留、可选中的悬停预览；可选带复制按钮。 |
 | `ImageLightbox` | 共享图片浮层，支持焦点恢复与 Esc 关闭。 |
 | `Toast` | 顶部居中的瞬时横幅，保持时长由所有者的 `holdMs` 决定。 |
@@ -74,6 +75,8 @@ kind: "package-library"
 | `GuideArtworkBrowser`/`Files` | 固定配色的 36×36 浏览器与文件夹插画，用于侧栏引导入口。 |
 | `FileTypeIcon`、`classifyFileType`、`fileExtension` | 按类别着色的 28px 文件或文件夹图形，以及它背后共享的不区分大小写文件名映射。代码与配置文件使用细分的全彩技术图形；链接前置图形使用 `LinkIconMedium`，图片内容使用图片预览。 |
 | `languageForPath`、`CODE_HIGHLIGHT_EXTENSIONS`、`useCodeHighlighter` | 代码预览与 diff review 共用的惰性逐行 token 高亮。文件名 grammar 选择再导出自 `@deepseek-ai/dsh-util-code-language`，即 read 卡片持久化短 id `lang` 提示背后的同一张扩展名表。 |
+
+`NavigationRail` 使用固定的 10px 间距，溢出滚动不会连带页面，虚拟化期间保留聚焦刻度，仅在鼠标位于轨道外且当前项超出淡出区以内的可见范围时跟随该项。Escape 关闭预览。`className` 定位外框；`--navigation-preview-width`、`--navigation-title-lines` 和 `--navigation-description-lines` 调整有尺寸限制的预览。减少动态效果时关闭过渡、动画和平滑滚动。
 
 有四组容易混淆：
 

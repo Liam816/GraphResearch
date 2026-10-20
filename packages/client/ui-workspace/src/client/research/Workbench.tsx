@@ -1,5 +1,5 @@
 /** Session-aware paper workspace, composing existing Agent and PDF factories. */
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import {
   Button, Input, Modal, Pill, Tooltip, ReferenceIconRegular,
@@ -9,6 +9,7 @@ import type { ResearchPaperId } from '@deepseek-ai/dsh-api-workspace-controller/
 import type { ResearchWorkbenchProps } from './contract.ts'
 import { defaultPaperView, resolvePanelOrder, type PaperView } from './store.ts'
 import { ResearchPaperPanels } from './PaperPanels.tsx'
+import { PaperNavigator } from './PaperNavigator.tsx'
 import css from './Research.module.css'
 
 /** Header controls toggle independent panels on wide screens and select one panel on narrow screens. */
@@ -53,6 +54,10 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
     : catalog.topics.find(item => item.id === state.topicId && paper.topicIds.includes(item.id))
       ?? catalog.topics.find(item => paper.topicIds.includes(item.id))
   const view = paper === undefined ? defaultPaperView() : state.papers[paper.id] ?? defaultPaperView()
+  const topicId = topic?.id
+  const topicPapers = useMemo(
+    () => catalog.papers.filter(item => topicId !== undefined && item.topicIds.includes(topicId)), [catalog.papers, topicId],
+  )
   const panelId = useId()
   const [referencesOpen, setReferencesOpen] = useState(false)
   const [selected, setSelected] = useState<ResearchPaperId[]>([])
@@ -79,7 +84,9 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
       setReferenceError(true)
     } finally { setReferenceBusy(false) }
   }
-  return <div className={css.workbench} data-research-workbench>
+  return <div className={css.workbench} data-research-workbench data-research-paper-navigation={topicPapers.length > 0 || undefined}>
+    {topic !== undefined && <PaperNavigator topic={topic} papers={topicPapers} activeId={paper?.id ?? null} t={t}
+      open={(id) => { actions.topic(topic.id); props.open(id) }} />}
     <header className={css.workbenchHeader}>
       <div className={css.breadcrumb}>{paper !== undefined && topic !== undefined && <button type="button" onClick={() => { props.open(topic.sessionId) }}>{topic.title}</button>}
         {paper !== undefined && topic !== undefined && <span aria-hidden="true">/</span>}<strong>{paper?.title ?? topic?.title ?? t('general')}</strong>

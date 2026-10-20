@@ -145,7 +145,7 @@ Fold coordination is viewport-local: reservations and idle callbacks never broad
 | No | Yes | Visible | The group follows; the outer transcript retains its reading position. |
 | No | No | Visible | Both retain their reading positions. |
 
-The turn rail mounts only visible marks, overscan, and the focused mark's neighbors. Its fixed pitch and observed viewport size determine scroll offsets without reading the DOM scroll extent. Initial placement waits for the body's restored active Turn and the rail's first usable viewport size. The ref controls activate a Turn or scroll the rail independently; the transcript itself remains fully mounted.
+The turn rail uses the shared [NavigationRail primitive](../ui-primitives/README.md#component-catalog), while Chat owns Turn destinations, paging and placement. It mounts only visible marks, overscan, and the focused mark's neighbors. Its fixed pitch and observed viewport size determine scroll offsets without reading the DOM scroll extent. Initial placement waits for the body's restored active Turn and the rail's first usable viewport size. The ref controls activate a Turn or scroll the rail independently; the transcript itself remains fully mounted.
 
 While the pointer is outside the rail, automatic follow keeps the rail still when the active mark's center is inside the fade-free band and centers it after it leaves that band. Previews follow pointer movement or focus; marks scrolling under a stationary pointer do not select another preview.
 
