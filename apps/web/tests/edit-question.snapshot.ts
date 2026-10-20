@@ -49,6 +49,11 @@ it.skipIf(webSnapshotMode() === 'record')('edits an interrupted question without
   const page = await newEnglishPage(browser)
   onTestFailed(() => saveFailureShot(page, 'edit-question'))
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  const newSession = page.locator('[data-sidebar-new-session]')
+  await newSession.first().waitFor({ state: 'attached' })
+  for (const button of await newSession.all()) expect(await button.isVisible()).toBe(false)
+  expect(await page.getByRole('button', { name: 'Plugins', exact: true }).count()).toBe(0)
+  expect(await page.getByRole('button', { name: 'Automation tasks', exact: true }).count()).toBe(0)
   await connectFreshWorkspace(page, scaffold.workspaceCwd)
   const prompts = fixtureUserPrompts(await readFile(FIXTURE, 'utf8'))
   const original = prompts[0]!

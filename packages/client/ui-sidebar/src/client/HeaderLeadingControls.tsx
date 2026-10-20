@@ -42,6 +42,7 @@ export function HeaderLeadingControls({ toggleSidebar, startSession, useShortcut
       <Tooltip label={t('session.new.label')} shortcutKeys={newShortcut?.keys} delayMs={500}>
         <button
           type="button"
+          data-sidebar-new-session
           className={css.iconButton}
           aria-label={t('session.new.label')}
           aria-keyshortcuts={newShortcut?.aria}

@@ -599,6 +599,12 @@
   width: auto;
 }
 
+/* GraphResearch keeps research navigation above the settings control. */
+.root .newSession,
+:global([data-windows-titlebar]) .root .newSession {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wide,
   .fading > *,

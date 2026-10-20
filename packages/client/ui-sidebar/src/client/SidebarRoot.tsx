@@ -97,7 +97,7 @@ export function SidebarRoot({
   t,
   renderSlot,
 }: SidebarRootComponentProps) {
-  const panels = usePanels(snapshot => snapshot)
+  const panels = usePanels(snapshot => snapshot).filter(panel => panel.id !== 'plugins' && panel.id !== 'schedules')
   const shortcut = useShortcuts(rows => rows.find(row => row.id === 'sidebar.left.toggle'))
   const newShortcut = useShortcuts(rows => rows.find(row => row.id === 'session.new'))
   const toggleLabel = collapsed ? t('toggle.open') : t('toggle.collapse')
@@ -260,6 +260,7 @@ export function SidebarRoot({
         <button
           type="button"
           className={css.newSession}
+          data-sidebar-new-session
           aria-label={t('session.new.label')}
           aria-keyshortcuts={newShortcut?.aria}
           onClick={() => { startSession() }}

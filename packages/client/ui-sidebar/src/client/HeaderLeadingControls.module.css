@@ -27,3 +27,7 @@
 .iconButton:hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
+
+.controls [data-sidebar-new-session] {
+  display: none;
+}
