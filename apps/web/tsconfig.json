@@ -76,6 +76,7 @@
     "tests/research-reading.e2e.ts",
     "tests/research-agent.snapshot.ts",
     "tests/research-translation.snapshot.ts",
+    "tests/edit-question.snapshot.ts",
     "tests/excel-opc.e2e.ts",
     "tests/office-fixture.ts",
     "tests/sidebar-browser.e2e.ts",

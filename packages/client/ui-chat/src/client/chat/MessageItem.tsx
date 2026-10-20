@@ -8,6 +8,7 @@ import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import { QuestionEditor } from './QuestionEditor.tsx'
 import css from './MessageItem.module.css'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
@@ -318,9 +319,14 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
 
 /** User and admitted-steering keyed Chat renderer. */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, openFile, openSkill, t,
+  node, renderMessageImages, openFile, openSkill, resendMessage, resendUnavailable = false, t,
 }: ChatNodeViewProps<'user' | 'steering'>) {
   const data = node.data
+  const [editing, setEditing] = useState(false)
+  if (editing && resendMessage !== undefined) return <div className={css.userRow}>
+    <QuestionEditor text={contentParts(data.content).text} unavailable={resendUnavailable}
+      resend={resendMessage} close={() => { setEditing(false) }} t={t} />
+  </div>
   return (
     <UserStyleBubble
       content={data.content}
@@ -335,6 +341,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           time={data.time}
           clock="start"
           className={css.actions}
+          onEdit={resendMessage === undefined ? undefined : () => { setEditing(true) }}
           t={t}
         />
       )}

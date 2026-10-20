@@ -72,7 +72,7 @@ export const CHAT_NODE_INJECT: ChatNodeInjected = {
 
 /** Services required by the Chat target and its presentation registrations. */
 export const inject = [
-  'slots', 'sessions', 'uiWorkspace', 'uiSession', 'uiConversation', 'locale',
+  'slots', 'sessions', 'uiWorkspace', 'uiSession', 'uiConversation', 'conversation', 'locale',
   'configForms', 'remote', 'remote.session', 'sidebarRight',
 ]
 
@@ -242,6 +242,20 @@ export function apply(ctx: Context): void {
         const chat = chatSource(binding)
         return {
           ...nodeSources(binding),
+          resendMessage: text => ctx.sessions.using(sessionId, { source: 'controllerOperation' }, async (reference) => {
+            if (reference.binding !== binding) throw new Error('The edited question belongs to an unavailable Session')
+            const current = session.getSnapshot()
+            const child = current.subagent
+            const input = ctx.conversation.input.for(binding.ctx)
+            if (text.trim() === '' || current.running || current.removed || current.openState !== 'open'
+              || (child !== null && (child.address.mode !== 'continuable' || child.parentAvailable !== true))
+              || ctx.conversation.blocks.storeFor(sessionId).getSnapshot() !== undefined
+              || input.state.getSnapshot().phase !== 'plain') {
+              throw new Error('The Session cannot accept an edited question yet')
+            }
+            const result = await session.prompt([{ type: 'text', text }], 'queue')
+            if (!result.ok) throw result.error
+          }),
           fileMentions: (owner: TurnTailOwnerProps) => ctx.get('chatFileMentions')?.forClosing(owner, sessionId),
           // Files open in the right Sidebar, not in a desktop application: the
           // content stays in the product, beside the conversation that produced

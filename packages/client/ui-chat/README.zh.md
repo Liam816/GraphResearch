@@ -18,6 +18,7 @@ kind: "package-reference"
 
 - [引用预览](#reference-previews)
 - [Chat 隐藏的行](#system-prompt-row)
+- [编辑已发送的问题](#editing-sent-questions)
 - [指令与失败行](#command-and-failure-rows)
 - [轮次 token 用量](#turn-token-usage)
 - [已完成轮次的页脚](#completed-turn-footer)
@@ -45,6 +46,13 @@ Chat 在节点列表外通过一个 `MarkdownDelegateProvider` 提供文件及 H
 Chat 在所有工作步骤展示模式下都不显示系统提示词行、普通上下文注入和 `permission` 命令行。包含工具添加或移除记录的上下文仍然可见。该过滤不改变已记录的 Session 事件或 Trajectory 查看能力。非人工轮次触发仍作为独立通知显示，其他命令行仍保留在 Chat 中。
 
 Assistant 尝试结束且没有可见消息时，Chat 隐藏已发布的 Node，不移除其 key。同一 Step 的重试再次产生可见内容时，复用该 key。已加载窗口缺少 Step 起点时也遵循此规则。
+
+<a id="editing-sent-questions"></a>
+## 编辑已发送的问题
+
+人工问题和已接收的 steering 消息在「复制」旁提供「编辑」。行内编辑框预填原文；「重新提问」通过同一 Session 的提示词接收流程将修改内容作为新一轮发送。原问题、回答和附件继续保留在对话及模型历史中。附件不会再次上传，底部输入框的草稿保持原样。Escape 或「取消」放弃本次本地编辑；Enter 发送，Shift+Enter 换行，输入法组字期间不会发送。
+
+正在进行的轮次必须先停止，才能重新提问。已移除的 Session 和父级不在线的可续接子会话会保留编辑内容，但无法重提；一次性子会话不显示「编辑」。发送时检查当前 Session 代际、输入框阻断状态及输入阶段。发送失败保留修改供重试，发送期间阻止重复请求。临时 Client 引用持有目标 Session，直到接收请求结束。
 
 <a id="command-and-failure-rows"></a>
 ## 指令与失败行
@@ -169,11 +177,11 @@ Chat 在浏览器本地保存每个 Session 的语义阅读锚点和手动轮次
 <a id="model-experience"></a>
 ## 模型体验
 
-无，因为本包在浏览器中渲染已记录的对话状态，不注册任何面向模型的内容。
+无；Chat 渲染已记录的状态，修改后的问题仍通过现有 Session 提示词接收流程重新提交。
 
 #### KV Cache 影响
 
-无；Chat 呈现不会组装或修改提供方请求。
+修改的问题追加为普通人工消息，保留已有对话前缀；提供方缓存遵循普通提示词接收流程。
 
 ## 已知限制与暂缓事项
 

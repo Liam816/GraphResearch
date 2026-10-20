@@ -1,0 +1,9 @@
+version: 1
+scenario: edit-question
+profile: web
+composition: web-default
+recording: authored
+header:
+  class: web-default
+replay:
+  override: true

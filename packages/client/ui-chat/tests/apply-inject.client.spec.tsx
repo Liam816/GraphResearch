@@ -137,6 +137,26 @@ async function bench(initialSettings?: ChatSettings, withBrowserRegistry = true,
 }
 
 describe('Chat inject API', () => {
+  it('resends into the original Session without changing its draft and honors running and composer blocks', async () => {
+    const b = await bench()
+    try {
+      const { injected } = b.chatViewApi(b.rootReference)
+      const input = b.runtime.ctx.conversation.input.for(b.rootReference.binding.ctx)
+      input.setDraft('Unsent composer draft')
+      await injected.resendMessage('Edited question')
+      expect(b.session.prompt).toHaveBeenCalledExactlyOnceWith([{ type: 'text', text: 'Edited question' }], 'queue')
+      expect(input.state.getSnapshot().draft).toBe('Unsent composer draft')
+      expect(b.runtime.sessions.retainInfo(ROOT).getSnapshot().retainedBy.controllerOperation).toBeUndefined()
+      await b.runtime.sessions.updateSessionSnapshot(ROOT, (snapshot) => { snapshot.running = true })
+      await expect(injected.resendMessage('While running')).rejects.toThrow('cannot accept')
+      await b.runtime.sessions.updateSessionSnapshot(ROOT, (snapshot) => { snapshot.running = false })
+      b.runtime.ctx.conversation.blocks.set(ROOT, { reason: 'Choose a model' })
+      await expect(injected.resendMessage('While blocked')).rejects.toThrow('cannot accept')
+      expect(b.session.prompt).toHaveBeenCalledOnce()
+      expect(input.state.getSnapshot().draft).toBe('Unsent composer draft')
+    } finally { await b.runtime.dispose() }
+  })
+
   it('projects independent Settings choices without saving timing to Host settings', async () => {
     const b = await bench()
     try {

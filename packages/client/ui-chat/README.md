@@ -18,6 +18,7 @@ File-mention providers receive the viewed Session ID with the closing-turn owner
 
 - [Reference previews](#reference-previews)
 - [Hidden Chat rows](#system-prompt-row)
+- [Editing sent questions](#editing-sent-questions)
 - [Command and failure rows](#command-and-failure-rows)
 - [Turn token usage](#turn-token-usage)
 - [Completed-turn footer](#completed-turn-footer)
@@ -45,6 +46,13 @@ Settings → General → Open chat links in selects the destination for ordinary
 Chat omits system-prompt, ordinary Context injection, and `permission` command rows in every work-details mode. Context containing tool additions or removals remains visible. The filter changes neither recorded Session events nor Trajectory inspection. Non-human Turn triggers remain independent, bordered notices with a contrasting neutral background; other command rows remain in Chat.
 
 When an Assistant attempt retires without a visible message, Chat hides its already-published Node instead of removing its key. A retry in the same Step reuses that key when visible content returns. This also applies when the loaded window lacks the Step start.
+
+<a id="editing-sent-questions"></a>
+## Editing sent questions
+
+Sent human questions and admitted steering messages offer **Edit** beside **Copy**. The inline editor starts with the original text; **Ask again** sends the edited text as a new turn through the same Session's prompt admission. The original question, answers and attachments remain in the conversation and model history. Attachments are not uploaded again, and the resident composer draft remains unchanged. Escape or Cancel discards the local edit; Enter sends, Shift+Enter inserts a newline, and IME composition never sends.
+
+An active turn must stop before resubmission. Removed Sessions and continuable children without their parent retain edits but cannot resend; one-shot children omit Edit. Admission checks the current Session generation, composer block and input phase. A failed send retains the edited text for retry, and an outstanding send prevents duplicate dispatch. Temporary Client references keep the addressed Session alive until admission settles.
 
 <a id="command-and-failure-rows"></a>
 ## Command and failure rows
@@ -169,11 +177,11 @@ Active-Turn highlighting is approximate: `readVisibleTurn` binary-searches the f
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as this package renders logged conversation state in the browser and registers nothing model-facing.
+None, as Chat renders logged state and resubmits edited questions through existing Session prompt admission.
 
 #### KV Cache effect
 
-None; Chat presentation does not assemble or mutate provider requests.
+Edited questions append ordinary user messages while preserving the existing conversation prefix; provider caching follows normal prompt admission.
 
 ## Known Limitations and Deferred Work
 

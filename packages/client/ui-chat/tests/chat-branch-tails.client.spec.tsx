@@ -44,10 +44,11 @@ interface MessageItemProps {
   readonly t: ChatNodeViewProps['t']
   readonly referenceLabels?: readonly string[]
   readonly skillNames?: readonly string[]
+  readonly resendMessage?: (text: string) => Promise<void>
 }
 
 /** Legacy-node fixture adapter for the independently registered renderers. */
-function MessageItem({ node, t: translate, referenceLabels, skillNames }: MessageItemProps) {
+function MessageItem({ node, t: translate, referenceLabels, skillNames, resendMessage }: MessageItemProps) {
   const kind = node.kind === 'assistant' ? 'assistant-step' : node.kind
   const viewNode: ChatConversationViewNode = {
     key: `fixture:${node.kind}:${node.seq}`,
@@ -68,7 +69,7 @@ function MessageItem({ node, t: translate, referenceLabels, skillNames }: Messag
         : node,
   }
   const props = {
-    node: viewNode, t: translate, renderMessageImages, openFile: vi.fn(), openSkill: vi.fn(), useChat: useDetachedChat,
+    node: viewNode, t: translate, renderMessageImages, openFile: vi.fn(), openSkill: vi.fn(), useChat: useDetachedChat, resendMessage,
   } as unknown as ChatNodeViewProps
   switch (node.kind) {
     case 'user':
@@ -159,7 +160,7 @@ describe('MessageItem arms', () => {
     expect(resolved.container.textContent).toContain('/123 then ')
   })
 
-  it('user bubbles expose clock / copy and neither branch nor edit; copy writes the text', () => {
+  it('read-only user bubbles expose clock and copy without edit or branch', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -182,6 +183,25 @@ describe('MessageItem arms', () => {
     expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '复制' }))
     expect(writeText).toHaveBeenCalledWith('hello bubble')
+  })
+
+  it('places Edit beside Copy and sends edited text without replacing the original question', async () => {
+    const resendMessage = vi.fn(async (_text: string) => {})
+    render(<MessageItem t={t} resendMessage={resendMessage} node={{
+      kind: 'user', seq: 1, time: 1000, source: null,
+      content: [{ type: 'text', text: 'Original question' }] as never,
+    }} />)
+    const buttons = screen.getAllByRole('button')
+    expect(buttons.map(button => button.getAttribute('aria-label'))).toEqual(['复制', '编辑'])
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    const editor = screen.getByRole<HTMLTextAreaElement>('textbox', { name: '编辑问题' })
+    expect(editor.value).toBe('Original question')
+    fireEvent.change(editor, { target: { value: 'Revised question' } })
+    fireEvent.click(screen.getByRole('button', { name: '重新提问' }))
+    await act(async () => {})
+    expect(resendMessage).toHaveBeenCalledExactlyOnceWith('Revised question')
+    expect(screen.getByText('Original question')).toBeTruthy()
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 
   it('user copy falls back to execCommand when clipboard.writeText is unavailable', () => {

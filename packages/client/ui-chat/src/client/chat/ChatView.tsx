@@ -59,7 +59,8 @@ const MOTION_TAIL_MS = 800
  */
 export function ChatView({
   useSession, useChat, useConversation, useSessions, renderSlot,
-  sessionId, openFile, openSkill, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt, fileMentions,
+  sessionId, openFile, openSkill, openExternalLink, loadOlder, loadThrough,
+  loadImage, inspectCall, chatScroll, forkAt, resendMessage, fileMentions,
   usePresentation, useProjection, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
@@ -91,6 +92,10 @@ export function ChatView({
     },
   }), [cwd, t])
   const running = useSession(s => s.running)
+  const removed = useSession(s => s.removed)
+  const subagent = useSession(s => s.subagent)
+  const canResend = subagent === null || subagent.address.mode === 'continuable'
+  const resendUnavailable = running || removed || (subagent !== null && subagent.parentAvailable !== true)
   // Fold transitions run while a Turn is live, while an input is pending, and briefly after settling.
   const [motionTail, setMotionTail] = useState(false)
   useEffect(() => {
@@ -227,6 +232,7 @@ export function ChatView({
               {renderSlot('conversation.chat.flow', {
                 entries, pendingInputs, lastInputTurn, deferCollapse,
                 cwd, openFile: requestOpenFile, openSkill, inspectCall, forkAt, loadImage, fileMentions,
+                resendMessage: canResend ? resendMessage : undefined, resendUnavailable,
               }, { hookContext: flowContext })}
             </MarkdownDelegateProvider>
             {/* No pending placeholders: questions (ui-user-questions) and approvals
