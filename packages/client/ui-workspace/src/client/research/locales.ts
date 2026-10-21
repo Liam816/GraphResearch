@@ -1,5 +1,7 @@
 /** Product and accessibility copy for the research workspace. */
 export const zh = {
+  resizeFiles: '调整目录与预览的比例', resizeFilesHint: '拖动调整目录与预览的比例，双击恢复默认；支持方向键调整',
+  filesDirectoryShare: '目录占比 {percent}%',
   paperFiles: '论文文件', browseFiles: '浏览论文目录', refreshFiles: '刷新文件', emptyFolder: '空文件夹',
   selectFile: '从目录中选择一个文件', selectFileHint: '预览原文、正文、笔记与代码；Markdown 支持在线编辑',
   filesFailed: '目录读取未完成，请重试', fileReadFailed: '文件读取未完成，请检查文件是否仍在目录中后重试',
@@ -59,6 +61,8 @@ export const zh = {
 export type ResearchKey = keyof typeof zh
 /** English research dictionary. */
 export const en = {
+  resizeFiles: 'Resize directory and preview', resizeFilesHint: 'Drag to resize; double-click to reset. Arrow keys also adjust the split.',
+  filesDirectoryShare: 'Directory size {percent}%',
   paperFiles: 'Paper files', browseFiles: 'Browse paper directory', refreshFiles: 'Refresh files', emptyFolder: 'Empty folder',
   selectFile: 'Select a file from the directory', selectFileHint: 'Preview PDFs, full text, notes, and code. Markdown files can be edited here.',
   filesFailed: 'Directory could not be read. Retry to load it.', fileReadFailed: 'File could not be read. Check that it still exists, then retry.',

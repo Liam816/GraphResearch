@@ -55,6 +55,7 @@
       - treeitem "paper.md" [level=1]
       - treeitem "paper.pdf" [level=1]
       - treeitem "session.json" [level=1]
+  - separator "Resize directory and preview"
   - text: notes/learning.md
   - status: Saved
   - button "Preview"

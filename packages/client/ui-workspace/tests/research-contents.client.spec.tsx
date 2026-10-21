@@ -85,3 +85,35 @@ it('keeps a conflicting draft visible and offers the latest contents without ove
   expect(await screen.findByRole('heading', { name: 'Agent version' })).toBeTruthy()
   expect(store.getSnapshot().papers[paper.id]?.files?.drafts['custom.md']?.text).toBe('Unsaved work')
 })
+
+it('adjusts the directory split with keys without discarding the selected file or draft', async () => {
+  const { Harness, store } = fixture()
+  render(<Harness />)
+  await open('custom.md')
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'Edit custom.md' }), { target: { value: 'Keep this draft' } })
+  const divider = screen.getByRole('separator', { name: 'Resize directory and preview' })
+  const columns = divider.getAttribute('aria-orientation') === 'vertical'
+  const axis = columns ? 'columns' : 'rows'
+  const otherAxis = columns ? 'rows' : 'columns'
+  const smaller = columns ? 'ArrowLeft' : 'ArrowUp'
+  const larger = columns ? 'ArrowRight' : 'ArrowDown'
+  const expected = columns ? 36 : 37
+  fireEvent.keyDown(divider, { key: 'End' })
+  expect(divider.getAttribute('aria-valuenow')).toBe('95')
+  fireEvent.keyDown(divider, { key: 'Home' })
+  fireEvent.keyDown(divider, { key: smaller })
+  expect(divider.getAttribute('aria-valuenow')).toBe('5')
+  fireEvent.doubleClick(divider)
+  fireEvent.keyDown(divider, { key: larger })
+  expect(divider.getAttribute('aria-valuenow')).toBe(String(expected))
+  await act(() => { store.actions.fileSplit(paper.id, otherAxis, 60); store.actions.reset(paper.id) })
+  const files = createResearchViewStore().create().getSnapshot().papers[paper.id]?.files
+  expect(files).toMatchObject({ selected: 'custom.md', split: { [axis]: expected, [otherAxis]: 60 }, drafts: { 'custom.md': { text: 'Keep this draft' } } })
+  expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Edit custom.md' }).value).toBe('Keep this draft')
+  fireEvent.click(screen.getByRole('button', { name: 'Example paper' }))
+  expect(divider.hidden).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Example paper' }))
+  expect(divider.hidden).toBe(false)
+  expect(divider.getAttribute('aria-valuenow')).toBe(String(expected))
+})

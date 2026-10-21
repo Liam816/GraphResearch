@@ -4,9 +4,10 @@ import type { CSSProperties, KeyboardEvent } from 'react'
 import { Button, FileTypeIcon, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconRefreshOutlineRegular, ReferenceIconRegular, StateDot, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ResearchDirectoryListing, ResearchPaper } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchWorkbenchProps } from './contract.ts'
-import type { PaperView } from './store.ts'
+import { DEFAULT_FILE_SPLIT, type PaperView } from './store.ts'
 import { ResearchNotes } from './Notes.tsx'
 import { PaperFilePreview } from './FilePreview.tsx'
+import { PaperFileDivider } from './FileDivider.tsx'
 import css from './Files.module.css'
 
 /** Shared commands and existing PDF factory supplied by the workbench. */
@@ -94,7 +95,10 @@ export function PaperFiles(props: PaperFilesProps) {
   }
   const note = path === 'notes/ai.md' || path === 'notes/learning.md'
   return <div className={css.root} data-paper-files>
-    <div className={css.layout} data-explorer-collapsed={collapsed}>
+    <div className={css.layout} data-explorer-collapsed={collapsed} style={{
+      '--files-rows': view.files?.split?.rows ?? DEFAULT_FILE_SPLIT.rows,
+      '--files-columns': view.files?.split?.columns ?? DEFAULT_FILE_SPLIT.columns,
+    } as CSSProperties}>
       <aside className={css.explorer} aria-label={t('paperFiles')}>
         <div className={css.explorerHeader}>
           <button type="button" className={css.rootFolder} title={paper.directory} aria-expanded={!collapsed} onClick={() => { setCollapsed(!collapsed) }}>
@@ -107,6 +111,7 @@ export function PaperFiles(props: PaperFilesProps) {
           <Branch {...props} path="" level={1} revision={revision} />
         </div>
       </aside>
+      <PaperFileDivider paperId={paper.id} split={view.files?.split} collapsed={collapsed} actions={props.viewActions} t={t} />
       <div className={css.viewer}>
         {path === '' ? <div className={css.empty}><ReferenceIconRegular kind="folder" size={28} /><p>{t('selectFile')}</p><small>{t('selectFileHint')}</small></div>
           : <><div className={css.fileTab} title={path}><FileTypeIcon path={path} size={16} /><span>{path}</span></div>

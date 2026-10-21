@@ -25,9 +25,16 @@ export interface NoteReadingView {
   editor?: NoteEditorPosition
   preview?: NoteScrollPosition
 }
+/** Independent directory proportions for stacked and side-by-side file layouts. */
+export type FileSplitAxis = 'rows' | 'columns'
+/** Default directory proportions before a paper has saved split preferences. */
+export const DEFAULT_FILE_SPLIT: Record<FileSplitAxis, number> = { rows: 35, columns: 34 }
+/** Inclusive directory percentage limits for both file layout axes. */
+export const FILE_SPLIT_LIMITS = { min: 5, max: 95 } as const
 /** File viewing preferences and drafts survive paper switches without caching disk contents. */
 export interface PaperFileView {
   selected?: string
+  split?: Partial<Record<FileSplitAxis, number>>
   expanded: Record<string, boolean>
   drafts: Record<string, { text: string; version: string }>
   reading: Record<string, NoteReadingView>
@@ -144,6 +151,12 @@ function researchViewDefinition() {
         const view = draft.papers[id] ??= defaultPaperView()
         const files = view.files ??= { expanded: {}, drafts: {}, reading: {} }
         files.expanded[path] = expanded
+      },
+      fileSplit: (draft, id: ResearchPaperId, axis: FileSplitAxis, percent: number) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        const files = view.files ??= { expanded: {}, drafts: {}, reading: {} }
+        const split = files.split ??= {}
+        split[axis] = Math.max(FILE_SPLIT_LIMITS.min, Math.min(FILE_SPLIT_LIMITS.max, percent))
       },
       fileEdit: (draft, id: ResearchPaperId, path: string, text: string, version: string) => {
         const view = draft.papers[id] ??= defaultPaperView()
