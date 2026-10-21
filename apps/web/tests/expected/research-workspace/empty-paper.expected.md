@@ -5,7 +5,7 @@
   - group "Panel visibility":
     - button "Agent chat" [pressed]
     - button "Original PDF" [pressed]
-    - button "Reading notes"
+    - button "Related content"
   - button "Reference papers"
 - region "Agent chat":
   - button "Reorder Agent chat"

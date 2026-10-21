@@ -18,13 +18,14 @@ import type { ResearchPaper, ResearchTranslation } from '@deepseek-ai/dsh-api-wo
 import type { ResearchWorkbenchProps } from './contract.ts'
 import { isResearchPanel, reorderPanels, resolvePanelOrder } from './store.ts'
 import type { PaperView, PanelPlacement, ResearchPanel } from './store.ts'
-import { ResearchNotes } from './Notes.tsx'
+import { PaperFiles } from './Files.tsx'
 import { PaperMarkdownStatus } from './MarkdownStatus.tsx'
 import css from './Research.module.css'
 
-type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'refresh' | 'highlight' | 'extractMarkdown' | 'translate' | 'saveTranslation'>
+type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'listFiles' | 'readFile' | 'saveFile' | 'refresh' | 'highlight' | 'extractMarkdown' | 'translate' | 'saveTranslation'>
 interface PaperPanelsProps extends PanelSeats {
   paper: ResearchPaper
+  revision: string
   highlightAvailable: boolean
   translationAvailable: boolean
   askTranslation: (translation: ResearchTranslation) => Promise<void>
@@ -116,7 +117,9 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
                 highlights: paper.highlights ?? [],
                 change: change => props.highlight({ paperId: paper.id, change }),
               } })}</>
-          : <ResearchNotes paper={paper} view={view} t={t} actions={actions} saveNote={props.saveNote} refresh={props.refresh} />}
+          : <PaperFiles paper={paper} view={view} t={t} viewActions={actions} saveNote={props.saveNote} refresh={props.refresh}
+            listFiles={props.listFiles} readFile={props.readFile} saveFile={props.saveFile}
+            renderFactorySlot={props.renderFactorySlot} revision={props.revision} />}
     </div>
   </section>
 }

@@ -1,0 +1,43 @@
+.root { display: flex; flex: 1; min-height: 0; min-width: 0; container: paper-files / inline-size; }
+.layout { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; }
+.explorer { display: flex; flex-direction: column; flex: 0 1 35%; min-height: 96px; border-bottom: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-1); }
+.explorerHeader { display: flex; flex: none; min-width: 0; align-items: center; gap: 4px; height: 36px; padding: 0 8px; }
+.rootFolder { display: flex; flex: 1; align-items: center; min-width: 0; gap: 6px; border: 0; padding: 4px 0; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 500; text-align: left; cursor: pointer; }
+.rootFolder span, .fileName, .fileTab span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rootFolder svg, .fileTab svg { flex: none; }
+.fileTree { min-height: 0; overflow: auto; padding: 2px 6px 8px; }
+.fileTree[hidden] { display: none; }
+.fileRow { box-sizing: border-box; display: flex; align-items: center; width: 100%; height: 28px; gap: 6px; border: 0; border-radius: var(--dsw-radius-sm); padding: 0 6px 0 calc((var(--file-level) - 1) * 14px + 2px); background: transparent; color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.fileRow > svg { flex: none; }
+.fileRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.fileRow[aria-selected=true] { background: var(--dsw-alias-interactive-bg-active); }
+.fileRow[aria-disabled=true] { color: var(--dsw-alias-label-secondary); cursor: default; }
+.fileRow:focus-visible, .rootFolder:focus-visible, .fileTree:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color); outline-offset: -2px; }
+.chevron { display: flex; flex: none; align-items: center; justify-content: center; width: 12px; }
+.dirty { margin-left: auto; color: var(--dsw-alias-state-business-primary); }
+.viewer { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
+.fileTab { display: flex; flex: none; min-width: 0; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--dsw-alias-border-l1); font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.document { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.toolbar { display: flex; flex: none; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 12px; }
+.toolbar > span { flex: 1; min-width: 60px; color: var(--dsw-alias-label-secondary); font-size: 12px; }
+.preview { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px 24px; }
+.preview:has(.code) { padding: 0; }
+.code { --dsl-code-block-line-white-space: pre; min-width: 100%; border: 0; border-radius: 0; margin: 0; }
+.code pre { white-space: pre; word-break: normal; overflow-wrap: normal; }
+.editor { box-sizing: border-box; display: block; flex: 1; min-height: 80px; width: 100%; border: 0; outline: none; resize: none; padding: 12px 16px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); font-family: var(--ds-font-family-code); font-size: 13px; line-height: 1.85; tab-size: 4; }
+.editor:focus-visible { box-shadow: inset 0 0 0 1px var(--dsw-focus-ring-color); }
+.notice { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-block-end: 1px solid var(--dsw-alias-border-l2); font-size: 12px; line-height: 1.6; }
+.empty, .loading { display: flex; flex: 1; min-height: 80px; align-items: center; justify-content: center; gap: 10px; padding: 20px; color: var(--dsw-alias-label-secondary); }
+.empty { flex-direction: column; text-align: center; }
+.empty p { margin: 0; font-size: 13px; }
+.empty small, .emptyFolder { font-size: 12px; line-height: 1.6; color: var(--dsw-alias-label-secondary); }
+.emptyFolder { margin: 8px 12px; }
+.image { flex: 1; overflow: auto; padding: 16px; }
+.image img { display: block; max-width: 100%; height: auto; margin: auto; }
+.layout[data-explorer-collapsed=true] .explorer { flex: none; min-height: 0; }
+@container paper-files (min-width: 620px) {
+  .layout { flex-direction: row; }
+  .explorer { flex: 0 0 210px; min-height: 0; border-bottom: 0; border-right: 1px solid var(--dsw-alias-border-l1); }
+  .layout[data-explorer-collapsed=true] { flex-direction: column; }
+}
+@media (pointer: coarse) { .fileRow { min-height: 44px; } .explorerHeader { min-height: 44px; } }

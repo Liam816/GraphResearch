@@ -170,6 +170,8 @@ interface SessionActivity {
 
 The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, page-relative text highlights, whole-paper Markdown publication status, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [translation types](../../packages/api/workspace-controller/src/research-translation-types.ts) define PDF text-item positions, original sentence windows, structured vocabulary explanations and auxiliary request/result audit events. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
 
+`ResearchFileRequest` identifies a `paperId` and paper-relative `path` (empty for its root). `ResearchDirectoryListing` returns that path and direct entries with `name`, `path`, `kind`, and optional `bytes`. `ResearchFileContent` distinguishes complete versioned UTF-8 `text`, bounded `image` previews, and `unsupported` binary or oversized files. `ResearchSaveFileRequest` adds Markdown `text` and its `expectedVersion` SHA-256; file previews and drafts do not change Session history.
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -448,6 +450,27 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the committed catalog; conflicts preserve the previous notebook.
  */
 @Remote('researchSaveNote') researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog>
+
+/**
+ * List direct children inside the selected paper.
+ * @param request - paper identity and relative directory.
+ * @returns direct children inside that paper.
+ */
+@Remote('researchListFiles') researchListFiles(request: ResearchFileRequest): Promise<ResearchDirectoryListing>
+
+/**
+ * Read a complete file preview inside the selected paper.
+ * @param request - paper identity and relative file.
+ * @returns bounded text or image contents for preview.
+ */
+@Remote('researchReadFile') researchReadFile(request: ResearchFileRequest): Promise<ResearchFileContent>
+
+/**
+ * Save a Markdown draft without replacing intervening edits.
+ * @param request - Markdown edit and last read content version.
+ * @returns acknowledged content; stale edits never replace disk contents.
+ */
+@Remote('researchSaveFile') researchSaveFile(request: ResearchSaveFileRequest): Promise<ResearchFileContent>
 
 /**
  * Add or remove a PDF text highlight without replacing concurrent annotations.

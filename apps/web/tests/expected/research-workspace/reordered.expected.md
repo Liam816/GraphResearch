@@ -3,25 +3,41 @@
   - strong: RT-2
   - text: Independent session
   - group "Panel visibility":
-    - button "Reading notes" [pressed]
+    - button "Related content" [pressed]
     - button "Agent chat" [pressed]
     - button "Original PDF" [pressed]
   - button "Reference papers"
-- region "Reading notes":
-  - button "Reorder Reading notes"
-  - strong: Reading notes
-  - button "Arrange Reading notes"
-  - button "Collapse Reading notes"
-  - group "Reading notes":
-    - button "Learning notes" [pressed]
-    - button "AI notes"
+- region "Related content":
+  - button "Reorder Related content"
+  - strong: Related content
+  - button "Arrange Related content"
+  - button "Collapse Related content"
+  - complementary "Paper files":
+    - button "RT-2" [expanded]
+    - button "Refresh files"
+    - tree "Paper files":
+      - treeitem "assets" [level=1]
+      - treeitem "code" [expanded] [level=1]
+      - group:
+        - treeitem "model.py" [level=2]
+      - treeitem "extracted" [level=1]
+      - treeitem "notes" [expanded] [level=1]
+      - group:
+        - treeitem "ai.md" [level=2]
+        - treeitem "learning.md" [level=2] [selected]: learning.md •
+      - treeitem "paper.json" [level=1]
+      - treeitem "paper.md" [level=1]
+      - treeitem "paper.pdf" [level=1]
+      - treeitem "reading.md" [level=1]
+      - treeitem "session.json" [level=1]
+  - text: notes/learning.md
   - status: Unsaved changes
   - button "Preview"
   - button "Save notes"
   - textbox "Learning notes":
     - /placeholder: Record methods, findings, questions, and your understanding. Markdown is supported.
     - text: Notebook draft survives pane reordering
-- separator "Resize Reading notes and Agent chat"
+- separator "Resize Related content and Agent chat"
 - region "Agent chat":
   - button "Reorder Agent chat"
   - strong: Agent chat

@@ -7,7 +7,7 @@ import type { PaperView } from './store.ts'
 import css from './Research.module.css'
 
 /** @param props - confirmed paper, saved panel preferences, and injected note commands. @returns a Markdown notebook editor. */
-export function ResearchNotes({ paper, view, ...props }: Pick<ResearchSeats, 't' | 'actions' | 'saveNote' | 'refresh'> & { paper: ResearchPaper; view: PaperView }) {
+export function ResearchNotes({ paper, view, file = false, ...props }: Pick<ResearchSeats, 't' | 'actions' | 'saveNote' | 'refresh'> & { paper: ResearchPaper; view: PaperView; file?: boolean }) {
   const { t, actions } = props
   const kind = view.notebook
   const draft = view.drafts[kind]
@@ -68,10 +68,10 @@ export function ResearchNotes({ paper, view, ...props }: Pick<ResearchSeats, 't'
     } finally { setBusy(false) }
   }
   return <div className={css.notebook}>
-    <div className={css.noteTabs} role="group" aria-label={t('notes')}>
+    {!file && <div className={css.noteTabs} role="group" aria-label={t('notes')}>
       {(['learning', 'ai'] as const).map(value => <button type="button" key={value} disabled={busy} aria-pressed={value === kind}
         onClick={() => { actions.notebook(paper.id, value); setError(undefined) }}>{t(value)}</button>)}
-    </div>
+    </div>}
     <div className={css.noteToolbar}><span className={css.hint} role="status">{t(busy ? 'saving' : draft !== undefined ? 'unsaved' : 'saved')}</span>
       <Button size="sm" onClick={() => { actions.noteMode(paper.id, kind, preview ? 'edit' : 'preview') }}>{t(preview ? 'edit' : 'preview')}</Button>
       <Button size="sm" disabled={busy || draft === undefined} onClick={() => { void save() }}>{t('save')}</Button>

@@ -5,7 +5,7 @@
   - group "Panel visibility":
     - button "Agent chat" [pressed]
     - button "Original PDF" [pressed]
-    - button "Reading notes" [pressed]
+    - button "Related content" [pressed]
   - button "Reference papers"
 - region "Agent chat":
   - button "Reorder Agent chat"
@@ -34,15 +34,28 @@
     - button "Zoom out"
     - button "Choose zoom": 100%
     - button "Zoom in"
-- separator "Resize Original PDF and Reading notes"
-- region "Reading notes":
-  - button "Reorder Reading notes"
-  - strong: Reading notes
-  - button "Arrange Reading notes"
-  - button "Collapse Reading notes"
-  - group "Reading notes":
-    - button "Learning notes" [pressed]
-    - button "AI notes"
+- separator "Resize Original PDF and Related content"
+- region "Related content":
+  - button "Reorder Related content"
+  - strong: Related content
+  - button "Arrange Related content"
+  - button "Collapse Related content"
+  - complementary "Paper files":
+    - button "RT-2" [expanded]
+    - button "Refresh files"
+    - tree "Paper files":
+      - treeitem "assets" [level=1]
+      - treeitem "code" [level=1]
+      - treeitem "extracted" [level=1]
+      - treeitem "notes" [expanded] [level=1]
+      - group:
+        - treeitem "ai.md" [level=2]
+        - treeitem "learning.md" [level=2] [selected]
+      - treeitem "paper.json" [level=1]
+      - treeitem "paper.md" [level=1]
+      - treeitem "paper.pdf" [level=1]
+      - treeitem "session.json" [level=1]
+  - text: notes/learning.md
   - status: Saved
   - button "Preview"
   - button "Save notes" [disabled]

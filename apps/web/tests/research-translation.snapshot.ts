@@ -1,3 +1,4 @@
+import { openResearchNote } from './research-files.helpers.ts'
 /** Shipped Web reading flow: explicit translation, original context, cache reuse and learning-note export. */
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -80,9 +81,9 @@ it('translates an explicit selection with five original sentences and retains it
   await card.getByText('The original and explanation are in the Agent composer. Add your question and send.', { exact: true }).waitFor()
   expect(await workbench.locator('[contenteditable="true"]').textContent()).toContain('First context sentence.')
   await workbench.getByRole('group', { name: 'Panel visibility', exact: true })
-    .getByRole('button', { name: 'Reading notes', exact: true }).click()
-  const notes = workbench.getByRole('region', { name: 'Reading notes', exact: true })
-  await notes.getByRole('button', { name: 'Learning notes', exact: true }).click()
+    .getByRole('button', { name: 'Related content', exact: true }).click()
+  const notes = workbench.getByRole('region', { name: 'Related content', exact: true })
+  await openResearchNote(workbench, 'learning')
   await expect.poll(() => notes.textContent()).toContain('机器人动作策略')
   await page.keyboard.press('Escape')
   await page.reload({ waitUntil: 'load' })

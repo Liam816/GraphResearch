@@ -168,8 +168,34 @@ export interface ResearchSaveNoteRequest {
   readonly expectedRevision: number
 }
 
+/** A paper-relative file address; an empty path denotes its root directory. */
+export interface ResearchFileRequest {
+  readonly paperId: ResearchPaperId
+  readonly path: string
+}
+
+/** Direct directory children; links and special files are visible but cannot be opened. */
+export interface ResearchDirectoryListing {
+  readonly path: string
+  readonly entries: readonly { readonly name: string; readonly path: string; readonly kind: 'directory' | 'file' | 'other'; readonly bytes?: number }[]
+}
+
+/** Complete bounded preview; unsupported contents are never returned as truncated text. */
+export type ResearchFileContent =
+  | { readonly kind: 'text'; readonly path: string; readonly text: string; readonly version: string; readonly editable: boolean }
+  | { readonly kind: 'image'; readonly path: string; readonly src: string }
+  | { readonly kind: 'unsupported'; readonly path: string; readonly reason: 'binary' | 'too-large' }
+
+/** Markdown replacement requires the exact content version last read by the editor. */
+export interface ResearchSaveFileRequest extends ResearchFileRequest {
+  readonly text: string
+  readonly expectedVersion: string
+}
+
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
+    /** Another writer changed the file; preserve the editor draft and load the latest contents. */
+    'research/file-conflict': { readonly path: string }
     /** Invalid title, PDF path, execution workspace or notebook revision. */
     'research/invalid': { readonly field: string }
     /** A selected paper or topic no longer exists. */

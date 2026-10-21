@@ -9,6 +9,7 @@ import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
 import { ResearchCatalogHost } from './research.ts'
 import { PaperTranslations } from './research-translation.ts'
+import type { ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from './research-types.ts'
 import type { ResearchTranslation, ResearchTranslationRequest } from './research-translation-types.ts'
 import { resolve } from 'node:path'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
@@ -365,6 +366,30 @@ export class WorkspaceController extends TypertRemoteService {
   researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog> {
     return this.research.saveNote(request)
   }
+
+  /**
+   * List direct children inside the selected paper.
+   * @param request - paper identity and relative directory.
+   * @returns direct children inside that paper.
+   */
+  @Remote('researchListFiles')
+  researchListFiles(request: ResearchFileRequest): Promise<ResearchDirectoryListing> { return this.research.listFiles(request) }
+
+  /**
+   * Read a complete file preview inside the selected paper.
+   * @param request - paper identity and relative file.
+   * @returns bounded text or image contents for preview.
+   */
+  @Remote('researchReadFile')
+  researchReadFile(request: ResearchFileRequest): Promise<ResearchFileContent> { return this.research.readFile(request) }
+
+  /**
+   * Save a Markdown draft without replacing intervening edits.
+   * @param request - Markdown edit and last read content version.
+   * @returns acknowledged content; stale edits never replace disk contents.
+   */
+  @Remote('researchSaveFile')
+  researchSaveFile(request: ResearchSaveFileRequest): Promise<ResearchFileContent> { return this.research.saveFile(request) }
 
   /**
    * Add or remove a PDF text highlight without replacing concurrent annotations.

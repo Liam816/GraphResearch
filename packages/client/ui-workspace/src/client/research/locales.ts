@@ -1,5 +1,13 @@
 /** Product and accessibility copy for the research workspace. */
 export const zh = {
+  paperFiles: '论文文件', browseFiles: '浏览论文目录', refreshFiles: '刷新文件', emptyFolder: '空文件夹',
+  selectFile: '从目录中选择一个文件', selectFileHint: '预览原文、正文、笔记与代码；Markdown 支持在线编辑',
+  filesFailed: '目录读取未完成，请重试', fileReadFailed: '文件读取未完成，请检查文件是否仍在目录中后重试',
+  fileSaveFailed: '保存未完成，草稿已保留。请重新读取文件确认保存状态后重试',
+  fileConflict: '文件已被其他窗口或 Agent 修改。草稿已保留，请查看最新版本后合并修改',
+  fileTooLarge: '文件超出在线预览大小限制，请在本地打开',
+  fileUnsupported: '此文件为二进制文件，暂不支持在线预览', readOnly: '只读预览', saveFile: '保存文件',
+  editFile: '编辑 {path}', reloadFile: '重新读取', viewDraft: '查看草稿',
   translationQuestion: '请进一步解释这篇论文第 {page} 页中的「{selected}」。\n\n原文上下文：\n{context}\n\n当前语境释义：{meaning}\n{explanation}\n\n原句译文：{translation}\n\n我的问题：',
   librarySettings: '论文资料目录', libraryDirectory: '资料目录', directoryMode: '操作方式', applyDirectory: '应用目录',
   openLibrary: '打开另一资料库', migrateLibrary: '迁移当前资料库',
@@ -25,7 +33,7 @@ export const zh = {
   backendRestartRequired: '前端已更新，当前后端尚不支持论文资料库。请停止并重新启动项目服务，然后刷新页面',
   createFailed: '创建未完成，填写内容已保留。请刷新研究目录确认是否已经创建，再决定是否重试',
   noWorkspaces: '请先在下方添加一个工作目录。', noResults: '没有匹配的 Topic 或论文',
-  agent: 'Agent 对话', pdf: 'PDF 原文', notes: '阅读笔记', ai: 'AI 笔记', learning: '学习笔记',
+  agent: 'Agent 对话', pdf: 'PDF 原文', notes: '关联内容', ai: 'AI 笔记', learning: '学习笔记',
   panels: '面板显示', panelFocus: '切换阅读面板', show: '展开 {panel}', viewPanel: '查看 {panel}',
   related: '关联论文', context: '引用其他论文', contextHint: '选择论文，将它的会话引用放入输入框；发送后带入已保存的阅读上下文。每次最多引用 3 篇。',
   noRelated: '这个 Topic 还没有其他论文。', insert: '插入引用', inserted: '引用已放入输入框',
@@ -51,6 +59,14 @@ export const zh = {
 export type ResearchKey = keyof typeof zh
 /** English research dictionary. */
 export const en = {
+  paperFiles: 'Paper files', browseFiles: 'Browse paper directory', refreshFiles: 'Refresh files', emptyFolder: 'Empty folder',
+  selectFile: 'Select a file from the directory', selectFileHint: 'Preview PDFs, full text, notes, and code. Markdown files can be edited here.',
+  filesFailed: 'Directory could not be read. Retry to load it.', fileReadFailed: 'File could not be read. Check that it still exists, then retry.',
+  fileSaveFailed: 'Save did not complete. Your draft was retained. Reload the file to check its saved contents before retrying.',
+  fileConflict: 'Another window or Agent changed this file. Your draft was retained. View the latest version and merge your changes.',
+  fileTooLarge: 'This file exceeds the online preview size limit. Open it locally to read it.',
+  fileUnsupported: 'This binary file cannot be previewed online yet.', readOnly: 'Read-only preview', saveFile: 'Save file',
+  editFile: 'Edit {path}', reloadFile: 'Reload file', viewDraft: 'View draft',
   translationQuestion: 'Help me understand “{selected}” on PDF page {page} of this paper.\n\nOriginal context:\n{context}\n\nContextual meaning: {meaning}\n{explanation}\n\nSentence translation: {translation}\n\nMy question: ',
   librarySettings: 'Paper library directory', libraryDirectory: 'Library directory', directoryMode: 'Operation', applyDirectory: 'Apply directory',
   openLibrary: 'Open another library', migrateLibrary: 'Migrate current library',
@@ -76,7 +92,7 @@ export const en = {
   backendRestartRequired: 'The frontend was updated, but this backend does not support the paper library. Stop and restart the project server, then reload the page.',
   createFailed: 'Creation did not complete. Your form entries were retained. Refresh the library to check whether the item was created before retrying.',
   noWorkspaces: 'Add a working directory below first.', noResults: 'No matching topics or papers',
-  agent: 'Agent chat', pdf: 'Original PDF', notes: 'Reading notes', ai: 'AI notes', learning: 'Learning notes',
+  agent: 'Agent chat', pdf: 'Original PDF', notes: 'Related content', ai: 'AI notes', learning: 'Learning notes',
   panels: 'Panel visibility', panelFocus: 'Reading panel', show: 'Show {panel}', viewPanel: 'View {panel}',
   related: 'Related papers', context: 'Reference papers', contextHint: 'Choose papers to insert session references into the composer. Sending includes their saved reading context. Up to 3 papers per prompt.',
   noRelated: 'There are no other papers in this topic yet.', insert: 'Insert references', inserted: 'References added to the composer',

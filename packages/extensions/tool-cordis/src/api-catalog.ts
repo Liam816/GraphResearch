@@ -3782,6 +3782,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the committed catalog; conflicts preserve the previous notebook.',
       },
       {
+        signature: '@Remote(\'researchListFiles\') researchListFiles(request: ResearchFileRequest): Promise<ResearchDirectoryListing>',
+        description: 'List direct children inside the selected paper.',
+        parameters: [{ name: 'request', description: 'paper identity and relative directory.' }],
+        returns: 'direct children inside that paper.',
+      },
+      {
+        signature: '@Remote(\'researchReadFile\') researchReadFile(request: ResearchFileRequest): Promise<ResearchFileContent>',
+        description: 'Read a complete file preview inside the selected paper.',
+        parameters: [{ name: 'request', description: 'paper identity and relative file.' }],
+        returns: 'bounded text or image contents for preview.',
+      },
+      {
+        signature: '@Remote(\'researchSaveFile\') researchSaveFile(request: ResearchSaveFileRequest): Promise<ResearchFileContent>',
+        description: 'Save a Markdown draft without replacing intervening edits.',
+        parameters: [{ name: 'request', description: 'Markdown edit and last read content version.' }],
+        returns: 'acknowledged content; stale edits never replace disk contents.',
+      },
+      {
         signature: '@Remote(\'researchHighlight\') researchHighlight(request: ResearchHighlightRequest): Promise<ResearchCatalog>',
         description: 'Add or remove a PDF text highlight without replacing concurrent annotations.',
         parameters: [{ name: 'request', description: 'owning paper and idempotent change.' }],
@@ -6616,8 +6634,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResearchCreateTopicRequest {\n    readonly title: string;\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
   },
   {
+    name: 'ResearchDirectoryListing',
+    declaration: 'export interface ResearchDirectoryListing {\n    readonly path: string;\n    readonly entries: readonly {\n        readonly name: string;\n        readonly path: string;\n        readonly kind: \'directory\' | \'file\' | \'other\';\n        readonly bytes?: number;\n    }[];\n}',
+  },
+  {
     name: 'ResearchDirectoryRequest',
     declaration: 'export interface ResearchDirectoryRequest {\n    readonly directory: string;\n    readonly mode: \'open\' | \'migrate\';\n}',
+  },
+  {
+    name: 'ResearchFileContent',
+    declaration: 'export type ResearchFileContent = {\n    readonly kind: \'text\';\n    readonly path: string;\n    readonly text: string;\n    readonly version: string;\n    readonly editable: boolean;\n} | {\n    readonly kind: \'image\';\n    readonly path: string;\n    readonly src: string;\n} | {\n    readonly kind: \'unsupported\';\n    readonly path: string;\n    readonly reason: \'binary\' | \'too-large\';\n};',
+  },
+  {
+    name: 'ResearchFileRequest',
+    declaration: 'export interface ResearchFileRequest {\n    readonly paperId: ResearchPaperId;\n    readonly path: string;\n}',
   },
   {
     name: 'ResearchFollowFrame',
@@ -6682,6 +6712,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResearchReadPaperRequest',
     declaration: 'export interface ResearchReadPaperRequest {\n    readonly paperId: ResearchPaperId;\n    readonly startPage?: number;\n    readonly pageCount?: number;\n}',
+  },
+  {
+    name: 'ResearchSaveFileRequest',
+    declaration: 'export interface ResearchSaveFileRequest extends ResearchFileRequest {\n    readonly text: string;\n    readonly expectedVersion: string;\n}',
   },
   {
     name: 'ResearchSaveNoteRequest',

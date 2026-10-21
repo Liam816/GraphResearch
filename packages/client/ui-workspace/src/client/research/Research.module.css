@@ -115,7 +115,7 @@
   .workbenchHeader { padding-inline: 12px; gap: 10px; }
   .breadcrumb { flex-basis: 100%; }
   .workbenchTools { width: 100%; }
-  .panelControls { flex: 1 0 100%; min-width: 0; gap: 8px; padding-right: 0; border-right: 0; }
+  .panelControls { flex: 1 0 100%; min-width: 0; gap: 4px; padding-right: 0; border-right: 0; }
   .panelVisibility { display: none; }
   .panelControlAnchor { flex: 1 1 auto; }
   .panelToggle { width: 100%; }

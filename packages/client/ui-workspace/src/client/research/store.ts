@@ -25,10 +25,18 @@ export interface NoteReadingView {
   editor?: NoteEditorPosition
   preview?: NoteScrollPosition
 }
+/** File viewing preferences and drafts survive paper switches without caching disk contents. */
+export interface PaperFileView {
+  selected?: string
+  expanded: Record<string, boolean>
+  drafts: Record<string, { text: string; version: string }>
+  reading: Record<string, NoteReadingView>
+}
 /** Paper-local layout and unsaved notebook edits. */
 export interface PaperView {
   /** Absent in older browser preferences; resolvePanelOrder supplies the reading order. */
   order?: ResearchPanel[]
+  files?: PaperFileView
   panels: Record<ResearchPanel, boolean>
   widths: Record<ResearchPanel, number>
   active: ResearchPanel
@@ -119,7 +127,44 @@ function researchViewDefinition() {
         const previous = draft.papers[id] ?? defaultPaperView()
         draft.papers[id] = { ...defaultPaperView(), panels: { agent: true, pdf: true, notes: true },
           drafts: previous.drafts, notebook: previous.notebook,
+          ...previous.files === undefined ? {} : { files: previous.files },
           ...previous.reading === undefined ? {} : { reading: previous.reading } }
+      },
+      fileSelect: (draft, id: ResearchPaperId, path: string) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        const files = view.files ??= { expanded: {}, drafts: {}, reading: {} }
+        files.selected = path
+        if (path === 'notes/ai.md' || path === 'notes/learning.md') {
+          view.notebook = path === 'notes/ai.md' ? 'ai' : 'learning'
+          const reading = view.reading ??= {}
+          reading[view.notebook] ??= { mode: 'preview' }
+        }
+      },
+      fileExpand: (draft, id: ResearchPaperId, path: string, expanded: boolean) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        const files = view.files ??= { expanded: {}, drafts: {}, reading: {} }
+        files.expanded[path] = expanded
+      },
+      fileEdit: (draft, id: ResearchPaperId, path: string, text: string, version: string) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        const files = view.files ??= { expanded: {}, drafts: {}, reading: {} }
+        files.drafts[path] = { text, version: files.drafts[path]?.version ?? version }
+      },
+      fileSaved: (draft, id: ResearchPaperId, path: string, text: string, version: string) => {
+        const files = draft.papers[id]?.files
+        const file = files?.drafts[path]
+        if (file === undefined || files === undefined) return
+        if (file.text === text) files.drafts = Object.fromEntries(Object.entries(files.drafts).filter(([key]) => key !== path))
+        else file.version = version
+      },
+      fileDiscard: (draft, id: ResearchPaperId, path: string) => {
+        const files = draft.papers[id]?.files
+        if (files !== undefined) files.drafts = Object.fromEntries(Object.entries(files.drafts).filter(([key]) => key !== path))
+      },
+      fileReading: (draft, id: ResearchPaperId, path: string, reading: NoteReadingView) => {
+        const view = draft.papers[id] ??= defaultPaperView()
+        const files = view.files ??= { expanded: {}, drafts: {}, reading: {} }
+        files.reading[path] = { ...files.reading[path], ...reading }
       },
       notebook: (draft, id: ResearchPaperId, kind: ResearchNoteKind) => { (draft.papers[id] ??= defaultPaperView()).notebook = kind },
       noteMode: (draft, id: ResearchPaperId, kind: ResearchNoteKind, mode: 'edit' | 'preview', latest: boolean = false) => {

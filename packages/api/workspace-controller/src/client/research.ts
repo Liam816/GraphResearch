@@ -1,6 +1,7 @@
 /** React-free research catalog, retaining the last confirmed data after failures. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from '../research-types.ts'
 import type { WorkspaceRemote } from './model.ts'
 import type { ResearchTranslation, ResearchTranslationRequest } from '../research-translation-types.ts'
 import type {
@@ -21,9 +22,44 @@ export class ClientResearchModel {
     phase: 'loading', catalog: { revision: 0, topics: [], papers: [] },
   })
 
-  /** @param remote - generated Workspace namespace. */
+  /**
+   * @param remote - generated Workspace namespace.
+   */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+    'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+
+  /**
+   * List direct children inside the selected paper.
+   * @param request - paper-relative directory.
+   * @returns current direct children.
+   */
+  async listFiles(request: ResearchFileRequest): Promise<ResearchDirectoryListing> {
+    const result = await this.remote.researchListFiles(request)
+    if (!result.ok) throw result.error
+    return result.value
+  }
+
+  /**
+   * Read a complete file preview inside the selected paper.
+   * @param request - paper-relative file.
+   * @returns bounded preview contents.
+   */
+  async readFile(request: ResearchFileRequest): Promise<ResearchFileContent> {
+    const result = await this.remote.researchReadFile(request)
+    if (!result.ok) throw result.error
+    return result.value
+  }
+
+  /**
+   * Save a Markdown draft without replacing intervening edits.
+   * @param request - Markdown draft with base hash.
+   * @returns the acknowledged version.
+   */
+  async saveFile(request: ResearchSaveFileRequest): Promise<ResearchFileContent> {
+    const result = await this.remote.researchSaveFile(request)
+    if (!result.ok) throw result.error
+    return result.value
+  }
 
   /**
    * Translate one explicit PDF selection without replacing catalog state.

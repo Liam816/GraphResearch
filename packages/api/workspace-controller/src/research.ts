@@ -13,6 +13,8 @@ import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { digest, missing, ResearchFiles, researchCatalogSchema, researchHighlightSchema } from './research-files.ts'
 import type { ResearchFilePolicy } from './research-files.ts'
+import { listPaperContents, readPaperContent, savePaperContent } from './research-contents.ts'
+import type { ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from './research-types.ts'
 import { importPdf, readPdfText } from './research-pdf.ts'
 import type { ResearchPdfPolicy } from './research-pdf.ts'
 import { extractPaperMarkdown } from './research-markdown.ts'
@@ -51,7 +53,10 @@ export class ResearchCatalogHost {
   private readonly followers = new Set<ResearchFollower>()
   private readonly archives = new Set<string>()
 
-  /** @param ctx - Host Workspace, Session and storage authorities. @param policy - validated library policy. */
+  /**
+   * @param ctx - Host Workspace, Session and storage authorities.
+   * @param policy - validated library policy.
+   */
   constructor(private readonly ctx: Context, private readonly policy: ResearchPolicy) {
     this.domain = ctx.storageDomain.open(researchDomain)
     this.ready = this.initialize()
@@ -91,6 +96,46 @@ export class ResearchCatalogHost {
   read(): Promise<ResearchCatalog> {
     return this.serialized(() => this.files.withLock(async () => {
       return this.accept(await this.ensureMarkdown(this.files, await this.files.read()))
+    }))
+  }
+
+  /**
+   * List direct children inside the selected paper.
+   * @param request - paper and relative directory.
+   * @returns the current directory children.
+   */
+  listFiles(request: ResearchFileRequest): Promise<ResearchDirectoryListing> {
+    return this.fileOperation(request, paper => listPaperContents(this.files, paper, request.path))
+  }
+
+  /**
+   * Read a complete file preview inside the selected paper.
+   * @param request - paper and relative file.
+   * @returns complete bounded contents for preview.
+   */
+  readFile(request: ResearchFileRequest): Promise<ResearchFileContent> {
+    return this.fileOperation(request, paper => readPaperContent(this.files, paper, request.path, this.policy.maxNoteBytes))
+  }
+
+  /**
+   * Save a Markdown draft without replacing intervening edits.
+   * @param request - Markdown draft and base version.
+   * @returns acknowledged contents; conflicts preserve the draft and disk version.
+   */
+  saveFile(request: ResearchSaveFileRequest): Promise<ResearchFileContent> {
+    return this.fileOperation(request, async (paper) => {
+      const content = await savePaperContent(this.files, paper, request, this.policy.maxNoteBytes)
+      this.accept(await this.files.read())
+      return content
+    })
+  }
+
+  private fileOperation<T>(request: ResearchFileRequest, operation: (paper: ResearchCatalog['papers'][number]) => Promise<T>): Promise<T> {
+    return this.serialized(() => this.files.withLock(async () => {
+      const catalog = await this.files.read()
+      const paper = catalog.papers.find(item => item.id === request.paperId)
+      if (paper === undefined) throw new RemoteError('research/not-found', 'Paper not found', { id: request.paperId })
+      return operation(paper)
     }))
   }
 

@@ -1,3 +1,4 @@
+import { openResearchNote } from './research-files.helpers.ts'
 /** The shipped Web Agent reads a paper and publishes Markdown through recorded tool calls. */
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -65,15 +66,15 @@ it('records research context, reads original pages, and saves the live AI notebo
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   const library = page.getByRole('region', { name: 'Research library', exact: true })
   await library.getByRole('button', { name: 'Fixture paper', exact: true }).click()
-  for (const label of ['Agent chat', 'Original PDF', 'Reading notes', 'Code repository']) {
+  for (const label of ['Agent chat', 'Original PDF', 'Related content', 'Code repository']) {
     expect(await library.getByText(label, { exact: true }).count()).toBe(0)
   }
   expect(await library.getByRole('button', { name: 'Collapse Fixture paper', exact: true }).count()).toBe(0)
   const workbench = page.locator('[data-research-workbench]')
-  expect(await workbench.getByRole('region', { name: 'Reading notes', exact: true }).isVisible()).toBe(false)
-  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'Reading notes', exact: true }).click()
-  await workbench.getByRole('button', { name: 'AI notes', exact: true }).click()
-  await workbench.getByRole('region', { name: 'Reading notes', exact: true }).getByRole('button', { name: 'Edit', exact: true }).click()
+  expect(await workbench.getByRole('region', { name: 'Related content', exact: true }).isVisible()).toBe(false)
+  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'Related content', exact: true }).click()
+  await openResearchNote(workbench, 'ai')
+  await workbench.getByRole('region', { name: 'Related content', exact: true }).getByRole('button', { name: 'Edit', exact: true }).click()
   expect(await workbench.getByRole('textbox', { name: 'AI notes', exact: true }).inputValue()).toContain('The original page contains selectable text')
   await page.reload({ waitUntil: 'load' })
   await expect.poll(() => workbench.getByRole('textbox', { name: 'AI notes', exact: true }).inputValue())

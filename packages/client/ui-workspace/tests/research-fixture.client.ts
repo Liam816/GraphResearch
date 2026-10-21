@@ -5,7 +5,11 @@ import { ClientResearchModel } from '@deepseek-ai/dsh-api-workspace-controller/c
 /** @param ctx - test Context receiving real catalog lifecycle and inert empty commands. */
 export function installEmptyResearch(ctx: Context): void {
   const result = () => Promise.resolve({ ok: true as const, value: { revision: 0, topics: [], papers: [] } })
-  ctx.provide('research', new ClientResearchModel({ researchList: result, researchCreateTopic: result, researchCreatePaper: result, researchSaveNote: result,
+  ctx.provide('research', new ClientResearchModel({
+    researchListFiles: () => Promise.resolve({ ok: true as const, value: { path: '', entries: [] } }),
+    researchReadFile: () => Promise.reject(new Error('file previews are not used by this fixture')),
+    researchSaveFile: () => Promise.reject(new Error('file edits are not used by this fixture')),
+    researchList: result, researchCreateTopic: result, researchCreatePaper: result, researchSaveNote: result,
     researchConfigure: result, researchHighlight: result, researchExtractMarkdown: result, researchSaveTranslation: result,
     researchTranslate: () => Promise.reject(new Error('paper translations are not used by this fixture')),
     researchImportPaper: () => Promise.reject(new Error('paper imports are not used by this fixture')),

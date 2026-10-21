@@ -3,7 +3,7 @@ import { useId, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import {
   Button, Input, Modal, Pill, Tooltip, ReferenceIconRegular,
-  IconCheckOutlineRegular, IconCloseOutlineRegular, IconListPenOutlineRegular, IconPlusOutlineRegular,
+  IconCheckOutlineRegular, IconCloseOutlineRegular, IconPlusOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ResearchPaperId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchWorkbenchProps } from './contract.ts'
@@ -31,8 +31,9 @@ function PanelControls({ paperId, view, id, navigation = false, t, viewActions }
               if (navigation) viewActions.focus(paperId, panel)
               else viewActions.panel(paperId, panel)
             }}>
-            <span className={css.panelControlIcon} aria-hidden="true">{panel === 'notes' ? <IconListPenOutlineRegular size={16} />
-              : <ReferenceIconRegular kind={panel === 'agent' ? 'session' : 'file'} size={16} />}</span>
+            <span className={css.panelControlIcon} aria-hidden="true">
+              <ReferenceIconRegular kind={panel === 'agent' ? 'session' : panel === 'notes' ? 'folder' : 'file'} size={16} />
+            </span>
             <span className={css.panelControlLabel}>{t(panel)}</span>
             <span className={css.panelControlState} aria-hidden="true">{selected ? <IconCheckOutlineRegular size={12} />
               : !navigation && <IconPlusOutlineRegular size={12} />}</span>
@@ -106,6 +107,7 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
       <div className={css.agentContent}>{agent()}</div>
     </div> : <ResearchPaperPanels key={paper.id} paper={paper} view={view} id={panelId} phase={phase} hero={hero}
       t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote}
+      listFiles={props.listFiles} readFile={props.readFile} saveFile={props.saveFile} revision={`${catalog.revision}:${session?.running === true}`}
       highlight={props.highlight} extractMarkdown={props.extractMarkdown}
       translate={props.translate} saveTranslation={props.saveTranslation}
       translationAvailable={catalog.capabilities?.pdfTranslations === true}

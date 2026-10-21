@@ -16,6 +16,7 @@
     "src/research-types.ts",
     "src/research.ts",
     "src/research-files.ts",
+    "src/research-contents.ts",
     "src/research-pdf.ts",
     "src/research-agent.ts",
     "src/research-session-backup.ts",
