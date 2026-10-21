@@ -1,7 +1,7 @@
 /** Managed paper files, revision recovery, and atomic Markdown publication. */
-import { createHash } from 'node:crypto'
-import { cp, lstat, mkdir, readFile, realpath, rm, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { createHash, randomUUID } from 'node:crypto'
+import { cp, lstat, mkdir, readFile, realpath, rename, rm, stat } from 'node:fs/promises'
+import { basename, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { z } from 'zod'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
@@ -46,6 +46,7 @@ export const researchCatalogSchema: z.ZodType<ResearchCatalog> = z.object({
   revision: z.number().int().nonnegative(), topics: z.array(topic), papers: z.array(paper), directory: z.string().optional(),
 })
 
+const paperIdentity = z.object({ id: paperId })
 const noteIndex = z.object({ revision: z.number().int().nonnegative(), sha256: z.string() })
 const folderName = z.string().min(1).refine(value => value !== '.' && value !== '..'
   && !/[\\/\u0000-\u001f<>:"|?*]/u.test(value) && !/[. ]$/.test(value) && Buffer.byteLength(value) <= 255)
@@ -59,6 +60,7 @@ const journalSchema = z.object({
   writes: z.array(z.object({
     kind: z.enum(['ai', 'learning', 'topic']), id: identity, previous: z.string().nullable(), text: z.string(),
   })),
+  deletion: z.object({ id: paperId, folder: folderName, token: z.uuid(), staged: z.boolean() }).optional(),
 })
 type Index = z.infer<typeof indexSchema>
 type Journal = z.infer<typeof journalSchema>
@@ -222,6 +224,45 @@ export class ResearchFiles {
     await destination.write({ ...catalog, revision: catalog.revision + 1 })
   }
 
+  /**
+   * Verify the path the user confirmed against the current paper and its on-disk identity.
+   * @param paper - current catalog entry, read under the library lock.
+   * @param confirmed - absolute directory displayed in the confirmation dialog.
+   * @returns the verified directory; no files are changed.
+   */
+  async confirmDeletion(paper: ResearchPaper, confirmed: string): Promise<string> {
+    const directory = await this.paperPath(paper)
+    if (directory !== confirmed) {
+      throw new RemoteError('research/delete-path-changed', 'Review the current paper directory before deleting', { paperId: paper.id, directory })
+    }
+    const metadata = await this.path('papers', basename(directory), 'paper.json')
+    if (!(await lstat(directory)).isDirectory() || paperIdentity.parse(JSON.parse(await readFile(metadata, 'utf8'))).id !== paper.id) {
+      throw new RemoteError('research/invalid-library', 'Paper directory identity does not match the selected paper', { path: directory })
+    }
+    return directory
+  }
+
+  /**
+   * Remove a verified paper through a recoverable rename, index update, and staged-file deletion.
+   * @param paper - current catalog entry, read under the library lock.
+   * @param confirmed - absolute directory the user confirmed.
+   * @returns the remaining catalog; interrupted operations finish on the next library read.
+   */
+  async deletePaper(paper: ResearchPaper, confirmed: string): Promise<ResearchCatalog> {
+    const directory = await this.confirmDeletion(paper, confirmed)
+    const index = indexSchema.parse(JSON.parse(await readFile(await this.path('library.json'), 'utf8')))
+    if (!index.papers.some(item => item.id === paper.id && indexedPaperFolder(item) === basename(directory))) {
+      throw new RemoteError('research/invalid-library', 'Paper differs from the current library index', { path: directory })
+    }
+    index.papers = index.papers.filter(item => item.id !== paper.id)
+    index.revision += 1
+    const journal: Journal = { index, writes: [],
+      deletion: { id: paper.id, folder: basename(directory), token: randomUUID(), staged: false } }
+    await writeFileAtomic(await this.path('.transaction.json'), `${JSON.stringify(journal)}\n`, { mode: 0o600, dirMode: 0o700 })
+    await this.recover()
+    return this.read()
+  }
+
   private async notePath(kind: 'ai' | 'learning' | 'topic', id: string): Promise<string> {
     return kind === 'topic' ? this.path('topics', id, 'notes.md') : this.path('papers', id, 'notes', `${kind}.md`)
   }
@@ -231,6 +272,39 @@ export class ResearchFiles {
     const pending = await optionalText(filename)
     if (pending === null) return
     const journal = journalSchema.parse(JSON.parse(pending))
+    if (journal.deletion !== undefined) {
+      const deletion = journal.deletion
+      if (journal.writes.length > 0 || 'moves' in journal
+        || journal.index.papers.some(item => item.id === deletion.id || indexedPaperFolder(item) === deletion.folder)) {
+        throw new RemoteError('research/invalid-library', 'Deletion differs from the pending library index', { path: filename })
+      }
+      const source = await this.path('papers', deletion.folder)
+      const stagingRoot = await this.path('.paper-deletions')
+      await mkdir(stagingRoot, { recursive: true, mode: 0o700 })
+      const staged = await this.path('.paper-deletions', deletion.token)
+      if (!deletion.staged) {
+        const moved = await optionalText(await this.path('.paper-deletions', deletion.token, 'paper.json'))
+        if (moved === null) {
+          const metadata = await readFile(await this.path('papers', deletion.folder, 'paper.json'), 'utf8')
+          if (paperIdentity.parse(JSON.parse(metadata)).id !== deletion.id || !(await lstat(source)).isDirectory()) {
+            throw new RemoteError('research/invalid-library', 'Deletion source identity changed', { path: source })
+          }
+          // An occupied staging path is never overwritten, even when it contains no metadata.
+          try { await lstat(staged); throw new RemoteError('research/invalid-library', 'Deletion staging path is occupied', { path: staged }) }
+          catch (error: unknown) { if (!missing(error)) throw error }
+          await rename(source, staged)
+        } else if (paperIdentity.parse(JSON.parse(moved)).id !== deletion.id) {
+          throw new RemoteError('research/invalid-library', 'Deletion staging identity changed', { path: staged })
+        }
+        deletion.staged = true
+        await writeFileAtomic(filename, `${JSON.stringify(journal)}\n`, { mode: 0o600, dirMode: 0o700 })
+      }
+      await this.writeIndex(journal.index)
+      // Once staged, recovery only touches this unique path, even if the original name is reused.
+      await rm(staged, { recursive: true, force: true })
+      await rm(filename)
+      return
+    }
     for (const item of journal.writes) {
       const path = await this.notePath(item.kind, item.id)
       const current = await optionalText(path)
@@ -264,6 +338,10 @@ export function digest(value: string | Uint8Array): string { return createHash('
  * @returns whether the file is absent.
  */
 export function missing(error: unknown): boolean { return error instanceof Error && 'code' in error && error.code === 'ENOENT' }
+
+function indexedPaperFolder(paper: { readonly id: string; readonly folder?: string | undefined }): string {
+  return paper.folder ?? paper.id
+}
 
 async function optionalText(path: string): Promise<string | null> {
   try { return await readFile(path, 'utf8') } catch (error: unknown) { if (missing(error)) return null; throw error }

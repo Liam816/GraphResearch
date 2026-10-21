@@ -1,0 +1,7 @@
+- dialog "Rename topic":
+  - heading "Rename topic" [level=2]
+  - button "Close"
+  - text: Topic name
+  - textbox "Topic name": Robot learning
+  - button "Cancel"
+  - button "Save name" [disabled]

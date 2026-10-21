@@ -11,17 +11,20 @@ import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { defineDomain, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import type { Session } from '@deepseek-ai/dsh-session'
+import { WorkspaceActiveSessionError } from '@deepseek-ai/dsh-workspace'
 import { digest, missing, ResearchFiles, researchCatalogSchema, researchHighlightSchema } from './research-files.ts'
 import type { ResearchFilePolicy } from './research-files.ts'
 import { listPaperContents, readPaperContent, savePaperContent } from './research-contents.ts'
-import type { ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from './research-types.ts'
+import type {
+  ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
+} from './research-types.ts'
 import { importPdf, readPdfText } from './research-pdf.ts'
 import type { ResearchPdfPolicy } from './research-pdf.ts'
 import { extractPaperMarkdown } from './research-markdown.ts'
 import type { ResearchMarkdownPolicy } from './research-markdown.ts'
 import { restoreResearchSessions } from './research-session-backup.ts'
 import type {
-  ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchDirectoryRequest,
+  ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchDirectoryRequest, ResearchDeletePaperRequest,
   ResearchFollowFrame, ResearchPaperId, ResearchReadPaperRequest, ResearchPaperText, ResearchSaveNoteRequest, ResearchTopicId,
   ResearchImportPaperRequest, ResearchAttachPdfRequest, ResearchHighlightRequest,
 } from './research-types.ts'
@@ -96,6 +99,42 @@ export class ResearchCatalogHost {
   read(): Promise<ResearchCatalog> {
     return this.serialized(() => this.files.withLock(async () => {
       return this.accept(await this.ensureMarkdown(this.files, await this.files.read()))
+    }))
+  }
+
+  /**
+   * Delete a paper's files and catalog entry after directory confirmation and Session archival.
+   * @param request - selected paper and exact absolute directory confirmed by the user.
+   * @returns the committed catalog; active paper or topic work refuses deletion before files change.
+   */
+  deletePaper(request: ResearchDeletePaperRequest): Promise<ResearchCatalog> {
+    return this.serialized(() => this.files.withLock(async () => {
+      const catalog = await this.files.read()
+      this.accept(catalog)
+      const paper = catalog.papers.find(item => item.id === request.paperId)
+      if (paper === undefined) throw new RemoteError('research/not-found', 'Paper not found', { id: request.paperId })
+      await this.files.confirmDeletion(paper, request.directory)
+      const sessions = [paper.sessionId, ...catalog.topics.filter(item => paper.topicIds.includes(item.id)).map(item => item.sessionId)]
+      const requireIdle = async (): Promise<void> => {
+        const activity = await Promise.all(sessions.map(sessionId => this.ctx.waterfall('workspace/session-activity', { sessionId }, () => Promise.resolve([]))))
+        if (activity.some(items => items.length > 0) || sessions.some(id => this.ctx.get('agents')?.get(id)?.status === 'running')) {
+          throw new RemoteError('research/paper-busy', 'Stop the paper and topic work before deleting this paper', { paperId: paper.id })
+        }
+      }
+      await requireIdle()
+      try { await this.ctx.workspaceRegistry.archiveSession(paper.sessionId) }
+      catch (error: unknown) {
+        if (error instanceof WorkspaceActiveSessionError) {
+          throw new RemoteError('research/paper-busy', 'Stop the paper work before deleting its files', { paperId: paper.id }, { cause: error })
+        }
+        throw error
+      }
+      await requireIdle()
+      const confirmed = await this.files.deletePaper(paper, request.directory)
+      this.accept(confirmed)
+      await this.watcher?.close()
+      await this.watch()
+      return confirmed
     }))
   }
 
@@ -184,6 +223,26 @@ export class ResearchCatalogHost {
       return { ...catalog, topics: [...catalog.topics, {
         ...request, title, id: brandString<ResearchTopicId>(randomUUID()), notes: { text: '', revision: 0 },
       }] }
+    })
+  }
+
+  /**
+   * Rename a Topic without changing its Session, notes, directory, or child-paper associations.
+   * @param request - Topic, replacement title, and title last displayed to the editor.
+   * @returns the committed catalog; an already-applied rename succeeds without another write.
+   */
+  renameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog> {
+    return this.mutate((catalog) => {
+      const title = requiredText(request.title, 'title')
+      const topic = catalog.topics.find(item => item.id === request.topicId)
+      if (topic === undefined) throw new RemoteError('research/not-found', 'Topic not found', { id: request.topicId })
+      if (topic.title === title) return catalog
+      if (topic.title !== request.expectedTitle) {
+        throw new RemoteError('research/topic-conflict', 'The Topic name changed; reopen the editor with the current name', {
+          topicId: topic.id, title: topic.title,
+        })
+      }
+      return { ...catalog, topics: catalog.topics.map(item => item.id === topic.id ? { ...item, title } : item) }
     })
   }
 
@@ -586,8 +645,17 @@ export class ResearchCatalogHost {
   }
 
   private async archive(session: Session): Promise<number | undefined> {
-    const paper = this.snapshot.papers.find(item => item.sessionId === session.id)
-    const topic = this.snapshot.topics.find(item => item.sessionId === session.id)
+    return this.files.withLock(async () => {
+      // Recover pending deletions before deciding whether this Session still owns a paper folder.
+      const catalog = await this.files.read()
+      this.accept(catalog)
+      return this.archiveCopy(session, catalog)
+    })
+  }
+
+  private async archiveCopy(session: Session, catalog: ResearchCatalog): Promise<number | undefined> {
+    const paper = catalog.papers.find(item => item.sessionId === session.id)
+    const topic = catalog.topics.find(item => item.sessionId === session.id)
     if (paper === undefined && topic === undefined) return
     const path = paper !== undefined ? await this.files.path('papers', paper.id, 'session.json')
       : topic !== undefined ? await this.files.path('topics', topic.id, 'session.json') : undefined

@@ -3770,10 +3770,22 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the committed catalog.',
       },
       {
+        signature: '@Remote(\'researchRenameTopic\') researchRenameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog>',
+        description: 'Persist a Topic name while retaining its identity and research resources.',
+        parameters: [{ name: 'request', description: 'Topic, replacement title, and last displayed title for conflict detection.' }],
+        returns: 'the committed catalog; stale names reject without replacing the latest title.',
+      },
+      {
         signature: '@Remote(\'researchCreatePaper\') async researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog>',
         description: 'Apply the requested research operation.',
         parameters: [{ name: 'request', description: 'Paper metadata and its independent Session.' }],
         returns: 'the committed catalog.',
+      },
+      {
+        signature: '@Remote(\'researchDeletePaper\') researchDeletePaper(request: ResearchDeletePaperRequest): Promise<ResearchCatalog>',
+        description: 'Permanently remove one paper\'s directory and catalog entry, retaining its archived native Session.',
+        parameters: [{ name: 'request', description: 'paper identity and the absolute directory confirmed by the user.' }],
+        returns: 'the remaining library after deletion completes.',
       },
       {
         signature: '@Remote(\'researchSaveNote\') researchSaveNote(request: ResearchSaveNoteRequest): Promise<ResearchCatalog>',
@@ -6634,6 +6646,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResearchCreateTopicRequest {\n    readonly title: string;\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n}',
   },
   {
+    name: 'ResearchDeletePaperRequest',
+    declaration: 'export interface ResearchDeletePaperRequest {\n    readonly paperId: ResearchPaperId;\n    readonly directory: string;\n}',
+  },
+  {
     name: 'ResearchDirectoryListing',
     declaration: 'export interface ResearchDirectoryListing {\n    readonly path: string;\n    readonly entries: readonly {\n        readonly name: string;\n        readonly path: string;\n        readonly kind: \'directory\' | \'file\' | \'other\';\n        readonly bytes?: number;\n    }[];\n}',
   },
@@ -6712,6 +6728,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResearchReadPaperRequest',
     declaration: 'export interface ResearchReadPaperRequest {\n    readonly paperId: ResearchPaperId;\n    readonly startPage?: number;\n    readonly pageCount?: number;\n}',
+  },
+  {
+    name: 'ResearchRenameTopicRequest',
+    declaration: 'export interface ResearchRenameTopicRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly expectedTitle: string;\n}',
   },
   {
     name: 'ResearchSaveFileRequest',

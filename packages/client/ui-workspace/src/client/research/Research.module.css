@@ -22,19 +22,37 @@
 .tree .children { padding-left: 16px; }
 .treeRow { display: flex; align-items: center; min-height: 34px; gap: 2px; }
 .paperRow { padding-left: 24px; }
+.paperActions { flex: none; display: flex; opacity: 0; pointer-events: none; }
+.paperRow:hover .paperActions, .paperRow[data-menu-open] .paperActions,
+html:not([data-input-modality='pointer']) .paperRow:has(:focus-visible:not([data-dsh-automatic-focus])) .paperActions { opacity: 1; pointer-events: auto; }
+.tree .paperMore { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; margin-right: 4px; color: var(--dsw-alias-label-secondary); }
+.tree .paperMore:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
+.treeTitle > .paperTitle { min-width: 0; text-overflow: clip; }
+.paperTitle[data-overflow]:not([data-scrolled]) { mask-image: linear-gradient(to right, #000, #000 calc(100% - 24px), transparent); }
+.paperTitle[data-overflow][data-scrolled][data-clipped] { mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+.paperTitle[data-overflow][data-scrolled]:not([data-clipped]) { mask-image: linear-gradient(to right, transparent, #000 24px); }
+@media (hover: none), (pointer: coarse) {
+  .paperActions { opacity: 1; pointer-events: auto; }
+  .tree .paperMore { width: 44px; height: 44px; }
+}
+.deleteDetails { display: flex; flex-direction: column; gap: 16px; padding-top: 12px; font-size: 13px; line-height: 1.6; }
+.deleteDetails p { margin: 0; }
+.deleteDetails > label { display: flex; flex-direction: column; gap: 8px; }
+.deletePath { display: block; padding: 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.deleteConfirm { color: var(--dsw-alias-state-error-primary); }
+.deleteDetails [role='alert'] { color: var(--dsw-alias-state-error-primary); }
 .tree button, .tree a { color: inherit; text-decoration: none; font: inherit; border: 0; background: transparent; border-radius: var(--dsw-radius-sm); cursor: pointer; }
 .tree button:hover, .tree a:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .tree .chevron { display: flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 28px; padding: 0; color: var(--dsw-alias-label-secondary); }
 .treeTitle { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; text-align: left; padding: 8px 6px; }
 .treeTitle > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.treeTitle small { color: var(--dsw-alias-label-secondary); }
 .treeTitle[aria-current] { color: var(--dsw-alias-state-business-primary); background: var(--dsw-alias-interactive-bg-hover); }
-.tree .addPaper { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0; margin-right: 4px; color: var(--dsw-alias-label-secondary); touch-action: manipulation; }
-.tree .addPaper:hover, .tree .addPaper:focus-visible { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
-.tree .addPaper:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
-.tree .addPaper:active { background: var(--dsw-alias-interactive-bg-hover); }
+.tree .addPaper, .tree .topicMore { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0; margin-right: 4px; color: var(--dsw-alias-label-secondary); touch-action: manipulation; }
+.tree .addPaper:hover, .tree .addPaper:focus-visible, .tree .topicMore:hover, .tree .topicMore:focus-visible { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
+.tree .addPaper:focus-visible, .tree .topicMore:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
+.tree .addPaper:active, .tree .topicMore:active { background: var(--dsw-alias-interactive-bg-hover); }
 @media (pointer: coarse) {
-  .tree .addPaper { width: 44px; height: 44px; }
+  .tree .addPaper, .tree .topicMore { width: 44px; height: 44px; }
 }
 .directoryEmpty { padding: 24px 8px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .directoryEmpty p, .hint { margin: 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 1.6; }

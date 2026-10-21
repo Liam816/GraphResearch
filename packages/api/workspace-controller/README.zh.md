@@ -58,6 +58,10 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 `researchHighlight` 新增或删除一个稳定的文字选区标识。新增时验证颜色、页码和归一化矩形；相同的重复新增和不存在的删除可安全重试，并发编辑保留其他选区。高亮保存于论文的 `paper.json` 和资料库元数据，随资料库迁移，通过已有的科研快照流更新。`researchMaxHighlightBytes` 限制每篇论文完整高亮列表的序列化大小，默认为 4 MiB。保存失败时保留已确认目录，可能留下可恢复的事务日志；重复相同操作可完成恢复而不重复创建高亮。尚无高亮的资料库无需转换。目录响应通过 `capabilities.pdfHighlights` 声明支持高亮；此运行时标志不写入资料库。
 
+`researchRenameTopic` 接收 Topic 标识、新名称及编辑框的 `expectedTitle`。它去除首尾空白并校验名称，拒绝不存在的 Topic；其他写入者已改名时返回 `research/topic-conflict`。重复已成功应用的改名不会再次增加修订号。现有资料库事务更新 `library.json` 和 `topic.json`；Topic 标识、笔记、Session、目录和论文关联保持稳定。写入失败时可能保留可恢复日志，重试前应先刷新资料库。
+
+`researchDeletePaper` 要求论文标识及用户确认的准确绝对目录。Host 校验当前元数据，拒绝链接、路径不匹配及仍有论文或 Topic 任务运行的请求，并归档论文 Session，阻止后续提问。事务日志先将已验证目录暂存到 `.paper-deletions/`，发布移除论文后的索引，再永久删除暂存文件。操作中断时保留日志，下次读取资料库继续恢复；恢复不会删除原路径下新建的同名目录。失败后 Session 可能已归档，删除也可能已部分执行，重试前需刷新确认。原生 Session 代际文件保留。
+
 `researchListFiles` 列出论文目录的直接子项；`researchReadFile` 在 `researchMaxNoteBytes` 限制内返回完整 UTF-8 文本或图片，并明确报告二进制文件与超限文件。路径相对论文目录，拒绝目录越界和符号链接。`researchSaveFile` 只编辑已有 Markdown，并要求 SHA-256 `expectedVersion`；版本冲突不写文件。I/O 失败保留浏览器草稿，重试前应重新读取文件确认状态。托管笔记修改也通过研究目录流发布。
 
 `researchFollow` 推送完整基线，以及已提交或外部观察到的笔记变更快照；重连启动新基线。浏览器草稿与已确认正文分别保留。协作进程间串行写入，检查 `expectedRevision`，并通过可恢复的事务日志发布 Markdown 与元数据。过期编辑不会写入文件。I/O 失败可能留下未完成的事务日志；重试前刷新以完成恢复，恢复期间发生冲突的外部修改会明确报告而不被覆盖。元数据无效、笔记文件缺失或监听失败时，浏览器保留已确认内容并显示问题。受管理路径拒绝符号链接。

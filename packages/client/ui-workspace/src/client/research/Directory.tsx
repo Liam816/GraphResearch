@@ -4,9 +4,12 @@ import {
   Button, Input, Modal, Tooltip, IconPlusOutlineRegular, IconNewChatOutlineMedium,
   IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconFolderCloseRegular, IconSearchOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchPaper, ResearchTopic, ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchDirectoryProps } from './contract.ts'
 import { ResearchLibrarySettings } from './LibrarySettings.tsx'
+import { ResearchPaperRow } from './PaperRow.tsx'
+import { DeletePaperDialog } from './DeletePaper.tsx'
+import { ResearchTopicActions, RenameTopicDialog } from './TopicActions.tsx'
 import css from './Research.module.css'
 
 /** @param props - catalog hook, view store, navigation, and durable commands. @returns the research directory. */
@@ -22,6 +25,8 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
   const [repositoryUrl, setRepositoryUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
+  const [deleting, setDeleting] = useState<ResearchPaper>()
+  const [renaming, setRenaming] = useState<ResearchTopic>()
   const needsRestart = phase === 'ready' && catalog.directory === undefined
   const filter = query.trim().toLocaleLowerCase()
   const topics = catalog.topics.filter(topic => topic.title.toLocaleLowerCase().includes(filter)
@@ -73,19 +78,17 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
               aria-expanded={expanded} onClick={() => { actions.expand(topic.id, !expanded) }}><Chevron size={14} /></button>
             <button type="button" className={css.treeTitle} aria-current={current === topic.sessionId ? 'page' : undefined}
               onClick={() => { actions.topic(topic.id); props.open(topic.sessionId) }}>
-              <IconFolderCloseRegular size={16} /><span>{topic.title}</span><small>{papers.length}</small>
+              <IconFolderCloseRegular size={16} /><span>{topic.title}</span>
             </button>
+            <ResearchTopicActions topic={topic} t={t} onRename={() => { setRenaming(topic) }} />
             <Tooltip label={t('addPaperToTopic', { title: topic.title })} side="right" portal>
               <button type="button" className={css.addPaper} aria-label={t('addPaperToTopic', { title: topic.title })}
                 onClick={() => { start(topic.id) }}><IconPlusOutlineRegular size={16} /></button>
             </Tooltip>
           </div>
-          {expanded && <ul className={css.children}>{papers.map(paper => <li key={paper.id} className={`${css.treeRow} ${css.paperRow}`}>
-            <button type="button" className={css.treeTitle} aria-current={current === paper.sessionId ? 'page' : undefined}
-              onClick={() => { actions.topic(topic.id); props.open(paper.sessionId) }}>
-              <span>{paper.title}</span>
-            </button>
-          </li>)}</ul>}
+          {expanded && <ul className={css.children}>{papers.map(paper => <ResearchPaperRow key={paper.id}
+            paper={paper} selected={current === paper.sessionId} t={t}
+            onOpen={() => { actions.topic(topic.id); props.open(paper.sessionId) }} onDelete={() => { setDeleting(paper) }} />)}</ul>}
         </li>
       })}</ul>
     </nav>
@@ -103,5 +106,9 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
         {needsRestart ? <p role="alert">{t('backendRestartRequired')}</p> : error && <p role="alert">{t('createFailed')}</p>}
       </form>
     </Modal>
+    {deleting !== undefined && <DeletePaperDialog paper={catalog.papers.find(item => item.id === deleting.id) ?? deleting}
+      t={t} deletePaper={props.deletePaper} onClose={() => { setDeleting(undefined) }} />}
+    {renaming !== undefined && <RenameTopicDialog topic={renaming} t={t} renameTopic={props.renameTopic}
+      onClose={() => { setRenaming(undefined) }} />}
   </section>
 }

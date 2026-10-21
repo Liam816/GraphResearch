@@ -107,6 +107,13 @@ export interface ResearchCreateTopicRequest {
   readonly sessionId: SessionId
 }
 
+/** Rename one Topic only while its last displayed title is still current. */
+export interface ResearchRenameTopicRequest {
+  readonly topicId: ResearchTopicId
+  readonly title: string
+  readonly expectedTitle: string
+}
+
 /** Register a paper with an independent Session and an optional original. */
 export interface ResearchCreatePaperRequest {
   readonly topicId: ResearchTopicId
@@ -116,6 +123,12 @@ export interface ResearchCreatePaperRequest {
   readonly repositoryUrl: string
   /** Optional external paper identity. */
   readonly sourceId?: string
+}
+
+/** Permanently remove one paper after the user confirms its current absolute directory. */
+export interface ResearchDeletePaperRequest {
+  readonly paperId: ResearchPaperId
+  readonly directory: string
 }
 
 /** Switch to an existing library or copy the current library into a new directory. */
@@ -194,6 +207,12 @@ export interface ResearchSaveFileRequest extends ResearchFileRequest {
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
+    /** Another writer renamed the Topic; retain the draft and request a new edit from the current name. */
+    'research/topic-conflict': { readonly topicId: ResearchTopicId; readonly title: string }
+    /** The paper moved since confirmation; display the new path and request confirmation again. */
+    'research/delete-path-changed': { readonly paperId: ResearchPaperId; readonly directory: string }
+    /** A paper or its topic still has active work; stop that work before deleting its files. */
+    'research/paper-busy': { readonly paperId: ResearchPaperId }
     /** Another writer changed the file; preserve the editor draft and load the latest contents. */
     'research/file-conflict': { readonly path: string }
     /** Invalid title, PDF path, execution workspace or notebook revision. */

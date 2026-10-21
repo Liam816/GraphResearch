@@ -109,6 +109,9 @@ function researchViewDefinition() {
       papers: {} as Record<ResearchPaperId, PaperView>,
     }),
     actions: {
+      forgetPaper: (draft, id: ResearchPaperId) => {
+        draft.papers = Object.fromEntries(Object.entries(draft.papers).filter(([key]) => key !== id))
+      },
       expand: (draft, id: string, value: boolean) => { draft.expanded[id] = value },
       topic: (draft, id: ResearchTopicId) => { draft.topicId = id; draft.expanded[id] = true },
       place: (draft, id: ResearchPaperId, source: ResearchPanel, target: ResearchPanel, placement: PanelPlacement) => {

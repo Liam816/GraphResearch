@@ -1,0 +1,2 @@
+- menu:
+  - menuitem "Rename topic"

@@ -1,11 +1,14 @@
 /** React-free research catalog, retaining the last confirmed data after failures. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from '../research-types.ts'
+import type {
+  ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
+} from '../research-types.ts'
 import type { WorkspaceRemote } from './model.ts'
 import type { ResearchTranslation, ResearchTranslationRequest } from '../research-translation-types.ts'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
+  ResearchDeletePaperRequest,
   ResearchDirectoryRequest, ResearchImportPaperRequest, ResearchHighlightRequest,
 } from '../research-types.ts'
 
@@ -26,7 +29,17 @@ export class ClientResearchModel {
    * @param remote - generated Workspace namespace.
    */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+    'researchRenameTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+
+  /**
+   * Delete a paper after explicit directory confirmation and publish the remaining catalog.
+   * @param request - paper identity and confirmed absolute directory.
+   */
+  async deletePaper(request: ResearchDeletePaperRequest): Promise<void> {
+    const result = await this.remote.researchDeletePaper(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
 
   /**
    * List direct children inside the selected paper.
@@ -102,6 +115,16 @@ export class ClientResearchModel {
    */
   async createTopic(request: ResearchCreateTopicRequest): Promise<void> {
     const result = await this.remote.researchCreateTopic(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
+
+  /**
+   * Rename a Topic and publish the acknowledged catalog revision.
+   * @param request - Topic, proposed name, and the editor's last confirmed name.
+   */
+  async renameTopic(request: ResearchRenameTopicRequest): Promise<void> {
+    const result = await this.remote.researchRenameTopic(request)
     if (!result.ok) throw result.error
     this.accept(result.value)
   }

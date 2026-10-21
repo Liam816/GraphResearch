@@ -170,6 +170,10 @@ interface SessionActivity {
 
 The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, page-relative text highlights, whole-paper Markdown publication status, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [translation types](../../packages/api/workspace-controller/src/research-translation-types.ts) define PDF text-item positions, original sentence windows, structured vocabulary explanations and auxiliary request/result audit events. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
 
+`ResearchRenameTopicRequest` carries a `topicId`, replacement `title`, and `expectedTitle` for concurrent-edit detection. It changes Topic metadata through the [controller](../../packages/api/workspace-controller/README.md#research-catalog).
+
+`ResearchDeletePaperRequest` carries the selected `paperId` and the absolute `directory` explicitly confirmed by the user. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) defines deletion checks, recovery, and retained Session history.
+
 `ResearchFileRequest` identifies a `paperId` and paper-relative `path` (empty for its root). `ResearchDirectoryListing` returns that path and direct entries with `name`, `path`, `kind`, and optional `bytes`. `ResearchFileContent` distinguishes complete versioned UTF-8 `text`, bounded `image` previews, and `unsupported` binary or oversized files. `ResearchSaveFileRequest` adds Markdown `text` and its `expectedVersion` SHA-256; file previews and drafts do not change Session history.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
@@ -438,11 +442,25 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('researchCreateTopic') async researchCreateTopic(request: ResearchCreateTopicRequest): Promise<ResearchCatalog>
 
 /**
+ * Persist a Topic name while retaining its identity and research resources.
+ * @param request - Topic, replacement title, and last displayed title for conflict detection.
+ * @returns the committed catalog; stale names reject without replacing the latest title.
+ */
+@Remote('researchRenameTopic') researchRenameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog>
+
+/**
  * Apply the requested research operation.
  * @param request - Paper metadata and its independent Session.
  * @returns the committed catalog.
  */
 @Remote('researchCreatePaper') async researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog>
+
+/**
+ * Permanently remove one paper's directory and catalog entry, retaining its archived native Session.
+ * @param request - paper identity and the absolute directory confirmed by the user.
+ * @returns the remaining library after deletion completes.
+ */
+@Remote('researchDeletePaper') researchDeletePaper(request: ResearchDeletePaperRequest): Promise<ResearchCatalog>
 
 /**
  * Apply the requested research operation.

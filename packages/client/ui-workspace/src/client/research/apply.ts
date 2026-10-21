@@ -3,12 +3,16 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { UiWorkspace } from '../navigation.ts'
 import type { ResearchInjected } from './contract.ts'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchCatalog, ResearchPaper, WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createResearchViewStore, type ResearchViewStore } from './store.ts'
 import { ResearchDirectory } from './Directory.tsx'
 import { ResearchWorkbench } from './Workbench.tsx'
 import { en, zh } from './locales.ts'
+import { ResearchActionToast, type ResearchNotice, type ResearchNoticeInjected } from './ActionToast.tsx'
+import { paperDeleteFailure } from './DeletePaper.tsx'
+import { topicRenameFailure } from './TopicActions.tsx'
 
 /**
  * Register research navigation and its session-bound workbench.
@@ -21,6 +25,17 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
   const handle = createResearchViewStore()
   const instance = handle.create()
   const store: typeof handle = { ...handle, create: () => instance }
+  const notice = createSnapshotStore<ResearchNotice | null>(null)
+  let noticeSeq = 0
+  const currentSession = () => Object.values(ctx.sessions.list.getSnapshot().byId).find(item => (item.retainedBy.mainView ?? 0) > 0)?.id
+  const finishRemoval = (paper: ResearchPaper, catalog: ResearchCatalog, wasOpen: boolean): void => {
+    instance.actions.forgetPaper(paper.id)
+    const current = currentSession()
+    if (current !== paper.sessionId && !(current === undefined && wasOpen)) return
+    const topic = catalog.topics.find(item => item.id === instance.getSnapshot().topicId && paper.topicIds.includes(item.id))
+      ?? catalog.topics.find(item => paper.topicIds.includes(item.id))
+    if (topic !== undefined) { instance.actions.topic(topic.id); open(topic.sessionId) }
+  }
   const pending = new Map<string, Promise<Parameters<ResearchInjected['open']>[0]>>()
   const createSession = (key: string, workspaceId: WorkspaceId) => {
     let session = pending.get(key)
@@ -44,6 +59,35 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     saveTranslation: (id, key) => ctx.research.saveTranslation(id, key),
     saveNote: request => ctx.research.saveNote(request),
     configureDirectory: request => ctx.research.configure(request),
+    renameTopic: async (request) => {
+      try { await ctx.research.renameTopic(request) }
+      catch (error: unknown) {
+        notice.set({ seq: ++noticeSeq, message: topicRenameFailure(error), success: false })
+        try { await ctx.research.refresh() }
+        catch (refreshError: unknown) { console.error('Research refresh after Topic rename failed:', refreshError) }
+        throw error
+      }
+      notice.set({ seq: ++noticeSeq, message: 'topicRenamed', success: true })
+    },
+    deletePaper: async (request) => {
+      const catalog = ctx.research.state.getSnapshot().catalog
+      const paper = catalog.papers.find(item => item.id === request.paperId)
+      const wasOpen = paper !== undefined && currentSession() === paper.sessionId
+      try {
+        await ctx.research.deletePaper(request)
+      } catch (error: unknown) {
+        notice.set({ seq: ++noticeSeq, message: paperDeleteFailure(error), success: false })
+        // An interrupted filesystem transaction may have completed; load its confirmed outcome before retry.
+        try { await ctx.research.refresh() }
+        catch (refreshError: unknown) { console.error('Research refresh after deletion failed:', refreshError) }
+        if (paper !== undefined && !ctx.research.state.getSnapshot().catalog.papers.some(item => item.id === paper.id)) {
+          finishRemoval(paper, catalog, wasOpen)
+        }
+        throw error
+      }
+      if (paper !== undefined) finishRemoval(paper, catalog, wasOpen)
+      notice.set({ seq: ++noticeSeq, message: 'paperDeleted', success: true })
+    },
     mentions: ids => ctx.research.mentions(ids),
     createTopic: async (request) => {
       const directory = ctx.research.state.getSnapshot().catalog.directory
@@ -74,6 +118,10 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
   ctx.slots.inject('sidebar.workspaces.research', () => ctx.slots.register({
     name: 'sidebar.workspaces.research', store, locale: 'research', inject: injected,
   }, ResearchDirectory))
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay', id: 'research.action-toast', locale: 'research',
+    inject: (): ResearchNoticeInjected => ({ hooks: { notice }, dismiss: () => { notice.set(null) } }),
+  }, ResearchActionToast))
   ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main', key: panelId, store, children: { 'main.research': { kind: 'single', scope: 'session-maybe' } },
   }, ResearchPanel))

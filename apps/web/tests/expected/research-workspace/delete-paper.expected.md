@@ -1,0 +1,10 @@
+- 'dialog "Delete “OpenVLA: An Open Source Vision Language Action Model for Generalist Robot Manipulation and Learning”"':
+  - 'heading "Delete “OpenVLA: An Open Source Vision Language Action Model for Generalist Robot Manipulation and Learning”" [level=2]'
+  - button "Close"
+  - paragraph: This permanently deletes the entire paper directory, including PDFs, notes, and code, and removes the paper from every topic. This cannot be undone. The original Agent session is retained in the archive.
+  - text: Directory to delete
+  - code: <paper-directory>
+  - checkbox "I checked this directory path and confirm permanent deletion of all its contents"
+  - text: I checked this directory path and confirm permanent deletion of all its contents
+  - button "Cancel"
+  - button "Delete paper" [disabled]

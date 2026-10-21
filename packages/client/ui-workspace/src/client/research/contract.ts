@@ -1,9 +1,10 @@
 /** Public Slot inputs; component code receives only snapshots, actions, and standard props. */
 import type { HostObservable, PropsHooks, PropsLocale, PropsRenderFactories, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ResearchSnapshot, ResearchCreateTopicRequest, ResearchCreatePaperRequest, ResearchSaveNoteRequest, ResearchPaperId, ResearchDirectoryRequest, ResearchHighlightRequest, ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchSnapshot, ResearchCreateTopicRequest, ResearchCreatePaperRequest, ResearchDeletePaperRequest, ResearchSaveNoteRequest, ResearchPaperId, ResearchDirectoryRequest, ResearchHighlightRequest, ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ResearchTranslation, ResearchTranslationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchViewStore } from './store.ts'
+import type { ResearchRenameTopicRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchKey } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client'
@@ -17,7 +18,9 @@ export interface ResearchInjected {
   saveFile: (request: ResearchSaveFileRequest) => Promise<ResearchFileContent>
   open: (sessionId: SessionId) => void
   createTopic: (request: Pick<ResearchCreateTopicRequest, 'title'>) => Promise<void>
+  renameTopic: (request: ResearchRenameTopicRequest) => Promise<void>
   createPaper: (request: Omit<ResearchCreatePaperRequest, 'sessionId'>) => Promise<void>
+  deletePaper: (request: ResearchDeletePaperRequest) => Promise<void>
   highlight: (request: ResearchHighlightRequest) => Promise<void>
   extractMarkdown: (paperId: ResearchPaperId) => Promise<void>
   translate: (request: ResearchTranslationRequest, signal: AbortSignal) => Promise<ResearchTranslation>

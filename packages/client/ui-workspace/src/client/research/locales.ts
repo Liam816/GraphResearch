@@ -1,5 +1,15 @@
 /** Product and accessibility copy for the research workspace. */
 export const zh = {
+  topicActions: '{title} 的 Topic 操作', renameTopic: '修改 Topic 名称', topicName: 'Topic 名称', saveTopicName: '保存名称', topicRenamed: 'Topic 名称已更新',
+  renameTopicConflict: 'Topic 名称已在其他窗口或 Agent 中更改，输入已保留。请重新打开修改窗口后再编辑',
+  renameTopicMissing: '这个 Topic 已不在目录中，输入已保留。请关闭窗口并刷新目录',
+  renameTopicFailed: '名称修改未完成，输入已保留。请刷新目录确认当前名称后重试',
+  paperActions: '{title} 的操作', deletePaper: '删除论文', deletingPaper: '正在删除…', deletePaperTitle: '删除「{title}」',
+  deletePaperWarning: '此操作将永久删除该论文的整个目录（含 PDF、笔记和代码），并从所有 Topic 中移除，无法撤销。原始 Agent 会话将归档保留',
+  deleteDirectory: '即将删除的目录', confirmDeleteDirectory: '我已核对目录路径，确认永久删除其中的全部内容',
+  deletePathUnavailable: '目录路径尚未就绪，请刷新后重试', paperDeleted: '论文和关联目录已删除',
+  deletePathChanged: '论文目录已变化，请刷新并重新核对路径后再删除', deleteBusy: '论文或所属 Topic 仍有任务运行，请停止任务后重试',
+  deleteMissing: '这篇论文已不在目录中，请刷新查看', deleteFailed: '删除未完成，可能已执行部分操作。请刷新目录确认当前状态后再重试',
   resizeFiles: '调整目录与预览的比例', resizeFilesHint: '拖动调整目录与预览的比例，双击恢复默认；支持方向键调整',
   filesDirectoryShare: '目录占比 {percent}%',
   paperFiles: '论文文件', browseFiles: '浏览论文目录', refreshFiles: '刷新文件', emptyFolder: '空文件夹',
@@ -61,6 +71,16 @@ export const zh = {
 export type ResearchKey = keyof typeof zh
 /** English research dictionary. */
 export const en = {
+  topicActions: 'Topic actions for {title}', renameTopic: 'Rename topic', topicName: 'Topic name', saveTopicName: 'Save name', topicRenamed: 'Topic name updated',
+  renameTopicConflict: 'Another window or Agent changed this Topic name. Your input was retained. Reopen the editor with the current name.',
+  renameTopicMissing: 'This Topic is no longer in the library. Your input was retained. Close this dialog and refresh the library.',
+  renameTopicFailed: 'The name change did not complete. Your input was retained. Refresh the library to check its current name before retrying.',
+  paperActions: 'Actions for {title}', deletePaper: 'Delete paper', deletingPaper: 'Deleting…', deletePaperTitle: 'Delete “{title}”',
+  deletePaperWarning: 'This permanently deletes the entire paper directory, including PDFs, notes, and code, and removes the paper from every topic. This cannot be undone. The original Agent session is retained in the archive.',
+  deleteDirectory: 'Directory to delete', confirmDeleteDirectory: 'I checked this directory path and confirm permanent deletion of all its contents',
+  deletePathUnavailable: 'The directory path is not ready. Refresh and retry.', paperDeleted: 'Paper and directory deleted',
+  deletePathChanged: 'The paper directory changed. Refresh and confirm the path again before deleting.', deleteBusy: 'The paper or its topic still has running work. Stop it before retrying.',
+  deleteMissing: 'This paper is no longer in the library. Refresh to check.', deleteFailed: 'Deletion did not complete and may have partially applied. Refresh the library to check its current state before retrying.',
   resizeFiles: 'Resize directory and preview', resizeFilesHint: 'Drag to resize; double-click to reset. Arrow keys also adjust the split.',
   filesDirectoryShare: 'Directory size {percent}%',
   paperFiles: 'Paper files', browseFiles: 'Browse paper directory', refreshFiles: 'Refresh files', emptyFolder: 'Empty folder',

@@ -9,7 +9,9 @@ import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
 import { ResearchCatalogHost } from './research.ts'
 import { PaperTranslations } from './research-translation.ts'
-import type { ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from './research-types.ts'
+import type {
+  ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
+} from './research-types.ts'
 import type { ResearchTranslation, ResearchTranslationRequest } from './research-translation-types.ts'
 import { resolve } from 'node:path'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
@@ -18,6 +20,7 @@ import * as ResearchAgent from './research-agent.ts'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
+  ResearchDeletePaperRequest,
   ResearchDirectoryRequest, ResearchFollowFrame, ResearchImportPaperRequest, ResearchReadPaperRequest, ResearchPaperText, ResearchTopicId,
   ResearchAttachPdfRequest, ResearchHighlightRequest,
 } from './research-types.ts'
@@ -346,6 +349,14 @@ export class WorkspaceController extends TypertRemoteService {
   }
 
   /**
+   * Persist a Topic name while retaining its identity and research resources.
+   * @param request - Topic, replacement title, and last displayed title for conflict detection.
+   * @returns the committed catalog; stale names reject without replacing the latest title.
+   */
+  @Remote('researchRenameTopic')
+  researchRenameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog> { return this.research.renameTopic(request) }
+
+  /**
    * Apply the requested research operation.
    * @param request - Paper metadata and its independent Session.
    * @returns the committed catalog.
@@ -356,6 +367,14 @@ export class WorkspaceController extends TypertRemoteService {
     await this.bindResearchAgents(catalog)
     return catalog
   }
+
+  /**
+   * Permanently remove one paper's directory and catalog entry, retaining its archived native Session.
+   * @param request - paper identity and the absolute directory confirmed by the user.
+   * @returns the remaining library after deletion completes.
+   */
+  @Remote('researchDeletePaper')
+  researchDeletePaper(request: ResearchDeletePaperRequest): Promise<ResearchCatalog> { return this.research.deletePaper(request) }
 
   /**
    * Apply the requested research operation.

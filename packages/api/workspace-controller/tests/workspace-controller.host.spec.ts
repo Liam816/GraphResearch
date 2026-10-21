@@ -501,6 +501,62 @@ describe('Research catalog', () => {
     return { ...fixture, topic: catalog.topics[0]!, workspace }
   }
 
+  it('renames a Topic durably while retaining its notes, Session and child-paper associations', async () => {
+    const { controller, topic, root } = await researchFixture()
+    await controller.researchTopicNote(topic.id, '# Reading order', 0)
+    const before = await controller.researchCreatePaper({ topicId: topic.id, title: 'Child paper', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const request = { topicId: topic.id, title: '  VLA foundations  ', expectedTitle: topic.title }
+    const renamed = await controller.researchRenameTopic(request)
+    expect(renamed.topics[0]).toEqual({ ...before.topics[0], title: 'VLA foundations' })
+    expect(renamed.papers).toEqual(before.papers)
+    expect(renamed.revision).toBe(before.revision + 1)
+    expect(JSON.parse(readFileSync(join(root, 'data', 'topics', topic.id, 'topic.json'), 'utf8')))
+      .toMatchObject({ id: topic.id, title: 'VLA foundations', sessionId: topic.sessionId })
+    expect(readFileSync(join(root, 'data', 'topics', topic.id, 'notes.md'), 'utf8')).toBe('# Reading order')
+    expect(JSON.parse(readFileSync(join(root, 'data', 'library.json'), 'utf8')))
+      .toMatchObject({ topics: [{ id: topic.id, title: 'VLA foundations' }] })
+    expect((await controller.researchList()).topics[0]?.title).toBe('VLA foundations')
+    expect((await controller.researchRenameTopic(request)).revision).toBe(renamed.revision)
+  })
+
+  it('rejects blank, missing and stale Topic renames without replacing the current title', async () => {
+    const { controller, topic } = await researchFixture()
+    await expect(controller.researchRenameTopic({ topicId: topic.id, title: '   ', expectedTitle: topic.title }))
+      .rejects.toMatchObject({ code: 'research/invalid', details: { field: 'title' } })
+    await expect(controller.researchRenameTopic({ topicId: 'missing' as typeof topic.id, title: 'New name', expectedTitle: topic.title }))
+      .rejects.toMatchObject({ code: 'research/not-found' })
+    const renamed = await controller.researchRenameTopic({ topicId: topic.id, title: 'Another window', expectedTitle: topic.title })
+    await expect(controller.researchRenameTopic({ topicId: topic.id, title: 'Stale edit', expectedTitle: topic.title }))
+      .rejects.toMatchObject({ code: 'research/topic-conflict', details: { topicId: topic.id, title: 'Another window' } })
+    expect(await controller.researchList()).toEqual(renamed)
+  })
+
+  it('deletes a confirmed paper, archives its Session and publishes the remaining library', async () => {
+    const { controller, ctx, topic } = await researchFixture()
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'Delete me', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]!
+    await expect(controller.researchDeletePaper({ paperId: paper.id, directory: topic.title })).rejects.toMatchObject({ code: 'research/delete-path-changed' })
+    expect(ctx.workspaceRegistry.archivedSessionIds).not.toContain(paper.sessionId)
+    const remaining = await controller.researchDeletePaper({ paperId: paper.id, directory: paper.directory! })
+    expect(remaining.papers).toEqual([])
+    expect(remaining.topics).toHaveLength(1)
+    expect(existsSync(paper.directory!)).toBe(false)
+    expect(ctx.workspaceRegistry.archivedSessionIds).toContain(paper.sessionId)
+    expect(ctx.sessions.get(paper.sessionId)).toBeDefined()
+    await expect(controller.researchList()).resolves.toMatchObject({ papers: [] })
+  })
+
+  it('refuses deletion while Session activity is reported and retains the entity and files', async () => {
+    const { controller, ctx, topic } = await researchFixture()
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'Busy paper', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]!
+    ctx.on('workspace/session-activity', async (_request, next) => [...await next(), { kind: 'probe' as const }])
+    await expect(controller.researchDeletePaper({ paperId: paper.id, directory: paper.directory! })).rejects.toMatchObject({ code: 'research/paper-busy' })
+    expect(existsSync(paper.directory!)).toBe(true)
+    expect((await controller.researchList()).papers.map(item => item.id)).toContain(paper.id)
+    expect(ctx.workspaceRegistry.archivedSessionIds).not.toContain(paper.sessionId)
+  })
+
   it('automatically publishes whole-paper Markdown, backfills legacy metadata and retains it on migration', async () => {
     const { controller, topic, root } = await researchFixture()
     writeFileSync(join(root, 'a.pdf'), pdfFixture())
