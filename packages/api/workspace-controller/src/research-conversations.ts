@@ -24,11 +24,11 @@ export function paperForSession(catalog: ResearchCatalog, sessionId: SessionId |
 }
 
 /**
- * Locate independent conversation backups beneath the paper directory.
+ * Locate independent conversation backups beneath the paper's runtime directory.
  * @param paper - owning paper.
  * @param sessionId - one of its conversation identities.
- * @returns paper-relative snapshot components.
+ * @returns runtime-relative snapshot components.
  */
-export function conversationBackup(paper: ResearchPaper, sessionId: SessionId): readonly string[] {
+export function conversationBackup(paper: Pick<ResearchPaper, 'sessionId'>, sessionId: SessionId): readonly string[] {
   return sessionId === paper.sessionId ? ['session.json'] : ['sessions', `conversation-${encodeURIComponent(sessionId)}`, 'session.json']
 }

@@ -46,11 +46,11 @@ export interface ResearchNote {
 
 /** Complete automatic PDF extraction, or a retained failure that can be explicitly retried. */
 export type ResearchMarkdown =
-  | { readonly status: 'ready'; readonly sourceSha256: string; readonly path: 'paper.md'; readonly pages: number; readonly backend: 'pdfjs' | 'pdftotext' }
+  | { readonly status: 'ready'; readonly sourceSha256: string; readonly path: string; readonly pages: number; readonly backend: 'pdfjs' | 'pdftotext' }
   | { readonly status: 'failed'; readonly sourceSha256?: string | undefined; readonly code: ResearchMarkdownFailure }
 
 /** Stable extraction failures; the original PDF and notebooks remain available. */
-export type ResearchMarkdownFailure = 'no-text' | 'text-limit' | 'timeout' | 'conversion-failed' | 'source-changed'
+export type ResearchMarkdownFailure = 'no-text' | 'text-limit' | 'timeout' | 'conversion-failed' | 'source-changed' | 'output-conflict'
 
 /** A topic with its own Agent session and execution workspace. */
 export interface ResearchTopic {
@@ -91,6 +91,8 @@ export interface ResearchUpdateConversationRequest extends ResearchCreateConvers
 export interface ResearchPaper {
   readonly id: ResearchPaperId
   readonly title: string
+  /** Agent-selected core abbreviation used by newly imported original files. */
+  readonly abbreviation?: string | undefined
   readonly topicIds: readonly ResearchTopicId[]
   readonly sessionId: SessionId
   /** Absent in legacy libraries; the original Session remains the first conversation. */
@@ -145,6 +147,7 @@ export interface ResearchRenameTopicRequest {
 export interface ResearchCreatePaperRequest {
   readonly topicId: ResearchTopicId
   readonly title: string
+  readonly abbreviation?: string
   readonly sessionId: SessionId
   readonly pdfPath?: string
   readonly repositoryUrl: string
@@ -168,6 +171,7 @@ export interface ResearchDirectoryRequest {
 export interface ResearchImportPaperRequest {
   readonly topicId: ResearchTopicId
   readonly title: string
+  readonly abbreviation?: string
   readonly source?: string
   readonly sourceId?: string
   readonly repositoryUrl?: string
@@ -177,6 +181,9 @@ export interface ResearchImportPaperRequest {
 export interface ResearchAttachPdfRequest {
   readonly paperId: ResearchPaperId
   readonly source: string
+  readonly abbreviation?: string
+  /** Optional paper-relative document folder; local originals already inside the paper retain their parent by default. */
+  readonly folder?: string
 }
 
 /** Page range read by the Agent; returned text retains original page numbers. */

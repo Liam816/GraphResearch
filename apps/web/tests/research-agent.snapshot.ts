@@ -25,18 +25,15 @@ it.each(['original', 'additional'] as const)('records research reading and live 
   const primary = conversation === 'original' ? paperSession
     : await scaffold.ctx.sessionController.create({ workspaceId: workspace.id, sessionId: SessionId('research-initial') })
   const topicSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id, sessionId: SessionId('research-topic') })
-  const paperDirectory = join(root, 'papers', 'fixture-paper')
-  await mkdir(join(paperDirectory, 'notes'), { recursive: true })
+  const paperDirectory = join(root, 'papers', 'Fixture paper')
+  await mkdir(paperDirectory, { recursive: true })
   await mkdir(join(root, 'topics', 'fixture-topic'), { recursive: true })
-  await writeFile(join(paperDirectory, 'paper.pdf'), pdfFixture(3))
-  await writeFile(join(paperDirectory, 'notes', 'ai.md'), '')
-  await writeFile(join(paperDirectory, 'notes', 'learning.md'), '')
-  await writeFile(join(root, 'topics', 'fixture-topic', 'notes.md'), '')
+  await writeFile(join(paperDirectory, 'paper_Fixture.pdf'), pdfFixture(3))
   const empty = { revision: 0, sha256: createHash('sha256').update('').digest('hex') }
-  await writeFile(join(root, 'library.json'), JSON.stringify({ version: 1, revision: 1,
+  await writeFile(join(root, 'agent-lib', 'library.json'), JSON.stringify({ version: 4, revision: 1,
     topics: [{ id: 'fixture-topic', title: 'Robotics', workspaceId: workspace.id, sessionId: topicSession.sessionId, notes: empty }],
-    papers: [{ id: 'fixture-paper', title: 'Fixture paper', topicIds: ['fixture-topic'], sessionId: primary.sessionId,
-      pdfPath: 'paper.pdf', repositoryUrl: '', ai: empty, learning: empty, progress: '' }],
+    papers: [{ id: 'fixture-paper', title: 'Fixture paper', folder: 'Fixture paper', abbreviation: 'Fixture', topicIds: ['fixture-topic'], sessionId: primary.sessionId,
+      pdfPath: 'paper_Fixture.pdf', repositoryUrl: '', ai: empty, learning: empty, progress: '' }],
   }))
   const catalog = await scaffold.ctx.workspaceController.researchList()
   if (conversation === 'additional') {
@@ -44,7 +41,7 @@ it.each(['original', 'additional'] as const)('records research reading and live 
     await scaffold.ctx.workspaceController.researchCreateConversation({ paperId: paper.id, sessionId: paperSession.sessionId })
     await scaffold.ctx.workspaceController.researchProgress(paper.id, '', paperSession.sessionId)
   }
-  expect(await readFile(join(paperDirectory, 'paper.md'), 'utf8'))
+  expect(await readFile(join(paperDirectory, 'paper_Fixture.md'), 'utf8'))
     .toBe('## Page 1\n\nSelectable PDF text\n\n## Page 2\n\nSelectable PDF text\n')
   const agent = scaffold.ctx.agents.get(paperSession.sessionId)
   if (agent === undefined) throw new Error('the paper Agent must exist')
@@ -62,16 +59,16 @@ it.each(['original', 'additional'] as const)('records research reading and live 
     && event.data.content.some(block => block.type === 'text' && block.text.includes('Research library:')))).toBe(true)
   expect(await readFile(join(paperDirectory, 'notes', 'ai.md'), 'utf8'))
     .toBe('## Key idea\n\nThe original page contains selectable text (page 1).\n')
-  expect(await readFile(join(paperDirectory, 'notes', 'learning.md'), 'utf8')).toBe('')
-  const sessionBackup = conversation === 'original' ? join(paperDirectory, 'session.json')
-    : join(paperDirectory, 'sessions', `conversation-${encodeURIComponent(paperSession.sessionId)}`, 'session.json')
+  await expect(readFile(join(paperDirectory, 'notes', 'learning.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  const sessionBackup = conversation === 'original' ? join(root, 'agent-lib', 'papers', 'fixture-paper', 'session.json')
+    : join(root, 'agent-lib', 'papers', 'fixture-paper', 'sessions', `conversation-${encodeURIComponent(paperSession.sessionId)}`, 'session.json')
   await expect.poll(async () => (JSON.parse(await readFile(sessionBackup, 'utf8')) as { events: unknown[] }).events.length)
     .toBe(events.length)
-  if (conversation === 'original') await assertFinalWorkspaceSnapshot(DIRECTORY, paperDirectory, { ignoredRootEntries: ['session.json'] })
+  if (conversation === 'original') await assertFinalWorkspaceSnapshot(DIRECTORY, paperDirectory)
   else {
     const original = scaffold.ctx.agents.get(primary.sessionId)!
     expect(original.session.snapshotEvents().some(event => event.type === 'user/message')).toBe(false)
-    const backup = join(paperDirectory, 'sessions', `conversation-${encodeURIComponent(paperSession.sessionId)}`, 'session.json')
+    const backup = join(root, 'agent-lib', 'papers', 'fixture-paper', 'sessions', `conversation-${encodeURIComponent(paperSession.sessionId)}`, 'session.json')
     await expect.poll(async () => (JSON.parse(await readFile(backup, 'utf8')) as { header: { id: string } }).header.id)
       .toBe(paperSession.sessionId)
     expect(events.some(event => event.type === 'working-directory/change')).toBe(true)

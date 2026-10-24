@@ -47,19 +47,20 @@ export function apply(ctx: Context): void {
       return `Research library: ${catalog.directory ?? ''}\n${JSON.stringify({
         paper: paper === undefined ? null : { id: paper.id, title: paper.title, directory: paper.directory,
           progress: paperConversations(paper).find(item => item.sessionId === agent.session.id)?.progress,
-          pdf: paper.pdfPath, markdown: paper.markdown, repository: paper.repositoryUrl,
+          abbreviation: paper.abbreviation, pdf: paper.pdfPath, markdown: paper.markdown, repository: paper.repositoryUrl,
           aiNoteRevision: paper.ai.revision, learningNoteRevision: paper.learning.revision },
         topic: topic === undefined ? null : { id: topic.id, title: topic.title },
-      })}\nStore all paper downloads, extracted text, notes, figures and code in this library. `
-        + 'Use research_import_paper to register and reuse papers; a title alone is enough. '
+      })}\nPaper directories contain only user documents. Store downloads, notes, figures and repositories in the owning paper directory; organize, create, move or delete its contents as the user requests. There are no required assets, code or extracted folders. The library agent-lib directory belongs to the Harness; never place user documents there or edit its runtime records. `
+        + 'Use research_import_paper to register and reuse papers; a title alone is enough. Supply a recognizable core abbreviation such as OpenVLA or RT2, and use the returned paper directory before saving files. '
         + 'An empty pdf means the original is not attached. When asked to download the current paper, find its original PDF URL and use research_attach_pdf; preserve its existing identity, session and notes. '
-        + 'Attached PDFs automatically produce paper.md in the paper directory, with original page headings and all extracted text, including references and appendices. '
-        + 'Read paper.md only when markdown.status is ready; a failed conversion retains the original PDF and requires retry or OCR. '
+        + 'Attached PDFs automatically produce paper_<abbreviation>.md in the paper directory, with original page headings and all extracted text, including references and appendices. '
+        + 'Use research_attach_pdf.folder for a user-chosen subfolder; the PDF, Markdown and bibliographic JSON stay together there. After moving an original inside its paper directory, attach its new local path with the same abbreviation to update the association without copying it back to the root. '
+        + 'Read the recorded markdown.path only when markdown.status is ready; a failed conversion retains the original PDF and requires retry or OCR. '
         + 'Use research_read_paper for page-numbered original text. Read existing notes with research_context before writing them. '
         + 'Use research_write_note to publish Markdown to the live AI notebook; update it by section as reading progresses. '
         + 'Edit learning notes only when the user explicitly asks. '
         + 'Cite original page numbers and distinguish paper claims from your interpretation. '
-        + 'Clone open-source repositories under the owning paper directory/code and record the commit analyzed in the AI notebook. '
+        + 'Clone repositories in a user-chosen location under the owning paper directory and record the commit analyzed in the AI notebook. Create folders only when needed. General file tools may create, download, move, rename or delete any user content there, including notes and extracted Markdown. Deleting user files must not delete or alter the paper entity or its conversations. Refresh research_context after filesystem changes; explicitly retry conversion only when the user wants to recreate a deleted Markdown document. '
         + 'Keep continuation points and unresolved questions with research_update_progress. '
         + 'Use research_write_topic_note for comparisons with paper sources.'
     },
@@ -101,7 +102,8 @@ export function apply(ctx: Context): void {
     name: 'research_import_paper', description: 'Register a paper in the fixed library with its independent Agent session; optionally import a PDF and reuse matching papers. To supply the current paper’s missing PDF, use research_attach_pdf.',
     parameters: {
       topic_id: { type: 'string', description: 'Owning Topic; defaults to the current research Topic.' },
-      title: { type: 'string', required: true, description: 'Paper title.' },
+      abbreviation: { type: 'string', required: true, description: 'Core paper acronym, such as OpenVLA or RT2, without a path, prefix or extension.' },
+      title: { type: 'string', required: true, description: 'Use the user’s paper name; otherwise choose a recognizable paper title. This also names its directory.' },
       source: { type: 'string', description: 'Optional HTTP(S) PDF URL or local Host PDF path. arXiv abstract URLs are accepted. Omit to create the paper before obtaining its PDF.' },
       source_id: { type: 'string', description: 'arXiv ID including version, or DOI.' },
       repository_url: { type: 'string', description: 'Optional source-code repository URL.' },
@@ -109,7 +111,7 @@ export function apply(ctx: Context): void {
     async execute(args, exec) {
       const topic = currentTopic(await controller.researchList(), exec, args.topic_id)
       const result = await controller.researchImportPaper({
-        topicId: topic.id, title: args.title,
+        topicId: topic.id, title: args.title, abbreviation: args.abbreviation,
         ...args.source === undefined ? {} : { source: args.source },
         ...args.source_id === undefined ? {} : { sourceId: args.source_id },
         ...args.repository_url === undefined ? {} : { repositoryUrl: args.repository_url },
@@ -120,17 +122,22 @@ export function apply(ctx: Context): void {
   ctx.tools.register(defineTool({
     name: 'research_attach_pdf', description: 'Download or copy the original PDF into an existing paper, preserving its directory, Agent session and notes. The PDF preview updates automatically. A different existing PDF cannot be overwritten.',
     parameters: {
+      abbreviation: { type: 'string', required: true, description: 'Choose the paper’s core acronym; the original and its converted Markdown and metadata use paper_<acronym> filenames.' },
+      folder: { type: 'string', description: 'Optional paper-relative folder for the PDF, Markdown and bibliographic JSON. Local sources inside the paper retain their parent when omitted.' },
       paper_id: { type: 'string', description: 'Defaults to the paper owning this session; required from a Topic session.' },
       source: { type: 'string', required: true, description: 'HTTP(S) PDF URL, arXiv abstract URL, or local Host path. Relative paths start in the target paper directory.' },
     }, output,
     async execute(args, exec) {
       const paper = currentPaper(await controller.researchList(), exec, args.paper_id)
-      const catalog = await controller.researchAttachPdf({ paperId: paper.id, source: args.source }, exec.signal)
+      const catalog = await controller.researchAttachPdf({
+        paperId: paper.id, source: args.source, abbreviation: args.abbreviation,
+        ...args.folder === undefined ? {} : { folder: args.folder },
+      }, exec.signal)
       return JSON.stringify(catalog.papers.find(item => item.id === paper.id), null, 2)
     },
   }))
   ctx.tools.register(defineTool({
-    name: 'research_read_paper', description: 'Extract a bounded range of original PDF pages and cache the page-numbered text under the paper directory. Image-only pages require OCR.',
+    name: 'research_read_paper', description: 'Extract a bounded range of original PDF pages and cache the page-numbered text in private runtime storage. Image-only pages require OCR.',
     parameters: {
       paper_id: { type: 'string', description: 'Defaults to the paper owning this session.' },
       start_page: { type: 'integer', description: 'First original page, starting at 1.' },

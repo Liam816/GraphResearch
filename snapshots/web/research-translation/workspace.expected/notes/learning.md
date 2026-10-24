@@ -10,4 +10,4 @@
 
 该策略预测动作。
 
-[Translation paper · PDF 1](../paper.pdf#page=1)
+[Translation paper · PDF 1](../paper_Translation.pdf#page=1)

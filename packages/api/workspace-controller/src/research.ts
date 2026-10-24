@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import chokidar from 'chokidar'
 import type { FSWatcher } from 'chokidar'
 import type { Context } from '@deepseek-ai/cordis'
@@ -20,6 +20,7 @@ import type {
 } from './research-types.ts'
 import { importPdf, readPdfText } from './research-pdf.ts'
 import type { ResearchPdfPolicy } from './research-pdf.ts'
+import { paperAbbreviation, paperFilename } from './research-file-names.ts'
 import { extractPaperMarkdown } from './research-markdown.ts'
 import type { ResearchMarkdownPolicy } from './research-markdown.ts'
 import { restoreResearchSessions } from './research-session-backup.ts'
@@ -360,6 +361,7 @@ export class ResearchCatalogHost {
     const catalog = await this.admitPaper({
       topicId: request.topicId, title: request.title, pdfPath: request.source ?? '', repositoryUrl: request.repositoryUrl ?? '',
       ...request.sourceId === undefined ? {} : { sourceId: request.sourceId },
+      ...request.abbreviation === undefined ? {} : { abbreviation: request.abbreviation },
     }, signal, (id) => { paperId = id }, createSession)
     if (paperId === undefined) throw new Error('Research import did not select a paper')
     return { catalog, paperId }
@@ -375,6 +377,7 @@ export class ResearchCatalogHost {
       if (topic === undefined) throw new RemoteError('research/not-found', 'Topic not found', { id: request.topicId })
       if (request.sessionId !== undefined) this.validateSession(topic.workspaceId, request.sessionId)
       const title = requiredText(request.title, 'title'), source = request.pdfPath?.trim() ?? ''
+      const abbreviation = paperAbbreviation(title, request.abbreviation)
       const repositoryUrl = validateRepository(request.repositoryUrl)
       const sourceId = normalizeSourceId(request.sourceId ?? source)
       const retry = request.sessionId === undefined ? undefined : catalog.papers.find(item => item.sessionId === request.sessionId)
@@ -384,25 +387,39 @@ export class ResearchCatalogHost {
       }
       if (request.sessionId !== undefined) this.requireIndependentSession(catalog, request.sessionId)
       const known = sourceId === '' ? undefined : catalog.papers.find(item => item.sourceId === sourceId)
-      if (known !== undefined) { selected?.(known.id); return attachTopic(catalog, known.id, topic.id) }
+      if (known !== undefined) {
+        selected?.(known.id)
+        const next = attachTopic(catalog, known.id, topic.id)
+        if (source === '' || known.pdfPath !== '') return next
+        const workspace = this.ctx.workspaceRegistry.get(topic.workspaceId)
+        if (workspace === undefined) throw new RemoteError('research/invalid', 'Topic workspace is unavailable', { field: 'workspaceId' })
+        const bytes = await importPdf(source, workspace.path, this.policy, signal)
+        return this.withPdf(next, { paperId: known.id, source,
+          abbreviation: request.abbreviation ?? known.abbreviation ?? abbreviation }, bytes, signal)
+      }
       const workspace = this.ctx.workspaceRegistry.get(topic.workspaceId)
       if (workspace === undefined) throw new RemoteError('research/invalid', 'Topic workspace is unavailable', { field: 'workspaceId' })
       const bytes = source === '' ? undefined : await importPdf(source, workspace.path, this.policy, signal)
       const pdfSha256 = bytes === undefined ? undefined : digest(bytes)
       const duplicate = pdfSha256 === undefined ? undefined : catalog.papers.find(item => item.pdfSha256 === pdfSha256)
-      if (duplicate !== undefined) { selected?.(duplicate.id); return attachTopic(catalog, duplicate.id, topic.id) }
+      if (duplicate !== undefined) {
+        selected?.(duplicate.id)
+        const next = attachTopic(catalog, duplicate.id, topic.id)
+        if (duplicate.pdfPath !== '' || bytes === undefined) return next
+        return this.withPdf(next, { paperId: duplicate.id, source,
+          abbreviation: duplicate.abbreviation ?? abbreviation }, bytes, signal)
+      }
       signal.throwIfAborted()
       const sessionId = request.sessionId ?? await createSession?.(topic.workspaceId)
       if (sessionId === undefined) throw new Error('Paper admission requires a Session owner')
       this.validateSession(topic.workspaceId, sessionId)
       const id = brandString<ResearchPaperId>(randomUUID())
-      const directory = await this.files.path('papers', id)
-      await mkdir(directory, { recursive: true, mode: 0o700 })
-      const pdfPath = bytes === undefined ? '' : await this.files.path('papers', id, 'paper.pdf')
+      const directory = await this.files.createPaperDirectory(title)
+      const pdfPath = bytes === undefined ? '' : await this.files.paperPath({ id, directory }, paperFilename({ title, abbreviation }, 'pdf'))
       if (bytes !== undefined) await writeFile(pdfPath, bytes, { flag: 'wx', mode: 0o600, signal })
       selected?.(id)
       return { ...catalog, papers: [...catalog.papers, {
-        id, title, topicIds: [topic.id], sessionId, directory, pdfPath, repositoryUrl, source, sourceId, pdfSha256,
+        id, title, abbreviation, topicIds: [topic.id], sessionId, directory, pdfPath, repositoryUrl, source, sourceId, pdfSha256,
         progress: '', ai: { text: '', revision: 0 }, learning: { text: '', revision: 0 },
       }] }
     })
@@ -419,21 +436,52 @@ export class ResearchCatalogHost {
       const paper = catalog.papers.find(item => item.id === request.paperId)
       if (paper === undefined) throw new RemoteError('research/not-found', 'Paper not found', { id: request.paperId })
       const source = requiredText(request.source, 'source')
-      const directory = await this.files.path('papers', paper.id)
+      await this.originalDestination(paper, request)
+      const directory = await this.files.paperPath(paper)
       const bytes = await importPdf(source, directory, this.policy, signal)
-      const pdfSha256 = digest(bytes)
-      const pdfPath = await this.files.path('papers', paper.id, 'paper.pdf')
-      let existing: Buffer | undefined
-      try { existing = await readFile(pdfPath) } catch (error: unknown) { if (!missing(error)) throw error }
-      if (existing !== undefined && digest(existing) !== pdfSha256) {
-        throw new RemoteError('research/invalid', 'This paper already has a different PDF; create a separate paper for another original', { field: 'source' })
-      }
-      signal.throwIfAborted()
-      if (existing === undefined) await writeFileAtomic(pdfPath, bytes, { mode: 0o600, dirMode: 0o700 })
-      if (paper.pdfPath === pdfPath && paper.pdfSha256 === pdfSha256) return catalog
-      return { ...catalog, papers: catalog.papers.map(item => item.id === paper.id
-        ? { ...item, pdfPath, pdfSha256, source, sourceId: item.sourceId || normalizeSourceId(source) } : item) }
+      return this.withPdf(catalog, request, bytes, signal)
     })
+  }
+
+  private async withPdf(
+    catalog: ResearchCatalog, request: ResearchAttachPdfRequest, bytes: Uint8Array, signal: AbortSignal,
+  ): Promise<ResearchCatalog> {
+    const paper = catalog.papers.find(item => item.id === request.paperId)
+    if (paper === undefined) throw new RemoteError('research/not-found', 'Paper not found', { id: request.paperId })
+    const pdfSha256 = digest(bytes)
+    const abbreviation = paperAbbreviation(paper.title, request.abbreviation ?? paper.abbreviation)
+    const pdfPath = await this.originalDestination(paper, request)
+    if (paper.pdfPath !== '' && paper.pdfSha256 !== undefined && paper.pdfSha256 !== pdfSha256) {
+      throw new RemoteError('research/invalid', 'This paper already has a different original PDF', { field: 'source' })
+    }
+    let existing: Buffer | undefined
+    try { existing = await readFile(pdfPath) } catch (error: unknown) { if (!missing(error)) throw error }
+    if (existing !== undefined && digest(existing) !== pdfSha256) {
+      throw new RemoteError('research/invalid', 'This paper already has a different PDF; create a separate paper for another original', { field: 'source' })
+    }
+    signal.throwIfAborted()
+    if (existing === undefined) await writeFileAtomic(pdfPath, bytes, { mode: 0o600, dirMode: 0o700 })
+    if (paper.pdfPath === pdfPath && paper.pdfSha256 === pdfSha256) return catalog
+    return { ...catalog, papers: catalog.papers.map(item => item.id === paper.id
+      ? { ...item, abbreviation, pdfPath, pdfSha256, source: request.source, sourceId: item.sourceId || normalizeSourceId(request.source),
+        ...item.pdfPath !== pdfPath ? { markdown: undefined } : {} } : item) }
+  }
+
+  private async originalDestination(paper: ResearchCatalog['papers'][number], request: ResearchAttachPdfRequest): Promise<string> {
+    const directory = await this.files.paperPath(paper)
+    const abbreviation = paperAbbreviation(paper.title, request.abbreviation ?? paper.abbreviation)
+    let folder = request.folder
+    if (folder !== undefined && (isAbsolute(folder) || /[\\\u0000:]/u.test(folder))) {
+      throw new RemoteError('research/invalid', 'Choose a document folder inside this paper', { field: 'folder' })
+    }
+    if (folder === undefined && !/^https?:\/\//iu.test(request.source)) {
+      const source = resolve(directory, request.source), child = relative(directory, source)
+      if (child !== '' && child !== '..' && !child.startsWith(`..${sep}`) && !isAbsolute(child)) {
+        await this.files.paperPath(paper, child)
+        folder = relative(directory, dirname(source))
+      }
+    }
+    return this.files.paperPath(paper, folder ?? '', paperFilename({ title: paper.title, abbreviation }, 'pdf'))
   }
 
   /**
@@ -574,7 +622,7 @@ export class ResearchCatalogHost {
       if (paper === undefined) throw new RemoteError('research/not-found', 'Paper not found', { id: request.paperId })
       if (paper.pdfPath === '') throw new RemoteError('research/invalid', 'No original PDF is attached. Find the paper and use research_attach_pdf before reading it.', { field: 'pdfPath' })
       const result = await readPdfText(paper.pdfPath, request, this.policy, signal)
-      await writeFileAtomic(await this.files.path('papers', paper.id, 'extracted', `pages-${request.startPage ?? 1}.json`),
+      await writeFileAtomic(await this.files.runtimePaperPath(paper, 'extracted', `pages-${request.startPage ?? 1}.json`),
         `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600, dirMode: 0o700 })
       return result
     })
@@ -585,12 +633,14 @@ export class ResearchCatalogHost {
     const previous = domain.global.get()
     this.files = await ResearchFiles.open(previous.directory ?? this.policy.directory, this.policy)
     const catalog = await this.files.withLock(async () => {
+      const imported: ResearchCatalog['papers'][number][] = []
       for (const paper of previous.papers) {
-        if (paper.pdfPath === '') continue
+        if (paper.pdfPath === '') { imported.push(paper); continue }
         const topic = previous.topics.find(item => paper.topicIds.includes(item.id))
         const workspace = topic === undefined ? undefined : this.ctx.workspaceRegistry.get(topic.workspaceId)
         const source = isAbsolute(paper.pdfPath) ? paper.pdfPath : resolve(workspace?.path ?? this.files.directory, paper.pdfPath)
         const target = await this.files.path('papers', paper.id, 'paper.pdf')
+        imported.push({ ...paper, pdfPath: target })
         if (source === target) continue
         await mkdir(await this.files.path('papers', paper.id), { recursive: true, mode: 0o700 })
         try { await copyFile(source, target, constants.COPYFILE_EXCL) } catch (error: unknown) {
@@ -598,7 +648,7 @@ export class ResearchCatalogHost {
           if (!missing(error) && !(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
         }
       }
-      const loaded = await this.files.read(previous)
+      const loaded = await this.files.read({ ...previous, papers: imported })
       const restored = await restoreResearchSessions(this.ctx, this.files, loaded)
       if (restored !== loaded) await this.files.write(restored)
       return this.ensureMarkdown(this.files, restored)
@@ -656,10 +706,12 @@ export class ResearchCatalogHost {
     let confirmed = catalog
     for (const paper of catalog.papers) {
       if (paper.pdfPath === '') continue
-      const path = await files.path('papers', paper.id, 'paper.md')
+      const documentFolder = relative(await files.paperPath(paper), dirname(paper.pdfPath))
+      const path = await files.paperPath(paper, documentFolder, paperFilename(paper, 'md'))
+      const markdownPath = relative(await files.paperPath(paper), path).split(sep).join('/')
       if (paper.id !== retry && paper.markdown !== undefined && paper.markdown.sourceSha256 === paper.pdfSha256) {
         if (paper.markdown.status === 'failed') continue
-        try { if ((await stat(path)).isFile()) continue } catch (error: unknown) { if (!missing(error)) throw error }
+        continue
       }
       let sourceSha256 = paper.pdfSha256
       let markdown: NonNullable<typeof paper.markdown>
@@ -672,14 +724,35 @@ export class ResearchCatalogHost {
         }
         const result = await extractPaperMarkdown(paper.pdfPath, bytes, this.policy, this.lifetime.signal)
         this.lifetime.signal.throwIfAborted()
-        await writeFileAtomic(path, result.text, { mode: 0o600, dirMode: 0o700 })
-        markdown = { status: 'ready', sourceSha256, path: 'paper.md', pages: result.pages, backend: result.backend }
+        let existing: ResearchFileContent | undefined
+        try { existing = await readPaperContent(files, paper, markdownPath, this.policy.maxMarkdownBytes) }
+        catch (error: unknown) {
+          if (remoteErrorOf(error)?.code === 'research/invalid') {
+            throw new RemoteError('research/extraction-failed', 'The Markdown destination is occupied; move it before retrying',
+              { reason: 'output-conflict' }, { cause: error })
+          }
+          if (!missing(error)) throw error
+        }
+        if (existing !== undefined && (existing.kind !== 'text' || existing.text !== result.text)) {
+          throw new RemoteError('research/extraction-failed', 'The Markdown destination contains a user document; move it before retrying',
+            { reason: 'output-conflict' })
+        }
+        if (existing === undefined) await writeFileAtomic(path, result.text, { mode: 0o600, dirMode: 0o700 })
+        markdown = { status: 'ready', sourceSha256, path: markdownPath, pages: result.pages, backend: result.backend }
       } catch (error: unknown) {
         this.lifetime.signal.throwIfAborted()
         const failure = remoteErrorOf(error)
         const code = failure?.code === 'research/extraction-failed' ? failure.details.reason : 'conversion-failed'
         markdown = { status: 'failed', ...sourceSha256 === undefined ? {} : { sourceSha256 }, code }
         this.ctx.logger.warn('PDF Markdown extraction failed for %s (%s); original PDF and notes retained. Retry from the PDF panel: %s', paper.id, code, error)
+      }
+      const metadataPath = await files.paperPath(paper, documentFolder, paperFilename(paper, 'json'))
+      try { await stat(metadataPath) } catch (error: unknown) {
+        if (!missing(error)) throw error
+        await writeFileAtomic(metadataPath, `${JSON.stringify({ title: paper.title, abbreviation: paper.abbreviation,
+          sourceId: paper.sourceId, source: paper.source, repositoryUrl: paper.repositoryUrl,
+          pdf: basename(paper.pdfPath), ...markdown.status === 'ready' ? { markdown: basename(path) } : {} }, null, 2)}\n`,
+        { mode: 0o600, dirMode: 0o700 })
       }
       const next = { ...confirmed, revision: confirmed.revision + 1,
         papers: confirmed.papers.map(item => item.id === paper.id
@@ -762,8 +835,8 @@ export class ResearchCatalogHost {
       }
     }
     if (paper === undefined && topic === undefined) return
-    const path = paper !== undefined ? await this.files.path('papers', paper.id, ...conversationBackup(paper, session.id))
-      : topic !== undefined ? await this.files.path('topics', topic.id, 'session.json') : undefined
+    const path = paper !== undefined ? await this.files.runtimePaperPath(paper, ...conversationBackup(paper, session.id))
+      : topic !== undefined ? await this.files.runtimePath('topics', topic.id, 'session.json') : undefined
     if (path === undefined) return
     for (;;) {
       const end = session.seq

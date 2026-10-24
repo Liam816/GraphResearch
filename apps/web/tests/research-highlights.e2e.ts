@@ -57,7 +57,7 @@ it('highlights selected original text across pages and restores the markers afte
   const paper = (await scaffold.ctx.workspaceController.researchList()).papers[0]
   if (paper === undefined || paper.directory === undefined) throw new Error('the created paper must be managed')
   expect(paper.highlights?.[0]?.text).toContain('Selectable PDF text')
-  expect((JSON.parse(await readFile(join(paper.directory, 'paper.json'), 'utf8')) as { highlights: typeof paper.highlights }).highlights).toEqual(paper.highlights)
+  expect((JSON.parse(await readFile(join(paper.directory, '..', '..', 'agent-lib', 'papers', paper.id, 'metadata.json'), 'utf8')) as { highlights: typeof paper.highlights }).highlights).toEqual(paper.highlights)
 
   // Select across the already rendered page text with the browser's actual Range geometry.
   await workbench.locator('[data-pdf-page="2"] [data-pdf-text] span').waitFor()

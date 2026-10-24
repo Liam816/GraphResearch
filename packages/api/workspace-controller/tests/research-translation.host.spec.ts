@@ -86,7 +86,7 @@ it('logs exact context before inference, saves a reusable result, and leaves con
   expect(view.adapter.calls[0]?.sessionId).toBe(view.session.id)
   expect(view.adapter.calls[0]?.tools).toBeUndefined()
   expect(await readFile(join(view.paperDirectory, 'notes', 'learning.md'), 'utf8')).toBe('')
-  const stored = JSON.parse(await readFile(join(view.paperDirectory, 'translations.json'), 'utf8')) as { entries: unknown[] }
+  const stored = JSON.parse(await readFile(join(view.paperDirectory, '..', '..', 'agent-lib', 'papers', 'paper', 'translations.json'), 'utf8')) as { entries: unknown[] }
   expect(stored.entries).toEqual([result])
   expect(await view.translate()).toEqual(result)
   expect(await view.translations.translate({ ...view.request, start: { item: 2, offset: 4, page: 1 },
@@ -108,7 +108,7 @@ it('retains only the request when a model returns malformed or incomplete output
   const view = await fixture(); view.adapter.response = 'not JSON'
   await expect(view.translate()).rejects.toMatchObject({ details: { reason: 'invalid-response' } })
   expect((await view.events()).map(event => event.type)).toEqual(['research/translation-request'])
-  await expect(readFile(join(view.paperDirectory, 'translations.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+  await expect(readFile(join(view.paperDirectory, '..', '..', 'agent-lib', 'papers', 'paper', 'translations.json'))).rejects.toMatchObject({ code: 'ENOENT' })
   view.adapter.response = JSON.stringify(explanation)
   expect((await view.translate()).result).toEqual(explanation)
   expect(view.adapter.calls).toHaveLength(2)
@@ -139,7 +139,7 @@ it('cancels an accepted translation without publishing a partial result', async 
   finally { lifetime.abort(new Error('selection closed')) }
   expect(await outcome).toMatchObject({ message: 'selection closed' })
   expect((await view.events()).map(event => event.type)).toEqual(['research/translation-request'])
-  await expect(readFile(join(view.paperDirectory, 'translations.json'))).rejects.toMatchObject({ code: 'ENOENT' })
+  await expect(readFile(join(view.paperDirectory, '..', '..', 'agent-lib', 'papers', 'paper', 'translations.json'))).rejects.toMatchObject({ code: 'ENOENT' })
 })
 
 it('retains a validated result when note export conflicts and allows a subsequent explicit retry', async () => {

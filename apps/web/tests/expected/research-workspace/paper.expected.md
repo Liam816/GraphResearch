@@ -27,7 +27,6 @@
   - strong: Original PDF
   - button "Arrange Original PDF"
   - button "Collapse Original PDF"
-  - status: Full text saved to paper.md (2 pages)
   - img "PDF page 1"
   - text: Selectable PDF text
   - img "PDF page 2"
@@ -46,17 +45,12 @@
     - button "RT-2" [expanded]
     - button "Refresh files"
     - tree "Paper files":
-      - treeitem "assets" [level=1]
-      - treeitem "code" [level=1]
-      - treeitem "extracted" [level=1]
       - treeitem "notes" [expanded] [level=1]
       - group:
-        - treeitem "ai.md" [level=2]
         - treeitem "learning.md" [level=2] [selected]
-      - treeitem "paper.json" [level=1]
-      - treeitem "paper.md" [level=1]
-      - treeitem "paper.pdf" [level=1]
-      - treeitem "session.json" [level=1]
+      - treeitem "paper_RT2.json" [level=1]
+      - treeitem "paper_RT2.md" [level=1]
+      - treeitem "paper_RT2.pdf" [level=1]
   - separator "Resize directory and preview"
   - text: notes/learning.md
   - status: Saved

@@ -106,7 +106,8 @@ export function PaperFilePreview({ path, ...props }: PaperFilesProps & { path: s
   }, [paper.id, path, readFile, revision, attempt, pdf])
   if (pdf) {
     const absolute = `${paper.directory?.replace(/[\\/]$/, '') ?? paper.pdfPath.replace(/[\\/][^\\/]+$/, '')}/${path}`
-    return props.renderFactorySlot('document.pdf', { path: absolute, viewKey: path === 'paper.pdf' ? paper.id : `${paper.id}/${path}` })
+    const original = absolute.replaceAll('\\', '/') === paper.pdfPath.replaceAll('\\', '/')
+    return props.renderFactorySlot('document.pdf', { path: absolute, viewKey: original ? paper.id : `${paper.id}/${path}` })
   }
   const reload = (): void => { setAttempt(value => value + 1) }
   return <div className={css.document}>

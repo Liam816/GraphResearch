@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** Paper conversion status stays beside the original, with explicit failure recovery. */
+/** Completed conversion stays unobtrusive while failures retain explicit recovery. */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
@@ -14,13 +14,13 @@ function fixture(markdown: NonNullable<ResearchPaper['markdown']>) {
     title: 'Reading', topicIds: [], pdfPath: '/library/paper.pdf', repositoryUrl: '', markdown,
     ai: { text: '', revision: 0 }, learning: { text: '', revision: 0 } }
   const extractMarkdown = vi.fn(async (_id: ResearchPaper['id']) => {})
-  render(<PaperMarkdownStatus paper={paper} t={makeTranslate(en)} extractMarkdown={extractMarkdown} />)
-  return { paper, extractMarkdown }
+  const { container } = render(<PaperMarkdownStatus paper={paper} t={makeTranslate(en)} extractMarkdown={extractMarkdown} />)
+  return { paper, extractMarkdown, container }
 }
 
-it('shows the saved filename and complete original page count', () => {
-  fixture({ status: 'ready', sourceSha256: 'hash', path: 'paper.md', pages: 2, backend: 'pdfjs' })
-  expect(screen.getByRole('status').textContent).toBe('Full text saved to paper.md (2 pages)')
+it('leaves no banner or reserved space after full-text conversion completes', () => {
+  const { container } = fixture({ status: 'ready', sourceSha256: 'hash', path: 'paper.md', pages: 2, backend: 'pdfjs' })
+  expect(container.childElementCount).toBe(0)
   expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
 })
 
@@ -35,4 +35,10 @@ it('retains OCR guidance and reports a failed retry without losing the paper con
   expect(extractMarkdown).toHaveBeenCalledWith(paper.id)
   expect(report).toHaveBeenCalledWith('Paper Markdown retry failed:', failure)
   expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Retry' }).disabled).toBe(false)
+})
+
+it('explains how to preserve an existing document before retrying conversion', () => {
+  fixture({ status: 'failed', code: 'output-conflict' })
+  expect(screen.getByRole('alert').textContent).toContain(en.markdownOutputConflict)
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined()
 })

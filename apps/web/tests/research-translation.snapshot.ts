@@ -23,16 +23,14 @@ it('translates an explicit selection with five original sentences and retains it
   const workspace = await scaffold.ctx.workspaceRegistry.create(root)
   const paperSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id, sessionId: SessionId('translation-paper-session') })
   const topicSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id, sessionId: SessionId('translation-topic-session') })
-  let paperDirectory = join(root, 'papers', 'translation-paper')
-  await mkdir(join(paperDirectory, 'notes'), { recursive: true }); await mkdir(join(root, 'topics', 'translation-topic'), { recursive: true })
-  await writeFile(join(paperDirectory, 'paper.pdf'), translationPdfFixture())
-  await writeFile(join(paperDirectory, 'notes', 'ai.md'), ''); await writeFile(join(paperDirectory, 'notes', 'learning.md'), '')
-  await writeFile(join(root, 'topics', 'translation-topic', 'notes.md'), '')
+  let paperDirectory = join(root, 'papers', 'Translation paper')
+  await mkdir(paperDirectory, { recursive: true }); await mkdir(join(root, 'topics', 'translation-topic'), { recursive: true })
+  await writeFile(join(paperDirectory, 'paper_Translation.pdf'), translationPdfFixture())
   const empty = { revision: 0, sha256: createHash('sha256').update('').digest('hex') }
-  await writeFile(join(root, 'library.json'), JSON.stringify({ version: 1, revision: 1,
+  await writeFile(join(root, 'agent-lib', 'library.json'), JSON.stringify({ version: 4, revision: 1,
     topics: [{ id: 'translation-topic', title: 'Translation study', workspaceId: workspace.id, sessionId: topicSession.sessionId, notes: empty }],
-    papers: [{ id: 'translation-paper', title: 'Translation paper', topicIds: ['translation-topic'],
-      sessionId: paperSession.sessionId, pdfPath: 'paper.pdf', repositoryUrl: '', ai: empty, learning: empty }],
+    papers: [{ id: 'translation-paper', title: 'Translation paper', folder: 'Translation paper', abbreviation: 'Translation', topicIds: ['translation-topic'],
+      sessionId: paperSession.sessionId, pdfPath: 'paper_Translation.pdf', repositoryUrl: '', ai: empty, learning: empty }],
   }))
   const catalog = await scaffold.ctx.workspaceController.researchList()
   paperDirectory = catalog.papers.find(paper => paper.id === 'translation-paper')!.directory!
@@ -66,14 +64,15 @@ it('translates an explicit selection with five original sentences and retains it
   await card.getByText('View context · PDF page 1', { exact: true }).click()
   expect(await card.getByText('First context sentence.', { exact: true }).isVisible()).toBe(true)
   expect(await card.getByText('Last context sentence.', { exact: true }).isVisible()).toBe(true)
-  const saved = JSON.parse(await readFile(join(paperDirectory, 'translations.json'), 'utf8')) as { entries: ResearchTranslation[] }
+  const saved = JSON.parse(await readFile(join(root, 'agent-lib', 'papers', 'translation-paper', 'translations.json'), 'utf8')) as { entries: ResearchTranslation[] }
+  expect(saved).toEqual(JSON.parse(await readFile(join(DIRECTORY, 'runtime.expected', 'translations.json'), 'utf8')))
   expect(saved.entries).toHaveLength(1)
   expect(saved.entries[0]?.context.before).toEqual(['First context sentence.', 'Second context sentence.'])
   expect(saved.entries[0]?.context.after).toEqual(['Next context sentence.', 'Last context sentence.'])
-  expect(await readFile(join(paperDirectory, 'notes', 'learning.md'), 'utf8')).toBe('')
+  await expect(readFile(join(paperDirectory, 'notes', 'learning.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   await card.getByRole('button', { name: 'Add to learning notes', exact: true }).click()
   await card.getByRole('button', { name: 'Added to notes', exact: true }).waitFor()
-  expect(await readFile(join(paperDirectory, 'notes', 'learning.md'), 'utf8')).toContain('(../paper.pdf#page=1)')
+  expect(await readFile(join(paperDirectory, 'notes', 'learning.md'), 'utf8')).toContain('(../paper_Translation.pdf#page=1)')
   await mkdir('.artifacts/research-ui', { recursive: true })
   await page.screenshot({ path: '.artifacts/research-ui/translation-light.png' })
   await page.getByRole('button', { name: 'Pin', exact: true }).click()
@@ -118,7 +117,7 @@ it('translates an explicit selection with five original sentences and retains it
   const expected = await readFile(FIXTURE, 'utf8')
   expect(actual).toBe(normalizeSessionSnapshots([expected], { cwd: '{{cwd}}', sessionIds: ['{{session:1}}'] })[0])
   await assertFinalWorkspaceSnapshot(DIRECTORY, paperDirectory, {
-    ignoredRootEntries: ['session.json', 'cache', 'paper.pdf', 'paper.md', 'paper.json', 'code', 'assets', 'extracted'],
+    ignoredRootEntries: ['paper_Translation.pdf', 'paper_Translation.md', 'paper_Translation.json'],
   })
   await writeFile('.artifacts/research-ui/translation-audit.jsonl', raw)
 })

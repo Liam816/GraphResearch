@@ -402,6 +402,14 @@
       "parameters": {
         "type": "object",
         "properties": {
+          "abbreviation": {
+            "type": "string",
+            "description": "Choose the paper’s core acronym; the original and its converted Markdown and metadata use paper_<acronym> filenames."
+          },
+          "folder": {
+            "type": "string",
+            "description": "Optional paper-relative folder for the PDF, Markdown and bibliographic JSON. Local sources inside the paper retain their parent when omitted."
+          },
           "paper_id": {
             "type": "string",
             "description": "Defaults to the paper owning this session; required from a Topic session."
@@ -412,6 +420,7 @@
           }
         },
         "required": [
+          "abbreviation",
           "source"
         ]
       }
@@ -439,9 +448,13 @@
             "type": "string",
             "description": "Owning Topic; defaults to the current research Topic."
           },
+          "abbreviation": {
+            "type": "string",
+            "description": "Core paper acronym, such as OpenVLA or RT2, without a path, prefix or extension."
+          },
           "title": {
             "type": "string",
-            "description": "Paper title."
+            "description": "Use the user’s paper name; otherwise choose a recognizable paper title. This also names its directory."
           },
           "source": {
             "type": "string",
@@ -457,13 +470,14 @@
           }
         },
         "required": [
+          "abbreviation",
           "title"
         ]
       }
     },
     {
       "name": "research_read_paper",
-      "description": "Extract a bounded range of original PDF pages and cache the page-numbered text under the paper directory. Image-only pages require OCR.",
+      "description": "Extract a bounded range of original PDF pages and cache the page-numbered text in private runtime storage. Image-only pages require OCR.",
       "parameters": {
         "type": "object",
         "properties": {

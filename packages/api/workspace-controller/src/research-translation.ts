@@ -1,7 +1,7 @@
 import { paperConversations } from './research-conversations.ts'
 /** Independent, audited paper translation with occurrence-aware files and revision-checked notebook export. */
 import { mkdir, readFile, stat } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { dirname, relative, sep } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { BlockAssembler, type FinishReason, type RequestUserInput } from '@deepseek-ai/dsh-llm'
 import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
@@ -106,6 +106,7 @@ export class PaperTranslations {
   async saveNote(paperId: ResearchPaperId, key: string): Promise<ResearchCatalog> {
     if (!/^[a-f0-9]{64}$/.test(key)) throw failure('selection')
     const { catalog, paper, files } = await this.source(paperId)
+    const paperDirectory = await files.paperPath(paper)
     const entries = await files.withLock(() => this.readStore(files, paper))
     const saved = entries.find(item => item.key === key)
     if (saved === undefined) throw failure('selection')
@@ -118,7 +119,7 @@ export class PaperTranslations {
       + `- 词义：${result.meanings.join('；')}\n- 此处含义：${result.contextualMeaning}\n\n${result.explanation}\n\n`
       + `> ${excerpt.replaceAll('\n', '\n> ')}\n\n${result.translation}\n\n`
       + `[${paper.title} · PDF ${context.startPage}${context.endPage === context.startPage ? '' : `–${context.endPage}`}]`
-      + `(../paper.pdf#page=${context.startPage})\n`
+      + `(../${relative(paperDirectory, paper.pdfPath).split(sep).map(encodeURIComponent).join('/')}#page=${context.startPage})\n`
     return this.owner.saveNote({ paperId, kind: 'learning', expectedRevision: paper.learning.revision, text })
   }
 
@@ -142,12 +143,12 @@ export class PaperTranslations {
       const sessionId = request.sessionId ?? paper.sessionId
       if (!paperConversations(paper).some(item => item.sessionId === sessionId && !item.archived)) throw failure('selection')
       stopped.throwIfAborted()
-      const originalPath = await files.paperPath(paper, 'paper.pdf')
+      const originalPath = await files.paperPath(paper, relative(await files.paperPath(paper), paper.pdfPath))
       if ((await stat(originalPath)).size > this.policy.maxPdfBytes) throw failure('limit')
       const bytes = new Uint8Array(await readFile(originalPath, { signal: stopped }))
       const sourceSha256 = digest(bytes)
       if (paper.pdfSha256 !== undefined && paper.pdfSha256 !== sourceSha256) throw failure('source-changed')
-      const cachePath = await files.paperPath(paper, 'cache', 'text-index.json')
+      const cachePath = await files.runtimePaperPath(paper, 'cache', 'text-index.json')
       let index: z.infer<typeof paperTextIndexSchema> | undefined
       try {
         if ((await stat(cachePath)).size > this.policy.maxIndexBytes) throw failure('limit')
@@ -221,7 +222,7 @@ export class PaperTranslations {
         const entries = await this.readStore(files, paper)
         const content = `${JSON.stringify({ version: 1, entries: [...entries.filter(item => item.key !== key), translation] })}\n`
         if (Buffer.byteLength(content) > this.policy.maxStoredBytes) throw failure('limit')
-        await writeFileAtomic(await files.paperPath(paper, 'translations.json'), content, { mode: 0o600 })
+        await writeFileAtomic(await files.runtimePaperPath(paper, 'translations.json'), content, { mode: 0o600 })
       })
       return translation
     } catch (error: unknown) {
@@ -234,7 +235,7 @@ export class PaperTranslations {
   }
 
   private async readStore(files: ResearchFiles, paper: ResearchPaper) {
-    const path = await files.paperPath(paper, 'translations.json')
+    const path = await files.runtimePaperPath(paper, 'translations.json')
     let text: string
     try {
       if ((await stat(path)).size > this.policy.maxStoredBytes) throw failure('limit')

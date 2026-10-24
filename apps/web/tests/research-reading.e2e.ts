@@ -24,6 +24,8 @@ it('returns each paper to its PDF anchor, zoom, notebook selection and original 
   await writeFile(join(scaffold.workspaceCwd, 'b.pdf'), pdfFixture(11))
   await scaffold.ctx.workspaceController.researchCreatePaper({ topicId: topic.id, title: 'Paper A', sessionId: aId, pdfPath: 'a.pdf', repositoryUrl: '' })
   const catalog = await scaffold.ctx.workspaceController.researchCreatePaper({ topicId: topic.id, title: 'Paper B', sessionId: bId, pdfPath: 'b.pdf', repositoryUrl: '' })
+  await scaffold.ctx.workspaceController.researchSaveNote({ paperId: catalog.papers.find(paper => paper.sessionId === bId)!.id,
+    kind: 'learning', text: 'Paper B notes', expectedRevision: 0 })
   const a = catalog.papers.find(paper => paper.sessionId === aId)!
   await scaffold.ctx.workspaceController.researchSaveNote({ paperId: a.id, kind: 'learning', text: 'Reading paragraph\n'.repeat(200), expectedRevision: 0 })
   await scaffold.ctx.workspaceController.researchSaveNote({ paperId: a.id, kind: 'ai', text: '## Analysis\n\nPaper explanation with citations.\n\n'.repeat(80), expectedRevision: 0 })

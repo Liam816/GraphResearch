@@ -27,13 +27,14 @@ async function fixture() {
 
 it('deletes only the confirmed paper directory and removes the entity from the catalog', async () => {
   const { root, files, paper, neighbor, revision } = await fixture()
+  mkdirSync(join(paper.directory!, 'code'))
   writeFileSync(join(paper.directory!, 'code', 'model.py'), 'weights = 1')
   const remaining = await files.withLock(() => files.deletePaper(paper, paper.directory!))
   expect(remaining.papers.map(item => item.id)).toEqual([neighbor.id])
   expect(remaining.revision).toBe(revision + 1)
   expect(existsSync(paper.directory!)).toBe(false)
   expect(readFileSync(join(neighbor.directory!, 'notes', 'ai.md'), 'utf8')).toBe('# Keep notes')
-  expect(existsSync(join(root, '.transaction.json'))).toBe(false)
+  expect(existsSync(join(root, 'agent-lib', '.transaction.json'))).toBe(false)
 })
 
 it('rejects stale or root paths before writing a deletion journal', async () => {
@@ -42,12 +43,12 @@ it('rejects stale or root paths before writing a deletion journal', async () => 
     await expect(files.withLock(() => files.deletePaper(paper, directory))).rejects.toMatchObject({ code: 'research/delete-path-changed' })
   }
   expect(existsSync(paper.directory!)).toBe(true)
-  expect(existsSync(join(root, '.transaction.json'))).toBe(false)
+  expect(existsSync(join(root, 'agent-lib', '.transaction.json'))).toBe(false)
 })
 
 it('refuses a directory whose paper identity no longer matches', async () => {
   const { files, paper, neighbor } = await fixture()
-  writeFileSync(join(paper.directory!, 'paper.json'), JSON.stringify({ id: neighbor.id }))
+  writeFileSync(await files.runtimePaperPath(paper, 'metadata.json'), JSON.stringify({ id: neighbor.id }))
   await expect(files.deletePaper(paper, paper.directory!)).rejects.toMatchObject({ code: 'research/invalid-library' })
   expect(existsSync(paper.directory!)).toBe(true)
 })
@@ -57,6 +58,7 @@ it.skipIf(process.platform === 'win32')('rejects a linked paper root and never f
   const { root, files, paper, neighbor } = await fixture()
   const outside = join(root, 'outside')
   mkdirSync(outside); writeFileSync(join(outside, 'keep.txt'), 'outside data')
+  mkdirSync(join(paper.directory!, 'code'))
   symlinkSync(outside, join(paper.directory!, 'code', 'external'))
   await files.deletePaper(paper, paper.directory!)
   expect(readFileSync(join(outside, 'keep.txt'), 'utf8')).toBe('outside data')
@@ -67,12 +69,12 @@ it.skipIf(process.platform === 'win32')('rejects a linked paper root and never f
 })
 
 function interrupted(root: string, paper: ResearchPaper, staged: boolean) {
-  const index = JSON.parse(readFileSync(join(root, 'library.json'), 'utf8')) as { revision: number; papers: { id: string }[] }
+  const index = JSON.parse(readFileSync(join(root, 'agent-lib', 'library.json'), 'utf8')) as { revision: number; papers: { id: string }[] }
   index.papers = index.papers.filter(item => item.id !== paper.id); index.revision += 1
   const token = '00112233-4455-4677-8899-aabbccddeeff'
-  const target = join(root, '.paper-deletions', token)
-  mkdirSync(join(root, '.paper-deletions'))
-  writeFileSync(join(root, '.transaction.json'), JSON.stringify({ index, writes: [],
+  const target = join(root, 'agent-lib', '.paper-deletions', token)
+  mkdirSync(join(root, 'agent-lib', '.paper-deletions'))
+  writeFileSync(join(root, 'agent-lib', '.transaction.json'), JSON.stringify({ index, writes: [],
     deletion: { id: paper.id, folder: basename(paper.directory!), token, staged } }))
   return target
 }
@@ -87,15 +89,25 @@ it('recovers a rename that finished before its staged flag or catalog was saved'
   expect(existsSync(paper.directory!)).toBe(false)
 })
 
+it('preserves both directories when an uncommitted deletion staging path is already occupied', async () => {
+  const { root, files, paper } = await fixture()
+  const staged = interrupted(root, paper, false)
+  mkdirSync(staged)
+  writeFileSync(join(staged, 'keep.txt'), 'Unrelated staging content')
+  await expect(files.withLock(() => files.read())).rejects.toMatchObject({ code: 'research/invalid-library' })
+  expect(existsSync(paper.directory!)).toBe(true)
+  expect(readFileSync(join(staged, 'keep.txt'), 'utf8')).toBe('Unrelated staging content')
+})
+
 it('finishes partial staged cleanup and preserves a newly created directory at the original name', async () => {
   const { root, files, paper } = await fixture()
   const staged = interrupted(root, paper, true)
   renameSync(paper.directory!, staged)
-  rmSync(join(staged, 'paper.json'))
+  rmSync(join(staged, 'notes'), { recursive: true })
   mkdirSync(paper.directory!); writeFileSync(join(paper.directory!, 'new.txt'), 'new unrelated files')
   const catalog = await files.withLock(() => files.read())
   expect(catalog.papers.some(item => item.id === paper.id)).toBe(false)
   expect(readFileSync(join(paper.directory!, 'new.txt'), 'utf8')).toBe('new unrelated files')
   expect(existsSync(staged)).toBe(false)
-  expect(existsSync(join(root, '.transaction.json'))).toBe(false)
+  expect(existsSync(join(root, 'agent-lib', '.transaction.json'))).toBe(false)
 })

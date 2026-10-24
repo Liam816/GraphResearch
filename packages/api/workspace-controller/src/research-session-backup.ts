@@ -38,10 +38,10 @@ const backupSchema = z.object({
 export async function restoreResearchSessions(ctx: Context, files: ResearchFiles, catalog: ResearchCatalog): Promise<ResearchCatalog> {
   const snapshots = [
     ...await Promise.all(catalog.topics.map(async topic => ({ sessionId: topic.sessionId,
-      path: await files.path('topics', topic.id, 'session.json') }))),
+      path: await files.runtimePath('topics', topic.id, 'session.json') }))),
     ...await Promise.all(catalog.papers.flatMap(paper => paperConversations(paper).map(async conversation => ({
       sessionId: conversation.sessionId,
-      path: await files.path('papers', paper.id, ...conversationBackup(paper, conversation.sessionId)) })))),
+      path: await files.runtimePaperPath(paper, ...conversationBackup(paper, conversation.sessionId)) })))),
   ]
   for (const item of snapshots) {
     const path = item.path

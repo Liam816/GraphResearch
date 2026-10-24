@@ -17,6 +17,7 @@
     "src/research-conversations.ts",
     "src/research.ts",
     "src/research-files.ts",
+    "src/research-file-names.ts",
     "src/research-contents.ts",
     "src/research-pdf.ts",
     "src/research-agent.ts",

@@ -6643,7 +6643,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchAttachPdfRequest',
-    declaration: 'export interface ResearchAttachPdfRequest {\n    readonly paperId: ResearchPaperId;\n    readonly source: string;\n}',
+    declaration: 'export interface ResearchAttachPdfRequest {\n    readonly paperId: ResearchPaperId;\n    readonly source: string;\n    readonly abbreviation?: string;\n    readonly folder?: string;\n}',
   },
   {
     name: 'ResearchCatalog',
@@ -6659,7 +6659,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchCreatePaperRequest',
-    declaration: 'export interface ResearchCreatePaperRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly sessionId: SessionId;\n    readonly pdfPath?: string;\n    readonly repositoryUrl: string;\n    readonly sourceId?: string;\n}',
+    declaration: 'export interface ResearchCreatePaperRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly abbreviation?: string;\n    readonly sessionId: SessionId;\n    readonly pdfPath?: string;\n    readonly repositoryUrl: string;\n    readonly sourceId?: string;\n}',
   },
   {
     name: 'ResearchCreateTopicRequest',
@@ -6711,15 +6711,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchImportPaperRequest',
-    declaration: 'export interface ResearchImportPaperRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly source?: string;\n    readonly sourceId?: string;\n    readonly repositoryUrl?: string;\n}',
+    declaration: 'export interface ResearchImportPaperRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly abbreviation?: string;\n    readonly source?: string;\n    readonly sourceId?: string;\n    readonly repositoryUrl?: string;\n}',
   },
   {
     name: 'ResearchMarkdown',
-    declaration: 'export type ResearchMarkdown = {\n    readonly status: \'ready\';\n    readonly sourceSha256: string;\n    readonly path: \'paper.md\';\n    readonly pages: number;\n    readonly backend: \'pdfjs\' | \'pdftotext\';\n} | {\n    readonly status: \'failed\';\n    readonly sourceSha256?: string | undefined;\n    readonly code: ResearchMarkdownFailure;\n};',
+    declaration: 'export type ResearchMarkdown = {\n    readonly status: \'ready\';\n    readonly sourceSha256: string;\n    readonly path: string;\n    readonly pages: number;\n    readonly backend: \'pdfjs\' | \'pdftotext\';\n} | {\n    readonly status: \'failed\';\n    readonly sourceSha256?: string | undefined;\n    readonly code: ResearchMarkdownFailure;\n};',
   },
   {
     name: 'ResearchMarkdownFailure',
-    declaration: 'export type ResearchMarkdownFailure = \'no-text\' | \'text-limit\' | \'timeout\' | \'conversion-failed\' | \'source-changed\';',
+    declaration: 'export type ResearchMarkdownFailure = \'no-text\' | \'text-limit\' | \'timeout\' | \'conversion-failed\' | \'source-changed\' | \'output-conflict\';',
   },
   {
     name: 'ResearchNote',
@@ -6731,7 +6731,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchPaper',
-    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly conversations?: readonly ResearchConversation[] | undefined;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly markdown?: ResearchMarkdown | undefined;\n    readonly highlights?: readonly ResearchHighlight[] | undefined;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
+    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly abbreviation?: string | undefined;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly conversations?: readonly ResearchConversation[] | undefined;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly markdown?: ResearchMarkdown | undefined;\n    readonly highlights?: readonly ResearchHighlight[] | undefined;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
   },
   {
     name: 'ResearchPaperId',

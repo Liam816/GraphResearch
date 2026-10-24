@@ -1,6 +1,6 @@
 import { openResearchNote } from './research-files.helpers.ts'
 /** Real Loader research navigation, PDF factory, independent sessions, and durable notebooks. */
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +19,44 @@ const DIRECTORY_EXPECTED = fileURLToPath(new URL('./expected/research-workspace/
 const REORDERED_EXPECTED = fileURLToPath(new URL('./expected/research-workspace/reordered.expected.md', import.meta.url))
 const SHOTS = fileURLToPath(new URL('../../../.artifacts/research-ui', import.meta.url))
 
+it('lets a Topic Agent create several named child papers and exposes them in the directory', async () => {
+  const scaffold = await launchWebScaffold()
+  onTestFinished(() => scaffold.close())
+  const directory = (await scaffold.ctx.workspaceController.researchList()).directory!
+  const workspace = await scaffold.ctx.workspaceRegistry.create(directory)
+  const session = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id })
+  const topic = (await scaffold.ctx.workspaceController.researchCreateTopic({ title: 'VLA reading list',
+    workspaceId: workspace.id, sessionId: session.sessionId })).topics[0]!
+  const agent = scaffold.ctx.agents.get(topic.sessionId)!
+  for (const [index, title] of ['OpenVLA', 'π0.5', 'OpenVLA'].entries()) {
+    const result = await scaffold.ctx.tools.execute({ agent, signal: new AbortController().signal,
+      callId: ToolCallId(`topic-child-${index}`), name: 'research_import_paper', arguments: { title, abbreviation: title } })
+    expect(result.isError, JSON.stringify(result.content)).toBe(false)
+  }
+  const catalog = await scaffold.ctx.workspaceController.researchList()
+  expect(catalog.papers.map(paper => paper.directory)).toEqual([
+    join(directory, 'papers', 'OpenVLA'), join(directory, 'papers', 'π0.5'), join(directory, 'papers', 'OpenVLA (2)'),
+  ])
+  expect(catalog.papers.every(paper => paper.topicIds.includes(topic.id) && paper.pdfPath === '')).toBe(true)
+  expect(new Set([topic.sessionId, ...catalog.papers.map(paper => paper.sessionId)]).size).toBe(4)
+  for (const paper of catalog.papers) {
+    expect(JSON.parse(await readFile(join(directory, 'agent-lib', 'papers', paper.id, 'metadata.json'), 'utf8'))).toMatchObject({ id: paper.id, title: paper.title })
+    expect(await readdir(paper.directory!)).toEqual([])
+    expect(scaffold.ctx.agents.get(paper.sessionId)).toBeDefined()
+  }
+  const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+  const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
+  onTestFinished(() => browser.close())
+  const page = await newEnglishPage(browser)
+  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  const library = page.getByRole('region', { name: 'Research library', exact: true })
+  await library.getByRole('button', { name: /^VLA reading list/ }).waitFor()
+  await expect.poll(() => library.getByRole('button', { name: 'OpenVLA', exact: true }).count()).toBe(2)
+  await library.getByRole('button', { name: 'π0.5', exact: true }).click()
+  await page.getByRole('heading', { name: 'No original PDF yet', exact: true }).waitFor()
+  expect(await page.locator('[data-research-workbench] > header strong').textContent()).toBe('π0.5')
+})
+
 it('navigates Topic papers through the collapsed directory rail', async () => {
   const scaffold = await launchWebScaffold()
   onTestFinished(() => scaffold.close())
@@ -30,8 +68,8 @@ it('navigates Topic papers through the collapsed directory rail', async () => {
   const agent = scaffold.ctx.agents.get(topic.sessionId)!
   for (const [index, title] of ['OpenVLA', 'π0.5', 'OpenVLA'].entries()) {
     const result = await scaffold.ctx.tools.execute({ agent, signal: new AbortController().signal,
-      callId: ToolCallId(`topic-child-${index}`), name: 'research_import_paper', arguments: { title } })
-    expect(result.isError).toBe(false)
+      callId: ToolCallId(`topic-child-${index}`), name: 'research_import_paper', arguments: { title, abbreviation: title } })
+    expect(result.isError, JSON.stringify(result.content)).toBe(false)
   }
   const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
   const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
@@ -71,7 +109,7 @@ it('navigates Topic papers through the collapsed directory rail', async () => {
   await expect.poll(() => page.locator('[data-research-workbench] > header strong').textContent()).toBe('π0.5')
   await expect.poll(() => mark.getAttribute('aria-current')).toBe('true')
   const imported = await scaffold.ctx.tools.execute({ agent, signal: new AbortController().signal,
-    callId: ToolCallId('topic-paper-rail-live-add'), name: 'research_import_paper', arguments: { title: 'Live child' } })
+    callId: ToolCallId('topic-paper-rail-live-add'), name: 'research_import_paper', arguments: { title: 'Live child', abbreviation: 'Live' } })
   expect(imported.isError).toBe(false)
   await expect.poll(() => rail.getByRole('button').count()).toBe(4)
   await rail.getByRole('button', { name: 'Open paper: OpenVLA', exact: true }).first().click()
@@ -187,14 +225,14 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('the PDF download fixture must listen on TCP')
   const attached = await scaffold.ctx.tools.execute({ agent: pendingAgent, signal: new AbortController().signal,
-    callId: ToolCallId('research-download-original'), name: 'research_attach_pdf', arguments: { source: `http://127.0.0.1:${address.port}/paper.pdf` } })
+    callId: ToolCallId('research-download-original'), name: 'research_attach_pdf', arguments: { source: `http://127.0.0.1:${address.port}/paper.pdf`, abbreviation: 'RT2' } })
   expect(attached.isError).toBe(false)
   const downloaded = await scaffold.ctx.workspaceController.researchList()
   expect(downloaded.papers).toHaveLength(1)
   expect(downloaded.papers[0]).toMatchObject({ id: pendingPaper.id, sessionId: pendingPaper.sessionId, directory: pendingPaper.directory })
-  expect(downloaded.papers[0]?.markdown).toMatchObject({ status: 'ready', path: 'paper.md', pages: 2 })
-  expect(await readFile(join(pendingPaper.directory!, 'paper.md'), 'utf8')).toContain('## Page 2\n\nSelectable PDF text')
-  await workbench.getByRole('status').filter({ hasText: 'Full text saved to paper.md (2 pages)' }).waitFor()
+  expect(downloaded.papers[0]?.markdown).toMatchObject({ status: 'ready', path: 'paper_RT2.md', pages: 2 })
+  expect(await readFile(join(pendingPaper.directory!, 'paper_RT2.md'), 'utf8')).toContain('## Page 2\n\nSelectable PDF text')
+  expect(await workbench.getByText('Full text saved to paper_RT2.md (2 pages)', { exact: true }).count()).toBe(0)
   await workbench.getByRole('img', { name: 'PDF page 1', exact: true }).waitFor()
   const header = workbench.locator(':scope > header')
   expect(await header.getByRole('button', { name: 'Restore three panels', exact: true }).count()).toBe(0)
@@ -207,6 +245,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await pdfToggle.press('Enter')
   await expect.poll(() => pdfToggle.getAttribute('aria-pressed')).toBe('true')
   await expect.poll(async () => (await workbench.getByRole('img', { name: 'PDF page 1', exact: true }).boundingBox())?.width).toBeGreaterThan(100)
+  await scaffold.ctx.workspaceController.researchSaveNote({ paperId: pendingPaper.id, kind: 'learning', text: '# Reading questions', expectedRevision: 0 })
   await panelControls.getByRole('button', { name: 'Related content', exact: true }).click()
   await openResearchNote(workbench, 'learning', true)
   const notes = workbench.getByRole('textbox', { name: 'Learning notes', exact: true })
@@ -222,10 +261,11 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   const paperRecord = (await scaffold.ctx.workspaceController.researchList()).papers.find(paper => paper.title === 'RT-2')
   if (paperRecord === undefined || paperRecord.directory === undefined) throw new Error('the imported paper must have a managed directory')
   const files = workbench.locator('[data-paper-files]')
+  await mkdir(join(paperRecord.directory, 'code'), { recursive: true })
   await writeFile(join(paperRecord.directory, 'code', 'model.py'), 'class VLA:\n    actions = 7\n')
   await writeFile(join(paperRecord.directory, 'reading.md'), '# Reading plan\n\nCompare action tokens.\n')
   await files.getByRole('button', { name: 'Refresh files', exact: true }).click()
-  await files.getByRole('treeitem', { name: 'paper.md', exact: true }).click()
+  await files.getByRole('treeitem', { name: 'paper_RT2.md', exact: true }).click()
   await files.getByRole('heading', { name: 'Page 1', exact: true }).waitFor()
   await files.getByRole('treeitem', { name: 'reading.md', exact: true }).click()
   await files.getByRole('heading', { name: 'Reading plan', exact: true }).waitFor()
@@ -239,12 +279,11 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await files.getByText('Read-only preview', { exact: true }).waitFor()
   await expect.poll(() => files.locator('pre').textContent()).toContain('class VLA:')
   await page.screenshot({ path: join(SHOTS, 'paper-code-files.png') })
-  await files.getByRole('treeitem', { name: 'paper.pdf', exact: true }).click()
+  await files.getByRole('treeitem', { name: 'paper_RT2.pdf', exact: true }).click()
   await files.getByRole('img', { name: 'PDF page 1', exact: true }).waitFor()
   await page.screenshot({ path: join(SHOTS, 'paper-pdf-file.png') })
   const paperAgent = scaffold.ctx.agents.get(paperRecord.sessionId)
   if (paperAgent === undefined) throw new Error('the paper Agent must be available')
-  await openResearchNote(workbench, 'ai')
   const extracted = await scaffold.ctx.tools.execute({ agent: paperAgent, signal: new AbortController().signal,
     callId: ToolCallId('research-read-original'), name: 'research_read_paper', arguments: { start_page: 1, page_count: 2 } })
   expect(extracted.isError).toBe(false)
@@ -253,6 +292,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
     callId: ToolCallId('research-write-notebook'), name: 'research_write_note',
     arguments: { kind: 'ai', operation: 'section', heading: 'Key ideas', text: 'Original method, page 1.', expected_revision: 0 } })
   expect(written.isError).toBe(false)
+  await openResearchNote(workbench, 'ai')
   await workbench.getByRole('heading', { name: 'Key ideas', exact: true }).waitFor()
   const aiPath = join(paperRecord.directory, 'notes', 'ai.md')
   expect(await readFile(aiPath, 'utf8')).toContain('Original method, page 1.')
@@ -358,6 +398,8 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
 
   await notes.fill('Unsaved RT-2 draft')
   await addPaper('OpenVLA')
+  const additionalPaper = (await scaffold.ctx.workspaceController.researchList()).papers.find(item => item.title === 'OpenVLA')!
+  await scaffold.ctx.workspaceController.researchSaveNote({ paperId: additionalPaper.id, kind: 'learning', text: '# OpenVLA reading', expectedRevision: 0 })
   await panelControls.getByRole('button', { name: 'Related content', exact: true }).click()
   await openResearchNote(workbench, 'learning', true)
   await workbench.getByRole('textbox', { name: 'Learning notes', exact: true }).fill('OpenVLA draft')
@@ -397,7 +439,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await librarySettings.waitFor({ state: 'hidden' })
   await expect.poll(() => scaffold.ctx.workspaceController.researchList().then(value => value.directory)).toBe(migratedDirectory)
   await expect.poll(() => notes.inputValue()).toContain('action token')
-  expect(await readFile(join(migratedDirectory, 'papers', paperRecord.id, 'notes', 'ai.md'), 'utf8')).toContain('New Agent analysis.')
+  expect(await readFile(join(migratedDirectory, 'papers', 'RT-2', 'notes', 'ai.md'), 'utf8')).toContain('New Agent analysis.')
 
   await openSettings(page, 'en')
   const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
@@ -461,7 +503,8 @@ it('resizes paper files in both layouts while retaining drafts and independent p
   const session = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id })
   const topic = (await scaffold.ctx.workspaceController.researchCreateTopic({ title: 'Resizable files',
     workspaceId: workspace.id, sessionId: session.sessionId })).topics[0]!
-  await scaffold.ctx.workspaceController.researchImportPaper({ topicId: topic.id, title: 'Resizable paper' }, new AbortController().signal)
+  const imported = await scaffold.ctx.workspaceController.researchImportPaper({ topicId: topic.id, title: 'Resizable paper' }, new AbortController().signal)
+  await scaffold.ctx.workspaceController.researchSaveNote({ paperId: imported.paperId, kind: 'learning', text: '# Reading notebook', expectedRevision: 0 })
   const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
   const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
   onTestFinished(() => browser.close())
@@ -705,7 +748,7 @@ it('renames a Topic from its directory menu and retains child papers across relo
   expect(catalog.topics[0]).toMatchObject({ id: topic.id, sessionId: topic.sessionId, title: 'Core VLA reading',
     notes: { text: '# Survey notes remain available' } })
   expect(catalog.papers[0]).toEqual(paper)
-  expect(JSON.parse(await readFile(join(directory, 'topics', topic.id, 'topic.json'), 'utf8')))
+  expect(JSON.parse(await readFile(join(directory, 'agent-lib', 'topics', topic.id, 'metadata.json'), 'utf8')))
     .toMatchObject({ id: topic.id, title: 'Core VLA reading' })
   await library.getByRole('button', { name: 'Add paper to Core VLA reading', exact: true }).click()
   await page.getByRole('dialog', { name: 'Add paper', exact: true }).getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -735,6 +778,7 @@ it('manages independent paper conversations while preserving mounted reading res
   await writeFile(source, pdfFixture(8))
   const imported = await controller.researchImportPaper({ topicId: topic.id, title: 'Multi-session paper', source }, new AbortController().signal)
   const paper = (await controller.researchList()).papers.find(item => item.id === imported.paperId)!
+  await controller.researchSaveNote({ paperId: paper.id, kind: 'learning', text: '# Reading notebook', expectedRevision: 0 })
   const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
   const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
   onTestFinished(() => browser.close())
