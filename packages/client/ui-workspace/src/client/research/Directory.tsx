@@ -1,7 +1,7 @@
 /** Topic → paper directory, with durable creation through injected commands. */
 import { useState } from 'react'
 import {
-  Button, Input, Modal, Tooltip, IconPlusOutlineRegular, IconNewChatOutlineMedium,
+  Button, Input, Modal, IconNewChatOutlineMedium,
   IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconFolderCloseRegular, IconSearchOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { paperForSession } from './conversation-records.ts'
@@ -10,6 +10,7 @@ import type { ResearchDirectoryProps } from './contract.ts'
 import { ResearchLibrarySettings } from './LibrarySettings.tsx'
 import { ResearchPaperRow } from './PaperRow.tsx'
 import { DeletePaperDialog } from './DeletePaper.tsx'
+import { DeleteTopicDialog } from './DeleteTopic.tsx'
 import { ResearchTopicActions, RenameTopicDialog } from './TopicActions.tsx'
 import css from './Research.module.css'
 
@@ -28,6 +29,7 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
   const [error, setError] = useState(false)
   const [deleting, setDeleting] = useState<ResearchPaper>()
   const [renaming, setRenaming] = useState<ResearchTopic>()
+  const [deletingTopic, setDeletingTopic] = useState<ResearchTopic>()
   const needsRestart = phase === 'ready' && catalog.directory === undefined
   const filter = query.trim().toLocaleLowerCase()
   const topics = catalog.topics.filter(topic => topic.title.toLocaleLowerCase().includes(filter)
@@ -81,11 +83,8 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
               onClick={() => { actions.topic(topic.id); props.open(topic.sessionId) }}>
               <IconFolderCloseRegular size={16} /><span>{topic.title}</span>
             </button>
-            <ResearchTopicActions topic={topic} t={t} onRename={() => { setRenaming(topic) }} />
-            <Tooltip label={t('addPaperToTopic', { title: topic.title })} side="right" portal>
-              <button type="button" className={css.addPaper} aria-label={t('addPaperToTopic', { title: topic.title })}
-                onClick={() => { start(topic.id) }}><IconPlusOutlineRegular size={16} /></button>
-            </Tooltip>
+            <ResearchTopicActions topic={topic} t={t} onAddPaper={() => { start(topic.id) }}
+              onRename={() => { setRenaming(topic) }} onDelete={() => { setDeletingTopic(topic) }} />
           </div>
           {expanded && <ul className={css.children}>{papers.map(paper => <ResearchPaperRow key={paper.id}
             paper={paper} selected={paperForSession(catalog, current)?.id === paper.id} t={t}
@@ -111,5 +110,7 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
       t={t} deletePaper={props.deletePaper} onClose={() => { setDeleting(undefined) }} />}
     {renaming !== undefined && <RenameTopicDialog topic={renaming} t={t} renameTopic={props.renameTopic}
       onClose={() => { setRenaming(undefined) }} />}
+    {deletingTopic !== undefined && <DeleteTopicDialog topic={catalog.topics.find(item => item.id === deletingTopic.id) ?? deletingTopic}
+      catalog={catalog} t={t} deleteTopic={props.deleteTopic} onClose={() => { setDeletingTopic(undefined) }} />}
   </section>
 }

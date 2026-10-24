@@ -1,0 +1,13 @@
+- dialog "Delete topic “Delete study”":
+  - heading "Delete topic “Delete study”" [level=2]
+  - button "Close"
+  - paragraph: This permanently deletes the Topic directory and the exclusive paper directories listed below. Shared papers are retained; original Agent histories are archived.
+  - text: Directory to delete
+  - code: {{cwd}}/topics/{{uuid}}
+  - text: Owned paper
+  - code: {{cwd}}/papers/Owned paper
+  - paragraph: "Shared papers retained: 1. Their files and conversations stay available under other Topics."
+  - checkbox "I checked this directory path and confirm permanent deletion of all its contents"
+  - text: I checked this directory path and confirm permanent deletion of all its contents
+  - button "Cancel"
+  - button "Delete topic" [disabled]

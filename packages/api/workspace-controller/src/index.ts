@@ -23,7 +23,7 @@ import * as ResearchAgent from './research-agent.ts'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
-  ResearchDeletePaperRequest,
+  ResearchDeletePaperRequest, ResearchDeleteTopicRequest,
   ResearchDirectoryRequest, ResearchFollowFrame, ResearchImportPaperRequest, ResearchReadPaperRequest, ResearchPaperText, ResearchTopicId,
   ResearchAttachPdfRequest, ResearchHighlightRequest,
 } from './research-types.ts'
@@ -358,6 +358,14 @@ export class WorkspaceController extends TypertRemoteService {
    */
   @Remote('researchRenameTopic')
   researchRenameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog> { return this.research.renameTopic(request) }
+
+  /**
+   * Remove a Topic and its exclusive papers, preserving shared papers and archived histories.
+   * @param request - Topic and every exclusive paper directory confirmed by the user.
+   * @returns the remaining catalog after recoverable deletion completes.
+   */
+  @Remote('researchDeleteTopic')
+  researchDeleteTopic(request: ResearchDeleteTopicRequest): Promise<ResearchCatalog> { return this.research.deleteTopic(request) }
 
   /**
    * Apply the requested research operation.

@@ -15,3 +15,9 @@ export async function openResearchNote(workbench: Locator, kind: 'ai' | 'learnin
   await files.getByRole('treeitem', { name: `${kind}.md`, exact: true }).click()
   if (edit && await files.getByRole('textbox').count() === 0) await files.getByRole('button', { name: 'Edit', exact: true }).click()
 }
+
+/** @param library - research directory. @param title - owning Topic title. @returns completion when its paper form is opened. */
+export async function openAddPaper(library: Locator, title: string): Promise<void> {
+  await library.getByRole('button', { name: `Topic actions for ${title}`, exact: true }).click()
+  await library.page().getByRole('menuitem', { name: 'Add paper', exact: true }).click()
+}

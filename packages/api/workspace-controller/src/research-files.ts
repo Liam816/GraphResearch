@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import type { ResearchCatalog, ResearchPaper, ResearchPaperId, ResearchTopicId, ResearchHighlight, ResearchHighlightId } from './research-types.ts'
+import type { ResearchCatalog, ResearchPaper, ResearchPaperId, ResearchTopic, ResearchTopicId, ResearchHighlight, ResearchHighlightId } from './research-types.ts'
 import { conversationBackup } from './research-conversations.ts'
 
 const identity = z.string().regex(/^[A-Za-z0-9_-]+$/)
@@ -55,6 +55,7 @@ export const researchCatalogSchema: z.ZodType<ResearchCatalog> = z.object({
 
 const noteIndex = z.object({ revision: z.number().int().nonnegative(), sha256: z.string() })
 const paperIdentity = z.object({ id: paperId })
+const topicIdentity = z.object({ id: topicId })
 const folderName = z.string().min(1).refine(value => value !== '.' && value !== '..'
   && !/[\\/\u0000-\u001f<>:"|?*]/u.test(value) && !/[. ]$/.test(value) && Buffer.byteLength(value) <= 255)
 const indexSchema = z.object({
@@ -86,6 +87,10 @@ const journalSchema = z.object({
   })),
   moves: z.array(z.object({ id: identity, from: folderName, to: folderName })).optional(),
   deletion: z.object({ id: paperId, folder: folderName, token: z.uuid(), staged: z.boolean() }).optional(),
+  topicDeletion: z.object({ id: topicId, token: z.uuid(), entries: z.array(z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('paper'), id: paperId, folder: folderName, staged: z.boolean() }),
+    z.object({ kind: z.literal('topic'), id: topicId, folder: folderName, staged: z.boolean() }),
+  ])).min(1) }).optional(),
 })
 type Index = z.infer<typeof indexSchema>
 type Journal = z.infer<typeof journalSchema>
@@ -372,6 +377,95 @@ export class ResearchFiles {
     return this.read()
   }
 
+  /**
+   * Verify a Topic directory against its stable runtime identity without changing files.
+   * @param topic - current Topic under the library lock.
+   * @param confirmed - absolute path displayed in the confirmation dialog.
+   * @returns the verified user directory.
+   */
+  async confirmTopicDeletion(topic: Pick<ResearchTopic, 'id'>, confirmed: string): Promise<string> {
+    const directory = await this.path('topics', topic.id)
+    if (directory !== confirmed) throw new RemoteError('research/delete-path-changed', 'Review the current Topic directory before deleting', { directory })
+    const metadata = await this.runtimePath('topics', topic.id, 'metadata.json')
+    if (!(await lstat(directory)).isDirectory() || topicIdentity.parse(JSON.parse(await readFile(metadata, 'utf8'))).id !== topic.id) {
+      throw new RemoteError('research/invalid-library', 'Topic directory identity changed', { path: directory })
+    }
+    return directory
+  }
+
+  /**
+   * Remove a Topic and its exclusive papers while retaining papers shared with other Topics.
+   * @param topic - confirmed Topic under the library lock.
+   * @param papers - its verified exclusive papers.
+   * @returns the remaining catalog; interrupted staging and cleanup resume on the next read.
+   */
+  async deleteTopic(topic: ResearchTopic, papers: readonly ResearchPaper[]): Promise<ResearchCatalog> {
+    await this.confirmTopicDeletion(topic, await this.path('topics', topic.id))
+    for (const paper of papers) await this.confirmDeletion(paper, await this.paperPath(paper))
+    const index = indexSchema.parse(JSON.parse(await readFile(await this.runtimePath('library.json'), 'utf8')))
+    const owned = index.papers.filter(item => item.topicIds.includes(topic.id) && item.topicIds.length === 1)
+    if (!index.topics.some(item => item.id === topic.id) || owned.length !== papers.length
+      || owned.some(item => !papers.some(paper => paper.id === item.id
+        && basename(paper.directory ?? paper.id) === indexedPaperFolder(item)))) {
+      throw new RemoteError('research/topic-contents-changed', 'Review the current Topic contents before deleting', { topicId: topic.id })
+    }
+    index.topics = index.topics.filter(item => item.id !== topic.id)
+    index.papers = index.papers.filter(item => !papers.some(paper => paper.id === item.id))
+      .map(item => ({ ...item, topicIds: item.topicIds.filter(id => id !== topic.id) }))
+    index.revision += 1
+    const journal: Journal = { index, writes: [], topicDeletion: { id: topic.id, token: randomUUID(), entries: [
+      { kind: 'topic', id: topic.id, folder: topic.id, staged: false },
+      ...owned.map(paper => ({ kind: 'paper' as const, id: paper.id, folder: indexedPaperFolder(paper), staged: false })),
+    ] } }
+    await writeFileAtomic(await this.runtimePath('.transaction.json'), `${JSON.stringify(journal)}\n`, { mode: 0o600, dirMode: 0o700 })
+    await this.recover()
+    return this.read()
+  }
+
+  private async recoverTopicDeletion(journal: Journal, filename: string): Promise<void> {
+    const removal = journal.topicDeletion
+    if (removal === undefined) return
+    const topics = removal.entries.filter(item => item.kind === 'topic')
+    const unique = new Set(removal.entries.map(item => `${item.kind}:${item.folder}`))
+    const identities = new Set(removal.entries.map(item => `${item.kind}:${item.id}`))
+    if (this.legacy || journal.index.version !== 4 || journal.writes.length > 0
+      || journal.moves !== undefined || journal.deletion !== undefined || topics.length !== 1
+      || !topics.some(item => item.id === removal.id && item.folder === removal.id)
+      || unique.size !== removal.entries.length || identities.size !== removal.entries.length
+      || journal.index.topics.some(item => item.id === removal.id) || journal.index.papers.some(item => item.topicIds.includes(removal.id))
+      || removal.entries.some(entry => entry.kind === 'paper' && journal.index.papers.some(item => item.id === entry.id || indexedPaperFolder(item) === entry.folder))) {
+      throw new RemoteError('research/invalid-library', 'Topic deletion differs from the pending index', { path: filename })
+    }
+    const staging = await this.runtimePath('.topic-deletions', removal.token)
+    for (const entry of removal.entries) {
+      if (entry.staged) continue
+      const source = await this.path(entry.kind === 'paper' ? 'papers' : 'topics', entry.folder)
+      const target = await this.runtimePath('.topic-deletions', removal.token, `${entry.kind}-${entry.id}`)
+      let exists = false
+      try {
+        if (!(await lstat(target)).isDirectory()) throw new RemoteError('research/invalid-library', 'Topic deletion destination is occupied', { path: target })
+        exists = true
+      } catch (error: unknown) { if (!missing(error)) throw error }
+      if (exists) {
+        try {
+          await lstat(source)
+          throw new RemoteError('research/invalid-library', 'Both Topic deletion directories exist; preserve both before retrying', { path: target })
+        } catch (error: unknown) { if (!missing(error)) throw error }
+      } else {
+        if (entry.kind === 'paper') await this.confirmDeletion({ id: entry.id, directory: source }, source)
+        else await this.confirmTopicDeletion({ id: entry.id }, source)
+        await mkdir(staging, { recursive: true, mode: 0o700 })
+        await rename(source, target)
+      }
+      entry.staged = true
+      await writeFileAtomic(filename, `${JSON.stringify(journal)}\n`, { mode: 0o600, dirMode: 0o700 })
+    }
+    await this.writeIndex(journal.index)
+    await rm(staging, { recursive: true, force: true })
+    for (const entry of removal.entries) await rm(await this.runtimePath(entry.kind === 'paper' ? 'papers' : 'topics', entry.id), { recursive: true, force: true })
+    await rm(filename)
+  }
+
   private async notePath(kind: 'ai' | 'learning' | 'topic', id: string, folder?: string): Promise<string> {
     const parts = kind === 'topic' ? ['topics', id, 'notes.md'] : ['papers', folder ?? id, 'notes', `${kind}.md`]
     try { return await this.path(...parts) } catch (error: unknown) {
@@ -527,6 +621,10 @@ export class ResearchFiles {
     const pending = await optionalText(filename)
     if (pending === null) return
     const journal = journalSchema.parse(JSON.parse(pending))
+    if (journal.topicDeletion !== undefined) {
+      await this.recoverTopicDeletion(journal, filename)
+      return
+    }
     if (journal.deletion !== undefined && !this.legacy) {
       const deletion = journal.deletion
       if (journal.writes.length > 0 || 'moves' in journal

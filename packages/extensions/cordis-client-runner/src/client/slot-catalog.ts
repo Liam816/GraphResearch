@@ -1919,7 +1919,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'main.research\', () => ctx.slots.register(\n      { name: \'main.research\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-workspace/src/client/research/contract.ts:51',
+    source: 'packages/client/ui-workspace/src/client/research/contract.ts:52',
   },
   {
     key: 'plugins.add.actions',
@@ -2337,7 +2337,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'research.agent\', () => ctx.slots.register(\n      { name: \'research.agent\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-workspace/src/client/research/contract.ts:53',
+    source: 'packages/client/ui-workspace/src/client/research/contract.ts:54',
   },
   {
     key: 'rightbar',
@@ -4157,7 +4157,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'sidebar.workspaces.research\', () => ctx.slots.register(\n      { name: \'sidebar.workspaces.research\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-workspace/src/client/research/contract.ts:49',
+    source: 'packages/client/ui-workspace/src/client/research/contract.ts:50',
   },
   {
     key: 'sidebar.workspaces.session.menu.item',

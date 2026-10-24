@@ -1,2 +1,5 @@
 - menu:
+  - menuitem "Add paper"
   - menuitem "Rename topic"
+  - separator
+  - menuitem "Delete topic"

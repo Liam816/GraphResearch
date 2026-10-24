@@ -9,7 +9,7 @@ import type { WorkspaceRemote } from './model.ts'
 import type { ResearchTranslation, ResearchTranslationRequest } from '../research-translation-types.ts'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
-  ResearchDeletePaperRequest,
+  ResearchDeletePaperRequest, ResearchDeleteTopicRequest,
   ResearchDirectoryRequest, ResearchImportPaperRequest, ResearchHighlightRequest,
 } from '../research-types.ts'
 
@@ -30,7 +30,7 @@ export class ClientResearchModel {
    * @param remote - generated Workspace namespace.
    */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+    'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeleteTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
 
   /**
    * Attach an independent conversation and accept its confirmed metadata.
@@ -48,6 +48,16 @@ export class ClientResearchModel {
    */
   async updateConversation(request: ResearchUpdateConversationRequest): Promise<void> {
     const result = await this.remote.researchUpdateConversation(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
+
+  /**
+   * Delete a confirmed Topic and its exclusive papers; shared papers retain their other Topics.
+   * @param request - Topic and all displayed exclusive-paper directories.
+   */
+  async deleteTopic(request: ResearchDeleteTopicRequest): Promise<void> {
+    const result = await this.remote.researchDeleteTopic(request)
     if (!result.ok) throw result.error
     this.accept(result.value)
   }

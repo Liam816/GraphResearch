@@ -6,7 +6,7 @@ import type { ResearchPaper, ResearchUpdateConversationRequest } from '@deepseek
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ResearchTranslation, ResearchTranslationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchViewStore } from './store.ts'
-import type { ResearchRenameTopicRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchRenameTopicRequest, ResearchDeleteTopicRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchKey } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client'
@@ -26,6 +26,7 @@ export interface ResearchInjected {
   open: (sessionId: SessionId) => void
   createTopic: (request: Pick<ResearchCreateTopicRequest, 'title'>) => Promise<void>
   renameTopic: (request: ResearchRenameTopicRequest) => Promise<void>
+  deleteTopic: (request: ResearchDeleteTopicRequest) => Promise<void>
   createPaper: (request: Omit<ResearchCreatePaperRequest, 'sessionId'>) => Promise<void>
   deletePaper: (request: ResearchDeletePaperRequest) => Promise<void>
   highlight: (request: ResearchHighlightRequest) => Promise<void>

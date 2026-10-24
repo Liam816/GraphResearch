@@ -30,7 +30,8 @@ function fixture(managed: boolean, collapsed = false) {
     useSessionStatus: select => select(new Map()), useSessionRetainInfo: () => undefined,
     usePanelInfo: select => select({ activePanelId: null }),
     useResource: () => ({ status: 'none', value: undefined, failure: undefined, reload: () => {} }),
-    renameTopic: vi.fn(async () => {}), deletePaper: vi.fn(async () => {}), refresh: vi.fn(async () => {}), open: vi.fn(),
+    renameTopic: vi.fn(async () => {}), deleteTopic: vi.fn(async () => {}),
+    deletePaper: vi.fn(async () => {}), refresh: vi.fn(async () => {}), open: vi.fn(),
     createTopic: vi.fn(async () => {}), createPaper: vi.fn(async () => {}),
     listFiles: vi.fn(async () => ({ path: '', entries: [] })),
     readFile: vi.fn(async () => ({ kind: 'unsupported' as const, path: '', reason: 'binary' as const })),
@@ -41,7 +42,9 @@ function fixture(managed: boolean, collapsed = false) {
   }
   if (collapsed) view.actions.expand('fixture-topic', false)
   render(<ResearchDirectory {...props} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Add paper to Robotics' }))
+  expect(screen.queryByRole('button', { name: 'Add paper to Robotics' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Topic actions for Robotics' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Add paper' }))
   const dialog = within(screen.getByRole('dialog', { name: 'Add paper' }))
   fireEvent.change(dialog.getByRole('textbox', { name: 'Title' }), { target: { value: 'pi0.7' } })
   return { props, dialog }

@@ -595,6 +595,57 @@ describe('Research catalog', () => {
     expect(await controller.researchList()).toEqual(renamed)
   })
 
+  it('deletes Topic-owned directories and conversations while retaining shared papers and their notes', async () => {
+    const { controller, ctx, topic, root, workspace } = await researchFixture()
+    ctx.sessions.create(SessionId('other-topic'), { meta: { cwd: root } })
+    await ctx.workspaceRegistry.get(workspace.workspaceId)!.attachSession(SessionId('other-topic'))
+    const otherCatalog = await controller.researchCreateTopic({ title: 'Other topic', workspaceId: workspace.workspaceId, sessionId: SessionId('other-topic') })
+    const other = otherCatalog.topics.find(item => item.id !== topic.id)!
+    const first = await controller.researchCreatePaper({ topicId: topic.id, title: 'Owned', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const owned = first.papers[0]!
+    const second = await controller.researchCreatePaper({ topicId: topic.id, title: 'Shared', sourceId: '2406.09246', repositoryUrl: '', sessionId: SessionId('paper-b') })
+    const shared = second.papers.find(item => item.id !== owned.id)!
+    await controller.researchImportPaper({ topicId: other.id, title: 'Shared', sourceId: '2406.09246' }, new AbortController().signal)
+    await controller.researchSaveNote({ paperId: shared.id, kind: 'ai', text: '# Retain me', expectedRevision: 0 })
+    writeFileSync(join(root, 'data', 'topics', topic.id, 'notes.md'), '# Topic summary')
+    const remaining = await controller.researchDeleteTopic({ topicId: topic.id, directory: join(root, 'data', 'topics', topic.id), papers: [{ paperId: owned.id, directory: owned.directory! }] })
+    expect(remaining.topics.map(item => item.id)).toEqual([other.id])
+    expect(remaining.papers).toHaveLength(1)
+    expect(remaining.papers[0]).toMatchObject({ id: shared.id, topicIds: [other.id], ai: { text: '# Retain me' } })
+    expect(existsSync(owned.directory!)).toBe(false)
+    expect(existsSync(join(root, 'data', 'topics', topic.id))).toBe(false)
+    expect(existsSync(join(root, 'data', 'agent-lib', 'topics', topic.id))).toBe(false)
+    expect(existsSync(shared.directory!)).toBe(true)
+    expect(ctx.workspaceRegistry.archivedSessionIds).toEqual(expect.arrayContaining([topic.sessionId, owned.sessionId]))
+    expect(ctx.workspaceRegistry.archivedSessionIds).not.toContain(shared.sessionId)
+    expect(ctx.sessions.get(owned.sessionId)).toBeDefined()
+    expect((await controller.researchList()).papers).toEqual(remaining.papers)
+  })
+
+  it('refuses stale Topic contents, invalid paths and running work before archiving or deleting', async () => {
+    const { controller, ctx, topic, root } = await researchFixture()
+    const request = { topicId: topic.id, directory: join(root, 'data', 'topics', topic.id), papers: [] }
+    await expect(controller.researchDeleteTopic({ ...request, directory: root })).rejects.toMatchObject({ code: 'research/delete-path-changed' })
+    const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'New child', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = catalog.papers[0]!
+    await expect(controller.researchDeleteTopic(request)).rejects.toMatchObject({ code: 'research/topic-contents-changed' })
+    ctx.on('workspace/session-activity', async (_request, next) => [...await next(), { kind: 'probe' as const }])
+    await expect(controller.researchDeleteTopic({ ...request, papers: [{ paperId: paper.id, directory: paper.directory! }] }))
+      .rejects.toMatchObject({ code: 'research/topic-busy' })
+    expect(ctx.workspaceRegistry.archivedSessionIds).not.toContain(topic.sessionId)
+    expect(existsSync(paper.directory!)).toBe(true)
+    expect((await controller.researchList()).topics).toHaveLength(1)
+  })
+
+  it('deletes an empty Topic without removing its Workspace or allocating a replacement Session', async () => {
+    const { controller, ctx, topic, root, workspace } = await researchFixture()
+    const remaining = await controller.researchDeleteTopic({ topicId: topic.id, directory: join(root, 'data', 'topics', topic.id), papers: [] })
+    expect(remaining.topics).toEqual([])
+    expect(ctx.workspaceRegistry.get(workspace.workspaceId)).toBeDefined()
+    expect(existsSync(root)).toBe(true)
+    expect(ctx.sessions.get(topic.sessionId)).toBeDefined()
+  })
+
   it('deletes a confirmed paper, archives its Session and publishes the remaining library', async () => {
     const { controller, ctx, topic } = await researchFixture()
     const catalog = await controller.researchCreatePaper({ topicId: topic.id, title: 'Delete me', repositoryUrl: '', sessionId: SessionId('paper-a') })

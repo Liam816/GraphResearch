@@ -1,6 +1,7 @@
 /** Topic action menu and name editor with conflict detection. */
 import { useState } from 'react'
-import { Button, Input, Menu, Modal, Tooltip, IconEditOutlineRegular, IconEllipsisOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input, Menu, Modal, Tooltip, IconEditOutlineRegular, IconEllipsisOutlineRegular,
+  IconPlusOutlineRegular, IconTrashOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ResearchTopic } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchSeats } from './contract.ts'
 import type { ResearchKey } from './locales.ts'
@@ -15,15 +16,27 @@ export function topicRenameFailure(error: unknown): ResearchKey {
 }
 
 /** @param props - Topic name, localized copy, and edit callback. @returns a portalled Topic action menu. */
-export function ResearchTopicActions({ topic, t, onRename }: Pick<ResearchSeats, 't'> & {
+export function ResearchTopicActions({ topic, t, onAddPaper, onRename, onDelete }: Pick<ResearchSeats, 't'> & {
   topic: ResearchTopic
+  onAddPaper: () => void
   onRename: () => void
+  onDelete: () => void
 }) {
   const [open, setOpen] = useState(false)
   const label = t('topicActions', { title: topic.title })
   return <Menu open={open} onClose={() => { setOpen(false) }} portal autoFocus closeOnPointerLeave dense align="end"
-    items={[{ id: 'rename', label: t('renameTopic'), icon: <IconEditOutlineRegular size={16} /> }]}
-    onSelect={() => { setOpen(false); onRename() }}
+    items={[
+      { id: 'add-paper', label: t('addPaper'), icon: <IconPlusOutlineRegular size={16} /> },
+      { id: 'rename', label: t('renameTopic'), icon: <IconEditOutlineRegular size={16} /> },
+      { id: 'delete-separator', type: 'separator' },
+      { id: 'delete', label: t('deleteTopic'), icon: <IconTrashOutlineRegular size={16} />, danger: true },
+    ]}
+    onSelect={(id) => {
+      setOpen(false)
+      if (id === 'add-paper') onAddPaper()
+      else if (id === 'rename') onRename()
+      else if (id === 'delete') onDelete()
+    }}
     anchor={<Tooltip label={label} side="right" portal><button type="button" className={css.topicMore} data-dsh-action-menu=""
       aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(value => !value) }}>
       <IconEllipsisOutlineRegular size={16} />

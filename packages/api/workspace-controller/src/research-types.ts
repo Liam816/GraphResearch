@@ -136,6 +136,15 @@ export interface ResearchCreateTopicRequest {
   readonly sessionId: SessionId
 }
 
+/** Delete a Topic and its exclusive papers after confirming every affected directory. */
+export interface ResearchDeleteTopicRequest {
+  readonly topicId: ResearchTopicId
+  /** Absolute Topic directory displayed in the confirmation dialog. */
+  readonly directory: string
+  /** Complete set of exclusively owned paper directories displayed before deletion. */
+  readonly papers: readonly { readonly paperId: ResearchPaperId; readonly directory: string }[]
+}
+
 /** Rename one Topic only while its last displayed title is still current. */
 export interface ResearchRenameTopicRequest {
   readonly topicId: ResearchTopicId
@@ -249,8 +258,12 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'research/conversation-archived': { readonly sessionId: SessionId }
     /** Another writer renamed the Topic; retain the draft and request a new edit from the current name. */
     'research/topic-conflict': { readonly topicId: ResearchTopicId; readonly title: string }
-    /** The paper moved since confirmation; display the new path and request confirmation again. */
-    'research/delete-path-changed': { readonly paperId: ResearchPaperId; readonly directory: string }
+    /** A directory moved since confirmation; display the current path and request confirmation again. */
+    'research/delete-path-changed': { readonly paperId?: ResearchPaperId; readonly directory: string }
+    /** Exclusive paper membership or a confirmed directory changed before deletion. */
+    'research/topic-contents-changed': { readonly topicId: ResearchTopicId }
+    /** A Topic or related paper still has active work; stop it before retrying deletion. */
+    'research/topic-busy': { readonly topicId: ResearchTopicId }
     /** A paper or its topic still has active work; stop that work before deleting its files. */
     'research/paper-busy': { readonly paperId: ResearchPaperId }
     /** Another writer changed the file; preserve the editor draft and load the latest contents. */

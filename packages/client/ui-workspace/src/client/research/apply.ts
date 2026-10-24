@@ -16,6 +16,7 @@ import { en, zh } from './locales.ts'
 import { ResearchActionToast, type ResearchNotice, type ResearchNoticeInjected } from './ActionToast.tsx'
 import { paperDeleteFailure } from './DeletePaper.tsx'
 import { topicRenameFailure } from './TopicActions.tsx'
+import { topicDeleteFailure } from './DeleteTopic.tsx'
 
 /**
  * Register research navigation, stable reading resources, and Session-scoped conversations.
@@ -143,6 +144,34 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
         throw error
       }
       notice.set({ seq: ++noticeSeq, message: 'topicRenamed', success: true })
+    },
+    deleteTopic: async (request) => {
+      const before = ctx.research.state.getSnapshot().catalog
+      const topic = before.topics.find(item => item.id === request.topicId)
+      const owned = before.papers.filter(item => item.topicIds.includes(request.topicId) && item.topicIds.length === 1)
+      const selected = currentSession()
+      const wasOpen = (topic !== undefined && selected === topic.sessionId)
+        || owned.some(paper => paperConversations(paper).some(item => item.sessionId === selected))
+      const finish = (): void => {
+        const after = ctx.research.state.getSnapshot().catalog
+        if (after.topics.some(item => item.id === request.topicId)) return
+        instance.actions.forgetTopic(request.topicId)
+        for (const paper of owned) if (!after.papers.some(item => item.id === paper.id)) instance.actions.forgetPaper(paper.id)
+        const current = currentSession()
+        if (!wasOpen || (current !== undefined && current !== selected)) return
+        const next = after.topics[0]
+        if (next !== undefined) { instance.actions.topic(next.id); open(next.sessionId) }
+      }
+      try { await ctx.research.deleteTopic(request) }
+      catch (error: unknown) {
+        notice.set({ seq: ++noticeSeq, message: topicDeleteFailure(error), success: false })
+        try { await ctx.research.refresh() }
+        catch (refreshError: unknown) { console.error('Research refresh after Topic deletion failed:', refreshError) }
+        finish()
+        throw error
+      }
+      finish()
+      notice.set({ seq: ++noticeSeq, message: 'topicDeleted', success: true })
     },
     deletePaper: async (request) => {
       const catalog = ctx.research.state.getSnapshot().catalog

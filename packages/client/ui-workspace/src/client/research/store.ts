@@ -118,6 +118,10 @@ function researchViewDefinition() {
       forgetPaper: (draft, id: ResearchPaperId) => {
         draft.papers = Object.fromEntries(Object.entries(draft.papers).filter(([key]) => key !== id))
       },
+      forgetTopic: (draft, id: ResearchTopicId) => {
+        draft.expanded = Object.fromEntries(Object.entries(draft.expanded).filter(([key]) => key !== id))
+        if (draft.topicId === id) draft.topicId = undefined
+      },
       expand: (draft, id: string, value: boolean) => { draft.expanded[id] = value },
       topic: (draft, id: ResearchTopicId) => { draft.topicId = id; draft.expanded[id] = true },
       place: (draft, id: ResearchPaperId, source: ResearchPanel, target: ResearchPanel, placement: PanelPlacement) => {

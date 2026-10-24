@@ -1,4 +1,4 @@
-import { openResearchNote } from './research-files.helpers.ts'
+import { openResearchNote, openAddPaper } from './research-files.helpers.ts'
 /** Real Loader research navigation, PDF factory, independent sessions, and durable notebooks. */
 import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -179,16 +179,14 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await workbench.getByRole('heading', { name: 'Robot VLA', exact: true }).waitFor()
   expect(await workbench.getByRole('region', { name: 'Original PDF', exact: true }).count()).toBe(0)
 
-  const addPaperButton = library.getByRole('button', { name: 'Add paper to Robot VLA', exact: true })
+  expect(await library.getByRole('button', { name: 'Add paper to Robot VLA', exact: true }).count()).toBe(0)
   await library.getByRole('button', { name: 'Collapse Robot VLA', exact: true }).click()
   await page.keyboard.press('Tab')
   await page.keyboard.press('Tab')
-  await expect.poll(() => library.getByRole('button', { name: 'Topic actions for Robot VLA', exact: true })
-    .evaluate(element => element === document.activeElement)).toBe(true)
-  await page.keyboard.press('Tab')
-  await expect.poll(() => addPaperButton.evaluate(element => element === document.activeElement)).toBe(true)
-  await page.getByRole('tooltip', { name: 'Add paper to Robot VLA', exact: true }).waitFor()
-  await addPaperButton.press('Enter')
+  const topicActions = library.getByRole('button', { name: 'Topic actions for Robot VLA', exact: true })
+  await expect.poll(() => topicActions.evaluate(element => element === document.activeElement)).toBe(true)
+  await topicActions.press('Enter')
+  await page.getByRole('menuitem', { name: 'Add paper', exact: true }).press('Enter')
   const addPaperDialog = page.getByRole('dialog', { name: 'Add paper', exact: true })
   await addPaperDialog.waitFor()
   await addPaperDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -196,7 +194,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await library.getByRole('button', { name: 'Expand Robot VLA', exact: true }).click()
 
   const addPaper = async (title: string): Promise<void> => {
-    await library.getByRole('button', { name: 'Add paper to Robot VLA', exact: true }).click()
+    await openAddPaper(library, 'Robot VLA')
     const form = page.getByRole('dialog', { name: 'Add paper', exact: true })
     await form.getByLabel('Title', { exact: true }).fill(title)
     if (title !== 'RT-2') await form.getByLabel('PDF file path', { exact: true }).fill(join(scaffold.workspaceCwd, 'openvla.pdf'))
@@ -714,9 +712,7 @@ it('renames a Topic from its directory menu and retains child papers across relo
   const row = topicButton.locator('..')
   expect(await row.locator('small').count()).toBe(0)
   const more = library.getByRole('button', { name: 'Topic actions for Robot learning', exact: true })
-  const add = library.getByRole('button', { name: 'Add paper to Robot learning', exact: true })
-  const moreBox = await more.boundingBox(), addBox = await add.boundingBox()
-  expect(moreBox!.x + moreBox!.width).toBeLessThanOrEqual(addBox!.x)
+  expect(await row.getByRole('button').count()).toBe(3)
   await library.getByRole('button', { name: 'Collapse Robot learning', exact: true }).click()
   await more.click()
   const menu = page.getByRole('menu')
@@ -750,7 +746,7 @@ it('renames a Topic from its directory menu and retains child papers across relo
   expect(catalog.papers[0]).toEqual(paper)
   expect(JSON.parse(await readFile(join(directory, 'agent-lib', 'topics', topic.id, 'metadata.json'), 'utf8')))
     .toMatchObject({ id: topic.id, title: 'Core VLA reading' })
-  await library.getByRole('button', { name: 'Add paper to Core VLA reading', exact: true }).click()
+  await openAddPaper(library, 'Core VLA reading')
   await page.getByRole('dialog', { name: 'Add paper', exact: true }).getByRole('button', { name: 'Cancel', exact: true }).click()
   await library.getByRole('button', { name: 'Expand Core VLA reading', exact: true }).click()
   await library.getByRole('button', { name: 'OpenVLA', exact: true }).click()
@@ -948,4 +944,79 @@ it('shows a restart notice and disables conversation management for an older Hos
   expect(scaffold.ctx.sessions.list()).toHaveLength(before)
   await compareOrRefreshGolden(fileURLToPath(new URL('./expected/research-workspace/conversations-unavailable.expected.md', import.meta.url)),
     await captureStableAria(page, '[data-research-panel=agent] [role=status]', scaffold.workspaceCwd), webSnapshotMode())
+})
+
+
+it('deletes a Topic through its menu after path confirmation and retains shared papers', async () => {
+  const scaffold = await launchWebScaffold()
+  onTestFinished(() => scaffold.close())
+  const controller = scaffold.ctx.workspaceController
+  const root = (await controller.researchList()).directory!
+  const workspace = await scaffold.ctx.workspaceRegistry.create(root)
+  const firstSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id })
+  const first = (await controller.researchCreateTopic({ title: 'Delete study', workspaceId: workspace.id, sessionId: firstSession.sessionId })).topics[0]!
+  const secondSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id })
+  const second = (await controller.researchCreateTopic({ title: 'Keep study', workspaceId: workspace.id, sessionId: secondSession.sessionId })).topics.find(item => item.id !== first.id)!
+  const signal = new AbortController().signal
+  const ownedImport = await controller.researchImportPaper({ topicId: first.id, title: 'Owned paper' }, signal)
+  const owned = ownedImport.catalog.papers.find(item => item.id === ownedImport.paperId)!
+  const sharedImport = await controller.researchImportPaper({ topicId: first.id, title: 'Shared paper', sourceId: '2406.09246' }, signal)
+  const shared = sharedImport.catalog.papers.find(item => item.id === sharedImport.paperId)!
+  await controller.researchImportPaper({ topicId: second.id, title: shared.title, sourceId: shared.sourceId! }, signal)
+  await writeFile(join(owned.directory!, 'user-note.md'), '# Owned note')
+  await writeFile(join(shared.directory!, 'user-note.md'), '# Shared note')
+  const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+  const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
+  onTestFinished(() => browser.close())
+  const page = await newEnglishPage(browser)
+  const console = watchConsole(page)
+  onTestFailed(() => saveFailureShot(page, 'research-topic-delete'))
+  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  const library = page.getByRole('region', { name: 'Research library', exact: true })
+  await library.getByRole('button', { name: first.title, exact: true }).click()
+  const openDelete = async () => {
+    await library.getByRole('button', { name: `Topic actions for ${first.title}`, exact: true }).click()
+    expect(await page.getByRole('menuitem').allTextContents()).toEqual(['Add paper', 'Rename topic', 'Delete topic'])
+    await mkdir(SHOTS, { recursive: true })
+    const theme = await page.locator('body').getAttribute('data-ds-dark-theme') === null ? 'light' : 'dark'
+    await page.screenshot({ path: join(SHOTS, `topic-actions-${theme}.png`) })
+    await page.getByRole('menuitem', { name: 'Delete topic', exact: true }).click()
+  }
+  await openDelete()
+  const dialog = page.getByRole('dialog', { name: 'Delete topic “Delete study”', exact: true })
+  expect(await dialog.getByText(join(root, 'topics', first.id), { exact: true }).count()).toBe(1)
+  expect(await dialog.getByText(owned.directory!, { exact: true }).count()).toBe(1)
+  expect(await dialog.getByText(shared.directory!, { exact: true }).count()).toBe(0)
+  expect(await dialog.getByRole('button', { name: 'Delete topic', exact: true }).isDisabled()).toBe(true)
+  await compareOrRefreshGolden(fileURLToPath(new URL('./expected/research-workspace/delete-topic.expected.md', import.meta.url)),
+    await captureStableAria(page, '[role="dialog"]', root), webSnapshotMode())
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect((await controller.researchList()).topics).toHaveLength(2)
+  await openSettings(page, 'en')
+  const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
+  await settings.getByRole('button', { name: 'Dark', exact: true }).click()
+  await settings.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect.poll(() => page.locator('body').getAttribute('data-ds-dark-theme')).not.toBeNull()
+  await openDelete()
+  await dialog.waitFor({ state: 'visible' })
+  await page.screenshot({ path: join(SHOTS, 'topic-delete-dark.png'), animations: 'disabled' })
+  await dialog.getByRole('checkbox').check()
+  await dialog.getByRole('button', { name: 'Delete topic', exact: true }).click()
+  await dialog.waitFor({ state: 'detached' })
+  await page.getByRole('heading', { name: second.title, exact: true }).waitFor()
+  expect(await library.getByRole('button', { name: first.title, exact: true }).count()).toBe(0)
+  await expect(readFile(join(owned.directory!, 'user-note.md'))).rejects.toMatchObject({ code: 'ENOENT' })
+  expect(await readFile(join(shared.directory!, 'user-note.md'), 'utf8')).toBe('# Shared note')
+  expect((await controller.researchList()).papers[0]).toMatchObject({ id: shared.id, topicIds: [second.id] })
+  await page.reload({ waitUntil: 'load' })
+  await library.getByRole('button', { name: shared.title, exact: true }).waitFor()
+  await library.getByRole('button', { name: `Topic actions for ${second.title}`, exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Delete topic', exact: true }).click()
+  const last = page.getByRole('dialog', { name: 'Delete topic “Keep study”', exact: true })
+  await last.getByRole('checkbox').check()
+  await last.getByRole('button', { name: 'Delete topic', exact: true }).click()
+  await last.waitFor({ state: 'detached' })
+  await library.getByText('Start with a research topic', { exact: true }).waitFor()
+  expect((await controller.researchList()).topics).toEqual([])
+  expect(console.pageErrors).toEqual([])
 })

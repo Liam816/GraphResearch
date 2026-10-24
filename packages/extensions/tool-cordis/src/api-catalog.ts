@@ -3776,6 +3776,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the committed catalog; stale names reject without replacing the latest title.',
       },
       {
+        signature: '@Remote(\'researchDeleteTopic\') researchDeleteTopic(request: ResearchDeleteTopicRequest): Promise<ResearchCatalog>',
+        description: 'Remove a Topic and its exclusive papers, preserving shared papers and archived histories.',
+        parameters: [{ name: 'request', description: 'Topic and every exclusive paper directory confirmed by the user.' }],
+        returns: 'the remaining catalog after recoverable deletion completes.',
+      },
+      {
         signature: '@Remote(\'researchCreatePaper\') async researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog>',
         description: 'Apply the requested research operation.',
         parameters: [{ name: 'request', description: 'Paper metadata and its independent Session.' }],
@@ -6668,6 +6674,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResearchDeletePaperRequest',
     declaration: 'export interface ResearchDeletePaperRequest {\n    readonly paperId: ResearchPaperId;\n    readonly directory: string;\n}',
+  },
+  {
+    name: 'ResearchDeleteTopicRequest',
+    declaration: 'export interface ResearchDeleteTopicRequest {\n    readonly topicId: ResearchTopicId;\n    readonly directory: string;\n    readonly papers: readonly {\n        readonly paperId: ResearchPaperId;\n        readonly directory: string;\n    }[];\n}',
   },
   {
     name: 'ResearchDirectoryListing',

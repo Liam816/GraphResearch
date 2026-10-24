@@ -4,7 +4,7 @@ import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, expect, it } from 'vitest'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ResearchCatalog, ResearchPaper, ResearchPaperId } from '../src/research-types.ts'
+import type { ResearchCatalog, ResearchPaper, ResearchPaperId, ResearchTopicId } from '../src/research-types.ts'
 import { ResearchFiles } from '../src/research-files.ts'
 
 const roots: string[] = []
@@ -109,5 +109,74 @@ it('finishes partial staged cleanup and preserves a newly created directory at t
   expect(catalog.papers.some(item => item.id === paper.id)).toBe(false)
   expect(readFileSync(join(paper.directory!, 'new.txt'), 'utf8')).toBe('new unrelated files')
   expect(existsSync(staged)).toBe(false)
+  expect(existsSync(join(root, 'agent-lib', '.transaction.json'))).toBe(false)
+})
+
+
+async function topicFixture() {
+  const setup = await fixture()
+  const first = brandString<ResearchTopicId>('topic-a'), second = brandString<ResearchTopicId>('topic-b')
+  const topics = [first, second].map(id => ({ id, title: id,
+    workspaceId: brandString<ResearchCatalog['topics'][number]['workspaceId']>(id),
+    sessionId: brandString<ResearchPaper['sessionId']>(id), notes: { text: '# Topic notes', revision: 1 } }))
+  await setup.files.write({ revision: 2, topics,
+    papers: [{ ...setup.paper, topicIds: [first] }, { ...setup.neighbor, topicIds: [first, second] }] })
+  const current = await setup.files.read()
+  return { ...setup, topic: current.topics[0]!, paper: current.papers[0]!, neighbor: current.papers[1]! }
+}
+
+function pendingTopic(root: string, topic: ResearchCatalog['topics'][number], paper: ResearchPaper, staged = false) {
+  const index = JSON.parse(readFileSync(join(root, 'agent-lib', 'library.json'), 'utf8')) as {
+    revision: number
+    topics: { id: string }[]
+    papers: { id: string; topicIds: string[] }[]
+  }
+  index.topics = index.topics.filter(item => item.id !== topic.id)
+  index.papers = index.papers.filter(item => item.id !== paper.id)
+    .map(item => ({ ...item, topicIds: item.topicIds.filter(id => id !== topic.id) }))
+  index.revision += 1
+  const token = '00112233-4455-4677-8899-aabbccddeeff'
+  const staging = join(root, 'agent-lib', '.topic-deletions', token)
+  mkdirSync(staging, { recursive: true })
+  writeFileSync(join(root, 'agent-lib', '.transaction.json'), JSON.stringify({ index, writes: [], topicDeletion: {
+    id: topic.id, token, entries: [
+      { kind: 'topic', id: topic.id, folder: topic.id, staged },
+      { kind: 'paper', id: paper.id, folder: basename(paper.directory!), staged },
+    ],
+  } }))
+  return staging
+}
+
+it('resumes a Topic deletion after its first directory moved but before the journal flag was saved', async () => {
+  const { root, files, topic, paper, neighbor } = await topicFixture()
+  const staging = pendingTopic(root, topic, paper)
+  renameSync(join(root, 'topics', topic.id), join(staging, `topic-${topic.id}`))
+  const remaining = await files.withLock(() => files.read())
+  expect(remaining.topics.map(item => item.id)).not.toContain(topic.id)
+  expect(remaining.papers.map(item => item.id)).toEqual([neighbor.id])
+  expect(remaining.papers[0]?.topicIds).toHaveLength(1)
+  expect(existsSync(paper.directory!)).toBe(false)
+  expect(existsSync(staging)).toBe(false)
+})
+
+it('refuses an occupied Topic staging destination and retains both copies for recovery', async () => {
+  const { root, files, topic, paper } = await topicFixture()
+  const staging = pendingTopic(root, topic, paper)
+  mkdirSync(join(staging, `topic-${topic.id}`))
+  writeFileSync(join(staging, `topic-${topic.id}`, 'keep.txt'), 'Unrelated')
+  await expect(files.withLock(() => files.read())).rejects.toMatchObject({ code: 'research/invalid-library' })
+  expect(readFileSync(join(staging, `topic-${topic.id}`, 'keep.txt'), 'utf8')).toBe('Unrelated')
+  expect(existsSync(join(root, 'topics', topic.id))).toBe(true)
+  expect(existsSync(paper.directory!)).toBe(true)
+})
+
+it('finishes staged Topic cleanup without removing a new directory at a deleted paper’s old path', async () => {
+  const { root, files, topic, paper } = await topicFixture()
+  const staging = pendingTopic(root, topic, paper, true)
+  renameSync(join(root, 'topics', topic.id), join(staging, `topic-${topic.id}`))
+  renameSync(paper.directory!, join(staging, `paper-${paper.id}`))
+  mkdirSync(paper.directory!); writeFileSync(join(paper.directory!, 'replacement.txt'), 'New content')
+  await files.withLock(() => files.read())
+  expect(readFileSync(join(paper.directory!, 'replacement.txt'), 'utf8')).toBe('New content')
   expect(existsSync(join(root, 'agent-lib', '.transaction.json'))).toBe(false)
 })

@@ -9,7 +9,7 @@ import { chromium } from 'playwright'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { pdfFixture } from '../../../packages/client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
-import { assertFinalWorkspaceSnapshot, fixtureUserPrompts, launchWebScaffold } from './scaffold.ts'
+import { assertFinalWorkspaceSnapshot, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, webSnapshotMode } from './scaffold.ts'
 import { newEnglishPage } from './support.ts'
 
 const DIRECTORY = fileURLToPath(new URL('../../../snapshots/web/research-notebook', import.meta.url))
@@ -107,4 +107,13 @@ it.each(['original', 'additional'] as const)('records research reading and live 
   await page.getByRole('tooltip').filter({ hasText: 'Fixture paper' }).waitFor()
   await mark.click()
   expect(await workbench.getByRole('textbox', { name: 'AI notes', exact: true }).inputValue()).toContain('The original page contains selectable text')
+  await page.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+  await page.getByRole('button', { name: 'Topic actions for Robotics', exact: true }).click()
+  await compareOrRefreshGolden(fileURLToPath(new URL('./expected/research-workspace/topic-menu.expected.md', import.meta.url)),
+    await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd), webSnapshotMode())
+  await page.getByRole('menuitem', { name: 'Delete topic', exact: true }).click()
+  const removal = page.getByRole('dialog', { name: 'Delete topic “Robotics”', exact: true })
+  expect(await removal.getByRole('button', { name: 'Delete topic', exact: true }).isDisabled()).toBe(true)
+  await removal.getByRole('button', { name: 'Cancel', exact: true }).click()
+  expect((await scaffold.ctx.workspaceController.researchList()).papers).toHaveLength(1)
 })

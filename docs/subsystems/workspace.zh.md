@@ -451,6 +451,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('researchRenameTopic') researchRenameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog>
 
 /**
+ * Remove a Topic and its exclusive papers, preserving shared papers and archived histories.
+ * @param request - Topic and every exclusive paper directory confirmed by the user.
+ * @returns the remaining catalog after recoverable deletion completes.
+ */
+@Remote('researchDeleteTopic') researchDeleteTopic(request: ResearchDeleteTopicRequest): Promise<ResearchCatalog>
+
+/**
  * Apply the requested research operation.
  * @param request - Paper metadata and its independent Session.
  * @returns the committed catalog.

@@ -27,7 +27,8 @@ import { restoreResearchSessions } from './research-session-backup.ts'
 import { paperConversations, paperForSession, conversationBackup } from './research-conversations.ts'
 import type { ResearchCreateConversationRequest, ResearchUpdateConversationRequest } from './research-types.ts'
 import type {
-  ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchDirectoryRequest, ResearchDeletePaperRequest,
+  ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchDirectoryRequest,
+  ResearchDeletePaperRequest, ResearchDeleteTopicRequest,
   ResearchFollowFrame, ResearchPaperId, ResearchReadPaperRequest, ResearchPaperText, ResearchSaveNoteRequest, ResearchTopicId,
   ResearchImportPaperRequest, ResearchAttachPdfRequest, ResearchHighlightRequest,
 } from './research-types.ts'
@@ -158,6 +159,51 @@ export class ResearchCatalogHost {
       }
       await requireIdle()
       const confirmed = await this.files.deletePaper(paper, request.directory)
+      this.accept(confirmed)
+      await this.watcher?.close()
+      await this.watch()
+      return confirmed
+    }))
+  }
+
+  /**
+   * Delete a Topic and its exclusive papers after checking the displayed paths and idle Sessions.
+   * @param request - Topic and complete exclusive-paper directory confirmation.
+   * @returns the remaining library, retaining shared papers and archived native histories.
+   */
+  deleteTopic(request: ResearchDeleteTopicRequest): Promise<ResearchCatalog> {
+    return this.serialized(() => this.files.withLock(async () => {
+      const catalog = await this.files.read()
+      this.accept(catalog)
+      const topic = catalog.topics.find(item => item.id === request.topicId)
+      if (topic === undefined) throw new RemoteError('research/not-found', 'Topic not found', { id: request.topicId })
+      await this.files.confirmTopicDeletion(topic, request.directory)
+      const related = catalog.papers.filter(item => item.topicIds.includes(topic.id))
+      const owned = related.filter(item => item.topicIds.length === 1)
+      if (request.papers.length !== owned.length || new Set(request.papers.map(item => item.paperId)).size !== request.papers.length
+        || owned.some(paper => !request.papers.some(item => item.paperId === paper.id && item.directory === paper.directory))) {
+        throw new RemoteError('research/topic-contents-changed', 'Topic contents changed; review every directory before deleting', { topicId: topic.id })
+      }
+      for (const paper of owned) await this.files.confirmDeletion(paper, await this.files.paperPath(paper))
+      const sessions = [...new Set([topic.sessionId, ...related.flatMap(paper => paperConversations(paper).map(item => item.sessionId)),
+        ...catalog.topics.filter(item => related.some(paper => paper.topicIds.includes(item.id))).map(item => item.sessionId)])]
+      const requireIdle = async (): Promise<void> => {
+        const activity = await Promise.all(sessions.map(sessionId => this.ctx.waterfall('workspace/session-activity', { sessionId }, () => Promise.resolve([]))))
+        if (activity.some(items => items.length > 0) || sessions.some(id => this.ctx.get('agents')?.get(id)?.status === 'running')) {
+          throw new RemoteError('research/topic-busy', 'Stop this Topic and its papers before deleting', { topicId: topic.id })
+        }
+      }
+      await requireIdle()
+      try {
+        for (const id of [topic.sessionId, ...owned.flatMap(paper => paperConversations(paper).map(item => item.sessionId))]) {
+          await this.ctx.workspaceRegistry.archiveSession(id)
+        }
+      } catch (error: unknown) {
+        if (error instanceof WorkspaceActiveSessionError) throw new RemoteError('research/topic-busy', 'Stop this Topic and its papers before deleting', { topicId: topic.id }, { cause: error })
+        throw error
+      }
+      await requireIdle()
+      const confirmed = await this.files.deleteTopic(topic, owned)
       this.accept(confirmed)
       await this.watcher?.close()
       await this.watch()

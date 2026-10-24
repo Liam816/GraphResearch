@@ -9,7 +9,6 @@
         - button "Collapse Robot VLA" [expanded]
         - button "Robot VLA"
         - button "Topic actions for Robot VLA"
-        - button "Add paper to Robot VLA"
         - list:
           - listitem:
             - button "RT-2"

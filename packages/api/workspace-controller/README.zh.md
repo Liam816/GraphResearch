@@ -63,6 +63,8 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 `researchRenameTopic` 接收 Topic 标识、新名称及编辑框的 `expectedTitle`。它去除首尾空白并校验名称，拒绝不存在的 Topic；其他写入者已改名时返回 `research/topic-conflict`。重复已成功应用的改名不会再次增加修订号。现有资料库事务更新 `agent-lib/library.json` 和私有 Topic 元数据；Topic 标识、笔记、Session、目录和论文关联保持稳定。写入失败时可能保留可恢复日志，重试前应先刷新资料库。
 
+`researchDeleteTopic` 在归档或暂存文件前，核对 Topic 的完整路径及全部专属论文身份和路径。相关任务运行或内容过期时拒绝删除。单个 `agent-lib/.transaction.json` 暂存 Topic 与专属论文，一并发布移除结果和共享论文的关联变更，再清理暂存文件与私有运行记录。读取会恢复中断的暂存或清理；目标被占用时停止并保留两份副本。共享论文及其会话继续可用。原始历史归档保留，不删除共享 Workspace。
+
 `researchDeletePaper` 要求论文标识及用户确认的准确绝对目录。Host 校验当前元数据，拒绝链接、路径不匹配及仍有论文或 Topic 任务运行的请求，并归档论文 Session，阻止后续提问。事务日志先将已验证目录暂存到 `agent-lib/.paper-deletions/`，发布移除论文后的索引，再永久删除暂存文件。操作中断时保留日志，下次读取资料库继续恢复；恢复不会删除原路径下新建的同名目录。失败后 Session 可能已归档，删除也可能已部分执行，重试前需刷新确认。原生 Session 代际文件保留。
 
 `researchListFiles` 列出论文目录的直接子项；`researchReadFile` 在 `researchMaxNoteBytes` 限制内返回完整 UTF-8 文本或图片，并明确报告二进制文件与超限文件。路径相对论文目录，拒绝目录越界和符号链接。`researchSaveFile` 只编辑已有 Markdown，并要求 SHA-256 `expectedVersion`；版本冲突不写文件。I/O 失败保留浏览器草稿，重试前应重新读取文件确认状态。托管笔记修改也通过研究目录流发布。
