@@ -14,6 +14,7 @@
     "src/feed.ts",
     "src/default-directory.ts",
     "src/research-types.ts",
+    "src/research-conversations.ts",
     "src/research.ts",
     "src/research-files.ts",
     "src/research-contents.ts",

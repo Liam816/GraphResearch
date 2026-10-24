@@ -1,5 +1,6 @@
 /** Research navigation and paper-local panel preferences; catalog data remains Host-owned. */
 import { defineStore } from '@deepseek-ai/dsh-client-store'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ResearchNoteKind, ResearchPaperId, ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 
 /** Independently collapsible paper panels. */
@@ -41,6 +42,8 @@ export interface PaperFileView {
 }
 /** Paper-local layout and unsaved notebook edits. */
 export interface PaperView {
+  activeSession?: SessionId
+
   /** Absent in older browser preferences; resolvePanelOrder supplies the reading order. */
   order?: ResearchPanel[]
   files?: PaperFileView
@@ -109,6 +112,9 @@ function researchViewDefinition() {
       papers: {} as Record<ResearchPaperId, PaperView>,
     }),
     actions: {
+      conversation: (draft, id: ResearchPaperId, sessionId: SessionId) => {
+        (draft.papers[id] ??= defaultPaperView()).activeSession = sessionId
+      },
       forgetPaper: (draft, id: ResearchPaperId) => {
         draft.papers = Object.fromEntries(Object.entries(draft.papers).filter(([key]) => key !== id))
       },
@@ -137,6 +143,7 @@ function researchViewDefinition() {
         const previous = draft.papers[id] ?? defaultPaperView()
         draft.papers[id] = { ...defaultPaperView(), panels: { agent: true, pdf: true, notes: true },
           drafts: previous.drafts, notebook: previous.notebook,
+          ...previous.activeSession === undefined ? {} : { activeSession: previous.activeSession },
           ...previous.files === undefined ? {} : { files: previous.files },
           ...previous.reading === undefined ? {} : { reading: previous.reading } }
       },

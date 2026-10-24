@@ -5,6 +5,7 @@ import {
   Button, Input, Modal, Pill, Tooltip, ReferenceIconRegular,
   IconCheckOutlineRegular, IconCloseOutlineRegular, IconPlusOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { paperForSession } from './conversation-records.ts'
 import type { ResearchPaperId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchWorkbenchProps } from './contract.ts'
 import { defaultPaperView, resolvePanelOrder, type PaperView } from './store.ts'
@@ -46,11 +47,13 @@ function PanelControls({ paperId, view, id, navigation = false, t, viewActions }
 
 /** @param props - current Session seats, catalog, layout store, and factory renderer. @returns a topic chat or paper workspace. */
 export function ResearchWorkbench(props: ResearchWorkbenchProps) {
-  const { t, viewActions: actions, sessionId, view: state } = props
+  const { t, viewActions: actions, view: state } = props
+  const sessionId = props.useSessions(value => Object.values(value.byId).find(item => (item.retainedBy.mainView ?? 0) > 0)?.id)
   const { catalog } = props.useResearch(value => value)
-  const session = props.useSession(value => value)
-  const conversationActive = props.useConversation(value => value.activeTargets.size > 0) ?? false
-  const paper = catalog.papers.find(item => item.sessionId === sessionId)
+  const resources = props.useResources(value => value)
+  const paper = paperForSession(catalog, sessionId)
+  const running = props.useSessions(value => paper?.conversations?.some(item => value.byId[item.sessionId]?.running === true)
+    ?? (sessionId !== undefined && value.byId[sessionId]?.running === true))
   const topic = paper === undefined ? catalog.topics.find(item => item.sessionId === sessionId)
     : catalog.topics.find(item => item.id === state.topicId && paper.topicIds.includes(item.id))
       ?? catalog.topics.find(item => paper.topicIds.includes(item.id))
@@ -66,21 +69,16 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
   const [referenceError, setReferenceError] = useState(false)
   const [referenceBusy, setReferenceBusy] = useState(false)
   const [inserted, setInserted] = useState(false)
-  const settling = sessionId !== undefined && session?.openState !== 'open' && session?.blank !== true
-  const hero = sessionId === undefined || (session?.blank === true && !session.running && !conversationActive && !session.promptAttempted)
-  const phase = settling ? 'settling' : hero ? 'hero' : 'active'
-  const agent = () => props.renderFactorySlot('conversation.content', { variant: 'embedded', phase, hero })
+  const agent = () => props.renderSlot('research.agent', { paper })
   const insert = async (): Promise<void> => {
-    const input = props.inputActions
-    if (input === undefined || selected.length === 0 || selected.length > 3) { setReferenceError(true); return }
-    const span = input.captureInsertion()
+    if (sessionId === undefined || selected.length === 0 || selected.length > 3) { setReferenceError(true); return }
     setReferenceBusy(true); setReferenceError(false)
     try {
-      const mentions = await props.mentions(selected)
-      if (!input.insertText(`${mentions.join(' ')} `, span)) { setReferenceError(true); return }
+      if (!await props.insertReferences(sessionId, selected)) { setReferenceError(true); return }
       if (paper !== undefined) actions.focus(paper.id, 'agent')
       setReferencesOpen(false); setInserted(true)
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
+      console.error('Research reference insertion failed:', error)
       // A failed or stale insertion keeps the user's selected papers available for retry.
       setReferenceError(true)
     } finally { setReferenceBusy(false) }
@@ -105,20 +103,20 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
     {paper === undefined ? <div className={css.topicChat}>
       {topic !== undefined && <div className={css.topicIntro}><span>{t('topic')}</span><h1>{topic.title}</h1><p>{t('topicDescription')}</p><small>{t('paperCount', { count: catalog.papers.filter(item => item.topicIds.includes(topic.id)).length })}</small></div>}
       <div className={css.agentContent}>{agent()}</div>
-    </div> : <ResearchPaperPanels key={paper.id} paper={paper} view={view} id={panelId} phase={phase} hero={hero}
+    </div> : <ResearchPaperPanels key={paper.id} paper={paper} view={view} id={panelId} agent={agent()}
+      resources={resources} SessionProvider={props.SessionProvider}
       t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote}
-      listFiles={props.listFiles} readFile={props.readFile} saveFile={props.saveFile} revision={`${catalog.revision}:${session?.running === true}`}
+      listFiles={props.listFiles} readFile={props.readFile} saveFile={props.saveFile} revision={`${catalog.revision}:${running}`}
       highlight={props.highlight} extractMarkdown={props.extractMarkdown}
       translate={props.translate} saveTranslation={props.saveTranslation}
       translationAvailable={catalog.capabilities?.pdfTranslations === true}
       askTranslation={(translation) => {
-        const input = props.inputActions
-        if (input === undefined) throw new Error('The paper composer is not ready')
+        if (sessionId === undefined) throw new Error('The paper composer is not ready')
         const { context, result } = translation
         const question = t('translationQuestion', { selected: context.selected,
           page: context.startPage, context: [...context.before, context.sentence, ...context.after].join(' '),
           meaning: result.contextualMeaning, explanation: result.explanation, translation: result.translation })
-        if (!input.insertText(question, input.captureInsertion())) throw new Error('The paper composer changed')
+        if (!props.insertText(sessionId, question)) throw new Error('The paper composer changed')
         actions.focus(paper.id, 'agent')
         return Promise.resolve()
       }}
@@ -129,13 +127,13 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
         <Button variant="primary" disabled={referenceBusy || selected.length === 0 || selected.length > 3} onClick={() => { void insert() }}>{t('insert')}</Button>
       </>}>
       <Input data-modal-autofocus aria-label={t('search')} placeholder={t('search')} value={query} onChange={(event) => { setQuery(event.target.value) }} />
-      <div className={css.referenceList}>{catalog.papers.filter(item => item.sessionId !== sessionId
+      <div className={css.referenceList}>{catalog.papers.filter(item => item.id !== paper?.id
         && item.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(item =>
         <label key={item.id}><input type="checkbox" disabled={referenceBusy || (!selected.includes(item.id) && selected.length >= 3)} checked={selected.includes(item.id)}
           onChange={(event) => {
             setSelected(event.target.checked ? [...selected, item.id] : selected.filter(id => id !== item.id))
           }} /><span>{item.title}</span></label>)}
-      {catalog.papers.filter(item => item.sessionId !== sessionId).length === 0 && <p>{t('noRelated')}</p>}
+      {catalog.papers.filter(item => item.id !== paper?.id).length === 0 && <p>{t('noRelated')}</p>}
       </div>
       {referenceError && <p role="alert">{t('referenceFailed')}</p>}
     </Modal>

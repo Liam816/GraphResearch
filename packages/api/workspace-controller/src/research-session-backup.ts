@@ -8,6 +8,7 @@ import { validateStoredEvents } from '@deepseek-ai/dsh-session-persistence'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
 import { z } from 'zod'
 import type { ResearchCatalog } from './research-types.ts'
+import { paperConversations, conversationBackup } from './research-conversations.ts'
 import { missing } from './research-files.ts'
 import type { ResearchFiles } from './research-files.ts'
 
@@ -35,8 +36,15 @@ const backupSchema = z.object({
  * @returns metadata with current Workspace bindings; callers publish any changed bindings.
  */
 export async function restoreResearchSessions(ctx: Context, files: ResearchFiles, catalog: ResearchCatalog): Promise<ResearchCatalog> {
-  for (const item of [...catalog.topics, ...catalog.papers]) {
-    const path = await files.path(catalog.papers.some(paper => paper.id === item.id) ? 'papers' : 'topics', item.id, 'session.json')
+  const snapshots = [
+    ...await Promise.all(catalog.topics.map(async topic => ({ sessionId: topic.sessionId,
+      path: await files.path('topics', topic.id, 'session.json') }))),
+    ...await Promise.all(catalog.papers.flatMap(paper => paperConversations(paper).map(async conversation => ({
+      sessionId: conversation.sessionId,
+      path: await files.path('papers', paper.id, ...conversationBackup(paper, conversation.sessionId)) })))),
+  ]
+  for (const item of snapshots) {
+    const path = item.path
     let content: string
     try { content = await readFile(path, 'utf8') } catch (error: unknown) { if (missing(error)) continue; throw error }
     try {
@@ -66,7 +74,8 @@ export async function restoreResearchSessions(ctx: Context, files: ResearchFiles
       workspace = await ctx.workspaceRegistry.create(header?.cwd ?? files.directory)
       changed = true
     }
-    const paperSessions = catalog.papers.filter(paper => paper.topicIds.includes(topic.id)).map(paper => paper.sessionId)
+    const paperSessions = catalog.papers.filter(paper => paper.topicIds.includes(topic.id))
+      .flatMap(paper => paperConversations(paper).map(item => item.sessionId))
     for (const id of [topic.sessionId, ...paperSessions]) {
       if (workspace.sessionIds.includes(id)) continue
       const header = ctx.sessions.get(id)?.header ?? (await ctx.sessionPersistence.stat(id))?.header

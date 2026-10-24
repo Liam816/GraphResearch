@@ -39,22 +39,41 @@ const paper = z.object({
   source: z.string().optional(), progress: z.string().optional(),
   highlights: z.array(researchHighlightSchema).optional(),
   markdown: markdown.optional(),
+  conversations: z.array(z.object({
+    sessionId: z.string().transform(value => brandString<ResearchPaper['sessionId']>(value)), title: z.string(),
+    pinned: z.boolean(), archived: z.boolean(), createdAt: z.number().int().nonnegative(), progress: z.string().optional(),
+  })).min(1).refine(items => new Set(items.map(item => item.sessionId)).size === items.length).readonly().optional(),
 })
 
 /** Existing storage-domain records remain readable during first-use file migration. */
 export const researchCatalogSchema: z.ZodType<ResearchCatalog> = z.object({
   revision: z.number().int().nonnegative(), topics: z.array(topic), papers: z.array(paper), directory: z.string().optional(),
-})
+}).refine(validSessionOwnership, 'Research Sessions must have one owner and include each paper’s original Session')
 
 const paperIdentity = z.object({ id: paperId })
 const noteIndex = z.object({ revision: z.number().int().nonnegative(), sha256: z.string() })
 const folderName = z.string().min(1).refine(value => value !== '.' && value !== '..'
   && !/[\\/\u0000-\u001f<>:"|?*]/u.test(value) && !/[. ]$/.test(value) && Buffer.byteLength(value) <= 255)
 const indexSchema = z.object({
-  version: z.literal(1), revision: z.number().int().nonnegative(),
+  version: z.union([z.literal(1), z.literal(3)]), revision: z.number().int().nonnegative(),
   topics: z.array(topic.omit({ notes: true }).extend({ notes: noteIndex })),
   papers: z.array(paper.omit({ ai: true, learning: true, directory: true }).extend({ ai: noteIndex, learning: noteIndex })),
-})
+}).refine(validSessionOwnership, 'Research Sessions must have one owner and include each paper’s original Session')
+  .refine(index => index.version === 3 || index.papers.every(item => item.conversations === undefined),
+    'Multiple conversations require library index version 3')
+
+function validSessionOwnership(value: {
+  topics: readonly { sessionId: string }[]
+  papers: readonly { sessionId: string; conversations?: readonly { sessionId: string }[] | undefined }[]
+}): boolean {
+  const sessions = value.topics.map(item => item.sessionId)
+  for (const paper of value.papers) {
+    if (paper.conversations !== undefined && !paper.conversations.some(item => item.sessionId === paper.sessionId)) return false
+    sessions.push(...paper.conversations?.map(item => item.sessionId) ?? [paper.sessionId])
+  }
+  return sessions.length === new Set(sessions).size
+}
+
 const journalSchema = z.object({
   index: indexSchema,
   writes: z.array(z.object({
@@ -199,7 +218,8 @@ export class ResearchFiles {
       papers.push({ ...metadata, ...highlights === undefined ? {} : { highlights: [...highlights] }, topicIds: [...metadata.topicIds], pdfPath: item.pdfPath === '' ? '' : relative(folder, await this.path('papers', item.id, 'paper.pdf')),
         ai: await prepare('ai', item.id, ai), learning: await prepare('learning', item.id, learning) })
     }
-    const journal: Journal = { index: { version: 1, revision: catalog.revision, topics, papers }, writes }
+    const version = catalog.papers.some(item => item.conversations !== undefined) ? 3 : 1
+    const journal: Journal = { index: { version, revision: catalog.revision, topics, papers }, writes }
     await writeFileAtomic(await this.path('.transaction.json'), `${JSON.stringify(journal)}\n`, { mode: 0o600, dirMode: 0o700 })
     await this.recover()
   }

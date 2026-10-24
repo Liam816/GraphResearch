@@ -53,6 +53,7 @@ export const remoteDefaultResponses: RemoteTable = {
     // ui-settings-account shares the account snapshot across settings and the sidebar menu.
     'account/watch': openStream([{ status: 'signed-out', attempt: null, links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' } }]),
     // api-workspace-controller client `apply`: the follow stream's opening baseline, then open.
+    'workspace/researchFollow': openStream([{ type: 'baseline', catalog: { revision: 0, topics: [], papers: [] } }]),
     'workspace/follow': openStream([{ type: 'baseline', value: { items: [], archivedSessionIds: [], pinnedSessionIds: [] } }]),
   },
 }

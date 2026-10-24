@@ -23347,7 +23347,7 @@
         "packages/api/workspace-controller/src/research-translation-types.ts#ResearchTranslation"
       ],
       "sources": [
-        "packages/api/workspace-controller/src/research-translation-types.ts:52"
+        "packages/api/workspace-controller/src/research-translation-types.ts:54"
       ]
     },
     {
@@ -23403,7 +23403,7 @@
       "digest": "2b64b82387d5c151eb7c75e8b5eeb17d32a2828cca7a09b286656e04369fa0a8",
       "names": [],
       "sources": [
-        "packages/api/workspace-controller/src/research-translation-types.ts:65"
+        "packages/api/workspace-controller/src/research-translation-types.ts:67"
       ]
     },
     {
@@ -23455,7 +23455,7 @@
       "digest": "2ebc18d4f9fda63e87ee5528008c981a5ee4d40e643a20be4a3ab842358c7a9f",
       "names": [],
       "sources": [
-        "packages/api/workspace-controller/src/research-translation-types.ts:83"
+        "packages/api/workspace-controller/src/research-translation-types.ts:85"
       ]
     },
     {
@@ -24548,7 +24548,7 @@
         "packages/api/workspace-controller/src/research-translation-types.ts#ResearchPronunciation"
       ],
       "sources": [
-        "packages/api/workspace-controller/src/research-translation-types.ts:45"
+        "packages/api/workspace-controller/src/research-translation-types.ts:47"
       ]
     },
     {
@@ -25214,7 +25214,7 @@
         "packages/api/workspace-controller/src/research-translation-types.ts#ResearchTranslationContext"
       ],
       "sources": [
-        "packages/api/workspace-controller/src/research-translation-types.ts:21"
+        "packages/api/workspace-controller/src/research-translation-types.ts:23"
       ]
     },
     {
@@ -25952,7 +25952,7 @@
         "packages/api/workspace-controller/src/research-translation-types.ts#ResearchTranslationRequestRecord"
       ],
       "sources": [
-        "packages/api/workspace-controller/src/research-translation-types.ts:62"
+        "packages/api/workspace-controller/src/research-translation-types.ts:64"
       ]
     },
     {
@@ -26008,7 +26008,7 @@
         "packages/api/workspace-controller/src/research-translation-types.ts#ResearchTranslationExplanation"
       ],
       "sources": [
-        "packages/api/workspace-controller/src/research-translation-types.ts:34"
+        "packages/api/workspace-controller/src/research-translation-types.ts:36"
       ]
     },
     {

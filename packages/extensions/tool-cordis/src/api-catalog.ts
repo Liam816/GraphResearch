@@ -3782,6 +3782,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the committed catalog.',
       },
       {
+        signature: '@Remote(\'researchCreateConversation\') async researchCreateConversation(request: ResearchCreateConversationRequest): Promise<ResearchCatalog>',
+        description: 'Attach a fresh independent Session to a paper.',
+        parameters: [{ name: 'request', description: 'paper and the newly created Session.' }],
+        returns: 'the catalog with the attached conversation.',
+      },
+      {
+        signature: '@Remote(\'researchUpdateConversation\') researchUpdateConversation(request: ResearchUpdateConversationRequest): Promise<ResearchCatalog>',
+        description: 'Rename, pin, archive, or restore a paper conversation.',
+        parameters: [{ name: 'request', description: 'conversation metadata changes.' }],
+        returns: 'the committed library.',
+      },
+      {
         signature: '@Remote(\'researchDeletePaper\') researchDeletePaper(request: ResearchDeletePaperRequest): Promise<ResearchCatalog>',
         description: 'Permanently remove one paper\'s directory and catalog entry, retaining its archived native Session.',
         parameters: [{ name: 'request', description: 'paper identity and the absolute directory confirmed by the user.' }],
@@ -3872,9 +3884,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'extracted text with original page numbers.',
       },
       {
-        signature: '@Remote(\'researchProgress\') researchProgress(paperId: ResearchPaperId, text: string): Promise<ResearchCatalog>',
+        signature: '@Remote(\'researchProgress\') researchProgress(paperId: ResearchPaperId, text: string, sessionId?: SessionId): Promise<ResearchCatalog>',
         description: 'Save the paper continuation point.',
-        parameters: [{ name: 'paperId', description: 'owning paper.' }, { name: 'text', description: 'continuation point and questions.' }],
+        parameters: [{ name: 'paperId', description: 'owning paper.' }, { name: 'text', description: 'continuation point and questions.' }, { name: 'sessionId', description: 'optional owning conversation; omission updates the original paper continuation.' }],
         returns: 'committed library.',
       },
       {
@@ -6635,7 +6647,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchCatalog',
-    declaration: 'export interface ResearchCatalog {\n    readonly revision: number;\n    readonly topics: readonly ResearchTopic[];\n    readonly papers: readonly ResearchPaper[];\n    readonly capabilities?: {\n        readonly pdfHighlights: true;\n        readonly pdfTranslations?: true;\n    } | undefined;\n    readonly directory?: string | undefined;\n}',
+    declaration: 'export interface ResearchCatalog {\n    readonly revision: number;\n    readonly topics: readonly ResearchTopic[];\n    readonly papers: readonly ResearchPaper[];\n    readonly capabilities?: {\n        readonly pdfHighlights: true;\n        readonly pdfTranslations?: true;\n        readonly paperConversations?: true;\n    } | undefined;\n    readonly directory?: string | undefined;\n}',
+  },
+  {
+    name: 'ResearchConversation',
+    declaration: 'export interface ResearchConversation {\n    readonly sessionId: SessionId;\n    readonly title: string;\n    readonly pinned: boolean;\n    readonly archived: boolean;\n    readonly createdAt: number;\n    readonly progress?: string | undefined;\n}',
+  },
+  {
+    name: 'ResearchCreateConversationRequest',
+    declaration: 'export interface ResearchCreateConversationRequest {\n    readonly paperId: ResearchPaperId;\n    readonly sessionId: SessionId;\n}',
   },
   {
     name: 'ResearchCreatePaperRequest',
@@ -6711,7 +6731,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchPaper',
-    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly markdown?: ResearchMarkdown | undefined;\n    readonly highlights?: readonly ResearchHighlight[] | undefined;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
+    declaration: 'export interface ResearchPaper {\n    readonly id: ResearchPaperId;\n    readonly title: string;\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly sessionId: SessionId;\n    readonly conversations?: readonly ResearchConversation[] | undefined;\n    readonly pdfPath: string;\n    readonly repositoryUrl: string;\n    readonly ai: ResearchNote;\n    readonly learning: ResearchNote;\n    readonly markdown?: ResearchMarkdown | undefined;\n    readonly highlights?: readonly ResearchHighlight[] | undefined;\n    readonly directory?: string | undefined;\n    readonly sourceId?: string | undefined;\n    readonly pdfSha256?: string | undefined;\n    readonly source?: string | undefined;\n    readonly progress?: string | undefined;\n}',
   },
   {
     name: 'ResearchPaperId',
@@ -6767,7 +6787,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchTranslationRequest',
-    declaration: 'export interface ResearchTranslationRequest {\n    readonly paperId: ResearchPaperId;\n    readonly text: string;\n    readonly start: ResearchTextPosition;\n    readonly end: ResearchTextPosition;\n}',
+    declaration: 'export interface ResearchTranslationRequest {\n    readonly sessionId?: SessionId;\n    readonly paperId: ResearchPaperId;\n    readonly text: string;\n    readonly start: ResearchTextPosition;\n    readonly end: ResearchTextPosition;\n}',
+  },
+  {
+    name: 'ResearchUpdateConversationRequest',
+    declaration: 'export interface ResearchUpdateConversationRequest extends ResearchCreateConversationRequest {\n    readonly title?: string;\n    readonly expectedTitle?: string;\n    readonly pinned?: boolean;\n    readonly archived?: boolean;\n}',
   },
   {
     name: 'ResolvedAlwaysRetryPolicy',

@@ -4,6 +4,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {
   ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
 } from '../research-types.ts'
+import type { ResearchCreateConversationRequest, ResearchUpdateConversationRequest } from '../research-types.ts'
 import type { WorkspaceRemote } from './model.ts'
 import type { ResearchTranslation, ResearchTranslationRequest } from '../research-translation-types.ts'
 import type {
@@ -29,7 +30,27 @@ export class ClientResearchModel {
    * @param remote - generated Workspace namespace.
    */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchRenameTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+    'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+
+  /**
+   * Attach an independent conversation and accept its confirmed metadata.
+   * @param request - paper and a fresh independent Session.
+   */
+  async createConversation(request: ResearchCreateConversationRequest): Promise<void> {
+    const result = await this.remote.researchCreateConversation(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
+
+  /**
+   * Update conversation settings and publish the confirmed library.
+   * @param request - conversation name, pin or archive changes.
+   */
+  async updateConversation(request: ResearchUpdateConversationRequest): Promise<void> {
+    const result = await this.remote.researchUpdateConversation(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
 
   /**
    * Delete a paper after explicit directory confirmation and publish the remaining catalog.

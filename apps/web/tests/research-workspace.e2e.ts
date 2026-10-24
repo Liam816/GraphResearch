@@ -6,7 +6,8 @@ import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
-import { expect, it, onTestFailed, onTestFinished } from 'vitest'
+import { expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 import { pdfFixture } from '../../../packages/client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
 import { captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode } from './scaffold.ts'
@@ -450,6 +451,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await expect.poll(() => notes.isVisible()).toBe(true)
   expect(await workbench.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(false)
   expect(console.pageErrors).toEqual([])
+  expect(clientErrors).toEqual([])
 }, 120_000)
 
 it('resizes paper files in both layouts while retaining drafts and independent proportions', async () => {
@@ -717,4 +719,189 @@ it('renames a Topic from its directory menu and retains child papers across relo
   expect(await field.inputValue()).toBe('Core VLA reading')
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   expect(console.pageErrors).toEqual([])
+})
+
+
+it('manages independent paper conversations while preserving mounted reading resources', async () => {
+  const scaffold = await launchWebScaffold()
+  onTestFinished(() => scaffold.close())
+  const controller = scaffold.ctx.workspaceController
+  const directory = (await controller.researchList()).directory!
+  const workspace = await scaffold.ctx.workspaceRegistry.create(directory)
+  const topicSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id })
+  const topic = (await controller.researchCreateTopic({ title: 'Conversation study', workspaceId: workspace.id,
+    sessionId: topicSession.sessionId })).topics[0]!
+  const source = join(scaffold.workspaceCwd, 'conversations.pdf')
+  await writeFile(source, pdfFixture(8))
+  const imported = await controller.researchImportPaper({ topicId: topic.id, title: 'Multi-session paper', source }, new AbortController().signal)
+  const paper = (await controller.researchList()).papers.find(item => item.id === imported.paperId)!
+  const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+  const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
+  onTestFinished(() => browser.close())
+  const page = await newEnglishPage(browser)
+  await page.setViewportSize({ width: 1800, height: 1080 })
+  const errors = watchConsole(page)
+  onTestFailed(() => { process.stderr.write(`${JSON.stringify(errors)}\n`) })
+  onTestFailed(() => saveFailureShot(page, 'research-conversations'))
+  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  const library = page.getByRole('region', { name: 'Research library', exact: true })
+  await library.getByRole('button', { name: paper.title, exact: true }).click()
+  const workbench = page.locator('[data-research-workbench]')
+  const agent = workbench.getByRole('region', { name: 'Agent chat', exact: true })
+  const composer = agent.getByRole('textbox', { name: /Describe what you want to build/ })
+  await composer.fill('Draft for the original reading')
+  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'Related content', exact: true }).click()
+  await openResearchNote(workbench, 'learning', true)
+  const note = workbench.getByRole('textbox', { name: 'Learning notes', exact: true })
+  await note.fill('Shared reading draft')
+  const noteNode = await note.elementHandle()
+  const pdf = workbench.getByRole('region', { name: 'Original PDF', exact: true })
+  const scroll = pdf.locator('[data-document-zoom-scrollport]')
+  await scroll.waitFor()
+  const frame = pdf.locator('[data-document-zoom-frame]')
+  const frameBounds = await frame.boundingBox()
+  if (frameBounds === null) throw new Error('The paper PDF must be visible')
+  await page.mouse.move(frameBounds.x + frameBounds.width / 2, frameBounds.y + frameBounds.height - 8)
+  await pdf.getByRole('button', { name: 'Choose zoom', exact: true }).click()
+  await page.getByRole('menuitem', { name: '200%', exact: true }).click()
+  await expect.poll(() => scroll.evaluate(node => node.scrollHeight > node.clientHeight), { timeout: 10_000 }).toBe(true)
+  await scroll.evaluate((node) => { node.scrollTop = 400 })
+  const offset = await scroll.evaluate(node => node.scrollTop)
+  const pdfNode = await scroll.elementHandle()
+  onTestFinished(async () => { await noteNode?.dispose(); await pdfNode?.dispose() })
+  await agent.getByRole('button', { name: 'New conversation', exact: true }).click()
+  await expect.poll(async () => (await controller.researchList()).papers[0]?.conversations?.length).toBe(2)
+  await expect.poll(() => composer.textContent()).toBe('')
+  expect(await scroll.evaluate((node, original) => node === original, pdfNode)).toBe(true)
+  expect(await note.evaluate((node, original) => node === original, noteNode)).toBe(true)
+  expect(await scroll.evaluate(node => node.scrollTop)).toBeCloseTo(offset, 0)
+  expect(await note.inputValue()).toBe('Shared reading draft')
+  await composer.fill('Draft for method details')
+  const picker = agent.getByRole('button', { name: 'Switch conversation', exact: true })
+  const popup = page.getByRole('dialog', { name: 'Paper conversations', exact: true })
+  await picker.click()
+  await popup.getByRole('button', { name: 'Conversation actions for New conversation', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Rename conversation', exact: true }).click()
+  const rename = page.getByRole('dialog', { name: 'Rename conversation', exact: true })
+  await rename.getByRole('textbox', { name: 'Conversation name', exact: true }).fill('Method details')
+  await rename.getByRole('button', { name: 'Save name', exact: true }).click()
+  await rename.waitFor({ state: 'hidden' })
+  await expect.poll(() => picker.textContent()).toContain('Method details')
+  await picker.click()
+  await popup.getByRole('button', { name: 'Conversation actions for Method details', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Pin conversation', exact: true }).click()
+  await expect.poll(async () => (await controller.researchList()).papers[0]?.conversations?.find(item => item.title === 'Method details')?.pinned).toBe(true)
+  await picker.click()
+  await popup.getByRole('button', { name: /^Initial reading/ }).click()
+  await expect.poll(() => composer.textContent()).toBe('Draft for the original reading')
+  await picker.click()
+  await popup.getByRole('button', { name: /^Method details/ }).click()
+  await expect.poll(() => composer.textContent()).toBe('Draft for method details')
+  expect(await scroll.evaluate((node, original) => node === original, pdfNode)).toBe(true)
+  await library.getByRole('button', { name: /^Conversation study/ }).click()
+  await library.getByRole('button', { name: paper.title, exact: true }).click()
+  await expect.poll(() => picker.textContent()).toContain('Method details')
+  await page.reload({ waitUntil: 'load' })
+  await expect.poll(() => picker.textContent()).toContain('Method details')
+  await picker.click()
+  await popup.getByRole('button', { name: 'Conversation actions for Method details', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Archive conversation', exact: true }).click()
+  await expect.poll(() => picker.textContent()).toContain('Initial reading')
+  await picker.click()
+  await popup.getByRole('button', { name: 'Show archived conversations', exact: true }).click()
+  await popup.getByRole('button', { name: /^Method details/ }).click()
+  await expect.poll(() => picker.textContent()).toContain('Method details')
+  expect((await controller.researchList()).papers[0]?.conversations?.find(item => item.title === 'Method details')?.archived).toBe(false)
+  await mkdir(SHOTS, { recursive: true })
+  await picker.click()
+  await compareOrRefreshGolden(fileURLToPath(new URL('./expected/research-workspace/conversations.expected.md', import.meta.url)),
+    await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
+  await page.screenshot({ path: join(SHOTS, 'paper-conversations-light.png') })
+  await page.keyboard.press('Escape')
+  await openSettings(page, 'en')
+  const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
+  await settings.getByRole('button', { name: 'Dark', exact: true }).click()
+  await settings.getByRole('button', { name: 'Close', exact: true }).click()
+  await picker.click()
+  await page.screenshot({ path: join(SHOTS, 'paper-conversations-dark.png') })
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 375, height: 812 })
+  await picker.click()
+  const bounds = await popup.boundingBox()
+  expect(bounds!.x).toBeGreaterThanOrEqual(0)
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(375)
+  expect(await page.locator('body').evaluate(node => node.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: join(SHOTS, 'paper-conversations-narrow.png') })
+  await page.keyboard.press('Escape')
+  await page.setViewportSize({ width: 1800, height: 1080 })
+  // A held real Agent turn must block its sibling before a model request is made.
+  const first = scaffold.ctx.agents.get(paper.sessionId)!
+  const additional = (await controller.researchList()).papers[0]!.conversations![1]!
+  const second = scaffold.ctx.agents.get(additional.sessionId)!
+  let release!: () => void, arrived!: () => void
+  const gate = new Promise<void>((resolve) => { release = resolve })
+  const entered = new Promise<void>((resolve) => { arrived = resolve })
+  const stopGate = scaffold.ctx.on('agent/pre-step', async ({ agent }, next) => {
+    if (agent !== first) return next()
+    arrived(); await gate
+    return { kind: 'reject' }
+  })
+  onTestFinished(async () => { release(); await first.whenIdle(); stopGate() })
+  const failures: unknown[] = []
+  const stopErrors = scaffold.ctx.on('agent/error', ({ error }) => { failures.push(error) })
+  onTestFinished(() => { stopErrors() })
+  const question = () => createUserMessage({ content: [{ type: 'text', text: 'Hold this paper turn' }], source: { kind: 'user' } })
+  first.followup(question())
+  await entered
+  await agent.getByRole('status').filter({ hasText: 'Another conversation for this paper is running.' }).waitFor()
+  second.followup(question())
+  await second.whenIdle()
+  expect(failures).toEqual([expect.objectContaining({ code: 'research/conversation-busy' })])
+  release(); await first.whenIdle(); stopGate()
+  for (const item of (await controller.researchList()).papers[0]!.conversations!) {
+    await controller.researchUpdateConversation({ paperId: paper.id, sessionId: item.sessionId, archived: true })
+  }
+  await agent.getByRole('button', { name: 'Restore conversation', exact: true }).waitFor()
+  expect(await composer.count()).toBe(0)
+  await agent.getByRole('button', { name: 'Restore conversation', exact: true }).click()
+  await agent.getByRole('textbox').waitFor()
+  expect(await agent.getByRole('textbox').isEnabled()).toBe(true)
+  expect(errors.pageErrors).toEqual([])
+})
+
+
+it('shows a restart notice and disables conversation management for an older Host', async () => {
+  const scaffold = await launchWebScaffold()
+  onTestFinished(() => scaffold.close())
+  const controller = scaffold.ctx.workspaceController
+  const directory = (await controller.researchList()).directory!
+  const workspace = await scaffold.ctx.workspaceRegistry.create(directory)
+  const session = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id })
+  const topic = (await controller.researchCreateTopic({ title: 'Legacy conversations', workspaceId: workspace.id,
+    sessionId: session.sessionId })).topics[0]!
+  await controller.researchImportPaper({ topicId: topic.id, title: 'Existing paper' }, new AbortController().signal)
+  const list = controller.researchList.bind(controller), follow = controller.researchFollow.bind(controller)
+  const read = vi.spyOn(controller, 'researchList').mockImplementation(async () => ({ ...await list(), capabilities: undefined }))
+  const stream = vi.spyOn(controller, 'researchFollow').mockImplementation(async function* (signal) {
+    for await (const frame of follow(signal)) {
+      yield frame.type === 'error' ? frame : { ...frame, catalog: { ...frame.catalog, capabilities: undefined } }
+    }
+  })
+  onTestFinished(() => { read.mockRestore(); stream.mockRestore() })
+  const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+  const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
+  onTestFinished(() => browser.close())
+  const page = await newEnglishPage(browser)
+  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  await page.getByRole('region', { name: 'Research library', exact: true }).getByRole('button', { name: 'Existing paper', exact: true }).click()
+  const agent = page.locator('[data-research-panel=agent]')
+  const message = 'The backend has not loaded paper conversations. Restart the server, then refresh this page.'
+  await agent.getByRole('status').filter({ hasText: message }).waitFor()
+  expect(await agent.getByRole('button', { name: 'New conversation', exact: true }).isDisabled()).toBe(true)
+  expect(await agent.getByRole('button', { name: 'Switch conversation', exact: true }).isDisabled()).toBe(true)
+  const before = scaffold.ctx.sessions.list().length
+  await agent.getByRole('button', { name: 'New conversation', exact: true }).evaluate((button) => { (button as HTMLButtonElement).click() })
+  expect(scaffold.ctx.sessions.list()).toHaveLength(before)
+  await compareOrRefreshGolden(fileURLToPath(new URL('./expected/research-workspace/conversations-unavailable.expected.md', import.meta.url)),
+    await captureStableAria(page, '[data-research-panel=agent] [role=status]', scaffold.workspaceCwd), webSnapshotMode())
 })

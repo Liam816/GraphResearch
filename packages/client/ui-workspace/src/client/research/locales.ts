@@ -1,5 +1,16 @@
 /** Product and accessibility copy for the research workspace. */
 export const zh = {
+  newConversation: '新会话', initialConversation: '初次阅读', chooseConversation: '切换会话', paperConversations: '本论文的会话',
+  searchConversations: '搜索本论文的会话', noConversations: '没有匹配的会话', pinnedConversations: '置顶', recentConversations: '最近',
+  archivedConversations: '已归档', currentConversation: '当前', conversationRunning: '运行中', conversationActions: '{title} 的会话操作',
+  renameConversation: '修改会话名称', conversationName: '会话名称', saveConversationName: '保存名称', pinConversation: '置顶会话',
+  unpinConversation: '取消置顶', archiveConversation: '归档会话', restoreConversation: '恢复会话', restoreAndOpen: '恢复并打开',
+  showActiveConversations: '查看使用中的会话', showArchivedConversations: '查看已归档会话', conversationArchived: '会话已归档，论文资料已保留',
+  conversationSaved: '会话设置已保存', conversationIsArchived: '此会话已归档，恢复后可继续查看和提问',
+  conversationBackendRestart: '当前后端尚未加载多会话功能，请重启服务后刷新页面',
+  conversationCreateFailed: '新建会话未完成，请刷新目录确认后重试',
+  conversationUpdateFailed: '会话修改未完成，输入已保留。请停止该会话中的任务，或刷新目录确认最新状态后重试',
+  conversationOtherRunning: '本论文另一个会话正在运行，请等待或停止该任务后再提问', viewRunningConversation: '查看运行中的会话',
   topicActions: '{title} 的 Topic 操作', renameTopic: '修改 Topic 名称', topicName: 'Topic 名称', saveTopicName: '保存名称', topicRenamed: 'Topic 名称已更新',
   renameTopicConflict: 'Topic 名称已在其他窗口或 Agent 中更改，输入已保留。请重新打开修改窗口后再编辑',
   renameTopicMissing: '这个 Topic 已不在目录中，输入已保留。请关闭窗口并刷新目录',
@@ -71,6 +82,17 @@ export const zh = {
 export type ResearchKey = keyof typeof zh
 /** English research dictionary. */
 export const en = {
+  newConversation: 'New conversation', initialConversation: 'Initial reading', chooseConversation: 'Switch conversation', paperConversations: 'Paper conversations',
+  searchConversations: 'Search this paper’s conversations', noConversations: 'No matching conversations', pinnedConversations: 'Pinned', recentConversations: 'Recent',
+  archivedConversations: 'Archived', currentConversation: 'Current', conversationRunning: 'Running', conversationActions: 'Conversation actions for {title}',
+  renameConversation: 'Rename conversation', conversationName: 'Conversation name', saveConversationName: 'Save name', pinConversation: 'Pin conversation',
+  unpinConversation: 'Unpin conversation', archiveConversation: 'Archive conversation', restoreConversation: 'Restore conversation', restoreAndOpen: 'Restore and open',
+  showActiveConversations: 'Show active conversations', showArchivedConversations: 'Show archived conversations', conversationArchived: 'Conversation archived; paper resources retained',
+  conversationSaved: 'Conversation settings saved', conversationIsArchived: 'This conversation is archived. Restore it to view and continue chatting.',
+  conversationBackendRestart: 'The backend has not loaded paper conversations. Restart the server, then refresh this page.',
+  conversationCreateFailed: 'Conversation creation did not complete. Refresh the library to check before retrying.',
+  conversationUpdateFailed: 'The change did not complete. Your input was retained. Stop this conversation’s work, or refresh the library to check its latest state before retrying.',
+  conversationOtherRunning: 'Another conversation for this paper is running. Wait or stop it before sending another question.', viewRunningConversation: 'View running conversation',
   topicActions: 'Topic actions for {title}', renameTopic: 'Rename topic', topicName: 'Topic name', saveTopicName: 'Save name', topicRenamed: 'Topic name updated',
   renameTopicConflict: 'Another window or Agent changed this Topic name. Your input was retained. Reopen the editor with the current name.',
   renameTopicMissing: 'This Topic is no longer in the library. Your input was retained. Close this dialog and refresh the library.',

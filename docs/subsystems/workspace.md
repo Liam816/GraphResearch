@@ -176,6 +176,8 @@ The Workspace controller also manages a research library whose Topic and paper i
 
 `ResearchFileRequest` identifies a `paperId` and paper-relative `path` (empty for its root). `ResearchDirectoryListing` returns that path and direct entries with `name`, `path`, `kind`, and optional `bytes`. `ResearchFileContent` distinguishes complete versioned UTF-8 `text`, bounded `image` previews, and `unsupported` binary or oversized files. `ResearchSaveFileRequest` adds Markdown `text` and its `expectedVersion` SHA-256; file previews and drafts do not change Session history.
 
+`ResearchConversation` records a paper-owned `sessionId`, title, pin/archive flags, creation time and optional continuation point. `ResearchCreateConversationRequest` identifies a paper and a fresh Session; `ResearchUpdateConversationRequest` adds optional title, expected title, pin and archive updates. `ResearchPaper.conversations` is optional for legacy single-Session libraries. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns admission, persistence and execution rules.
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -456,6 +458,20 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('researchCreatePaper') async researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog>
 
 /**
+ * Attach a fresh independent Session to a paper.
+ * @param request - paper and the newly created Session.
+ * @returns the catalog with the attached conversation.
+ */
+@Remote('researchCreateConversation') async researchCreateConversation(request: ResearchCreateConversationRequest): Promise<ResearchCatalog>
+
+/**
+ * Rename, pin, archive, or restore a paper conversation.
+ * @param request - conversation metadata changes.
+ * @returns the committed library.
+ */
+@Remote('researchUpdateConversation') researchUpdateConversation(request: ResearchUpdateConversationRequest): Promise<ResearchCatalog>
+
+/**
  * Permanently remove one paper's directory and catalog entry, retaining its archived native Session.
  * @param request - paper identity and the absolute directory confirmed by the user.
  * @returns the remaining library after deletion completes.
@@ -568,9 +584,10 @@ researchCurrent(): ResearchCatalog
  * Save the paper continuation point.
  * @param paperId - owning paper.
  * @param text - continuation point and questions.
+ * @param sessionId - optional owning conversation; omission updates the original paper continuation.
  * @returns committed library.
  */
-@Remote('researchProgress') researchProgress(paperId: ResearchPaperId, text: string): Promise<ResearchCatalog>
+@Remote('researchProgress') researchProgress(paperId: ResearchPaperId, text: string, sessionId?: SessionId): Promise<ResearchCatalog>
 
 /**
  * Save a revision-checked Topic summary.
@@ -581,6 +598,8 @@ researchCurrent(): ResearchCatalog
  */
 @Remote('researchTopicNote') researchTopicNote(topicId: ResearchTopicId, text: string, revision: number): Promise<ResearchCatalog>
 ```
+
+Types: [SessionId](core.md)
 
 Source: [`packages/api/workspace-controller/src/index.ts`](../../packages/api/workspace-controller/src/index.ts)
 

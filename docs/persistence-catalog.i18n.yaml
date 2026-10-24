@@ -159,11 +159,11 @@
   en: e101074da6c1aa2d
   zh: e101074da6c1aa2d
 /session-persistence-event-catalog/events/research/research-translation-request-log-only:
-  en: 63d4a06cd42965ec
-  zh: 6e9bb365270d7965
+  en: a26570ba636d1546
+  zh: 53b090fda8df97f3
 /session-persistence-event-catalog/events/research/research-translation-result-log-only:
-  en: f71c32baf9226a3c
-  zh: e9e32a1b0f5212ac
+  en: caa13184d19d00f2
+  zh: 9948ed6fe9d290de
 /session-persistence-event-catalog/events/sandbox:
   en: ec841ab8439335b0
   zh: ec841ab8439335b0
@@ -1170,20 +1170,20 @@
   en: a8c85838f43dbbbb
   zh: ae339cce170b9be4
 /session-persistence-event-catalog/resolved-persistence-types/researchpronunciation:
-  en: f726f3fdc51931f3
-  zh: d47d445e0adf87a3
+  en: 2d6fffe7093da705
+  zh: 1b958cea6ab3fa4f
 /session-persistence-event-catalog/resolved-persistence-types/researchtranslation:
-  en: 9578e3f341ec8e7d
-  zh: 95781f93fcd2f592
+  en: 8806d2f6405eedbe
+  zh: 08f08a89d285da04
 /session-persistence-event-catalog/resolved-persistence-types/researchtranslationcontext:
-  en: 7a81cf5d429e8269
-  zh: 40467cca75d14a13
+  en: 93161f51c399a9bd
+  zh: 783906c28f47112a
 /session-persistence-event-catalog/resolved-persistence-types/researchtranslationexplanation:
-  en: 024ab65981774eff
-  zh: f8553dd0b68c0214
+  en: 2fdffcb787105a58
+  zh: f7f9364248a9bd16
 /session-persistence-event-catalog/resolved-persistence-types/researchtranslationrequestrecord:
-  en: a9dd529747423959
-  zh: 6a7fca34d9068de4
+  en: 08671b23cfeca59c
+  zh: 27b613bc0be781d3
 /session-persistence-event-catalog/resolved-persistence-types/sandboxmode:
   en: c9fa5343ea99733b
   zh: d6de41351c57a73f
@@ -1464,8 +1464,8 @@
   en: cc1dc22a2016f91e
   zh: 54c6bcb015cc922b
 /session-persistence-event-catalog/resolved-persistence-types/config-messages-system:
-  en: 53114aefeea87a11
-  zh: 831f3dc71e4b630e
+  en: 955cad7f2ecbd3d2
+  zh: b2f3c0b8e2d59070
 /session-persistence-event-catalog/resolved-persistence-types/cwd:
   en: 1bc55be85a68f0a3
   zh: 9e84a55ed11bba5d
@@ -1899,8 +1899,8 @@
   en: e473d84f198221a8
   zh: 4862e4c4c5bcfae8
 /session-persistence-event-catalog/resolved-persistence-types/requestseq-translation:
-  en: 3890ec9553e03b3f
-  zh: 0d0ac16232eeff17
+  en: 1d60a6d271f2500f
+  zh: e4012005ce07f7fe
 /session-persistence-event-catalog/resolved-persistence-types/role-user:
   en: 04b34b8ffe7e7764
   zh: a792d5371516fd9d

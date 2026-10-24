@@ -1,5 +1,6 @@
 /** Located paper excerpts and structured vocabulary explanations shared with the reader. */
 import type { LlmCallConfig, RequestUserInput } from '@deepseek-ai/dsh-llm'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ResearchPaperId } from './research-types.ts'
 
 /** A UTF-16 position inside a nonempty PDF.js text item, independent of reader zoom. */
@@ -11,6 +12,7 @@ export interface ResearchTextPosition {
 
 /** Explicit reader selection; surrounding sentences are resolved from the managed original. */
 export interface ResearchTranslationRequest {
+  readonly sessionId?: SessionId
   readonly paperId: ResearchPaperId
   readonly text: string
   readonly start: ResearchTextPosition

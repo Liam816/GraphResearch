@@ -22,15 +22,15 @@ async function fixture() {
   })
   await files.write({ revision: 1, topics: [], papers })
   const catalog = await files.read()
-  return { root, files, paper: catalog.papers[0]!, neighbor: catalog.papers[1]! }
+  return { root, files, revision: catalog.revision, paper: catalog.papers[0]!, neighbor: catalog.papers[1]! }
 }
 
 it('deletes only the confirmed paper directory and removes the entity from the catalog', async () => {
-  const { root, files, paper, neighbor } = await fixture()
+  const { root, files, paper, neighbor, revision } = await fixture()
   writeFileSync(join(paper.directory!, 'code', 'model.py'), 'weights = 1')
   const remaining = await files.withLock(() => files.deletePaper(paper, paper.directory!))
   expect(remaining.papers.map(item => item.id)).toEqual([neighbor.id])
-  expect(remaining.revision).toBe(2)
+  expect(remaining.revision).toBe(revision + 1)
   expect(existsSync(paper.directory!)).toBe(false)
   expect(readFileSync(join(neighbor.directory!, 'notes', 'ai.md'), 'utf8')).toBe('# Keep notes')
   expect(existsSync(join(root, '.transaction.json'))).toBe(false)

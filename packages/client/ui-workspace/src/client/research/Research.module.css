@@ -155,3 +155,25 @@ html:not([data-input-modality='pointer']) .paperRow:has(:focus-visible:not([data
 :global([data-sidebar-collapsed='true']) .paperRailSlot { display: block; }
 :global([data-sidebar-collapsed='true']) .workbench[data-research-paper-navigation] { box-sizing: border-box; padding-inline-start: 40px; }
 .paperRailSlot > .paperRail { --navigation-preview-width: min(300px, calc(100cqw - 64px)); --navigation-title-lines: 3; --navigation-description-lines: 1; position: absolute; top: 50%; left: 12px; max-height: min(420px, calc(100% - 128px)); transform: translateY(-50%); }
+
+.conversationPane { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; }
+.conversationPane > [data-conversation-content] { flex: 1; min-height: 0; }
+.conversationControls { flex: none; min-width: 0; }
+.conversationToolbar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+.conversationPicker { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; height: 28px; padding: 4px 6px; color: var(--dsw-alias-label-primary); background: transparent; border: 0; border-radius: var(--dsw-radius-sm); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.conversationPicker > span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; mask-image: linear-gradient(to right, #000, #000 calc(100% - 16px), transparent); }
+.conversationPicker:hover, .conversationMore:hover, .conversationOption:hover, .conversationArchiveFilter:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.newConversation { flex: none; white-space: nowrap; }
+.conversationPopup { position: fixed; z-index: 1100; width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); display: flex; flex-direction: column; gap: 6px; padding: 10px; color: var(--dsw-alias-label-primary); }
+.conversationList { overflow: auto; min-height: 0; max-height: 340px; padding: 0 2px; }
+.conversationGroup { margin: 8px 6px 4px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.conversationRow { display: flex; align-items: center; gap: 4px; }
+.conversationOption { display: flex; align-items: center; flex: 1; min-width: 0; gap: 6px; padding: 9px 6px; border: 0; border-radius: var(--dsw-radius-sm); color: inherit; background: transparent; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.conversationOption > span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.conversationOption > small { color: var(--dsw-alias-label-secondary); white-space: nowrap; }
+.conversationOption[aria-current] { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-state-business-primary); }
+.conversationMore { display: flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--dsw-radius-sm); color: var(--dsw-alias-label-secondary); background: transparent; cursor: pointer; }
+.conversationArchiveFilter { border: 0; border-top: 0.5px solid var(--dsw-alias-border-l2); padding: 9px 6px 2px; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.conversationNotice { flex: none; margin: 0; padding: 8px 12px; font-size: 12px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
+@container (max-width: 1000px) { .newConversation > span:last-child:not(:first-child) { display: none; } }
+@media (pointer: coarse) { .conversationPicker, .conversationMore, .conversationOption, .conversationArchiveFilter { min-height: 44px; } .conversationMore { width: 44px; } }

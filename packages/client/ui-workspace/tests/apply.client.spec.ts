@@ -1,3 +1,7 @@
+import type { ResearchInjected } from '../src/client/research/contract.ts'
+import type { ResearchNoticeInjected } from '../src/client/research/ActionToast.tsx'
+import type { ResearchPaperId, ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { ResearchActionToast } from '../src/client/research/ActionToast.tsx'
 import { installEmptyResearch } from './research-fixture.client.ts'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { Context } from '@deepseek-ai/cordis'
@@ -224,6 +228,28 @@ describe('ui-workspace apply', () => {
     expect(directory?.store).toBe(main?.store)
     expect(workbench).toBeDefined()
     expect(workbench?.store).toBeUndefined()
+    expect(b.slots.spec('main.research')?.scope).toBe('root')
+    expect(b.slots.spec('research.agent')?.scope).toBe('session-maybe')
+  })
+
+  it('explains an outdated Host before allocating a paper conversation Session', async () => {
+    const b = await bench()
+    onTestFinished(() => b.ctx.fiber.dispose())
+    declare(b.slots, 'sidebar.workspaces', 'shell.overlay')
+    const paperId = 'legacy-paper' as ResearchPaperId, topicId = 'legacy-topic' as ResearchTopicId
+    b.ctx.research.state.set({ phase: 'ready', catalog: { revision: 1, directory: '/library',
+      topics: [{ id: topicId, title: 'Topic', workspaceId: 'workspace' as WorkspaceId, sessionId: sid('topic') }],
+      papers: [{ id: paperId, title: 'Paper', sessionId: sid('paper'), topicIds: [topicId], pdfPath: '', repositoryUrl: '',
+        ai: { text: '', revision: 0 }, learning: { text: '', revision: 0 } }],
+    } })
+    await b.ctx.plugin({ apply, inject }).await()
+    const create = vi.spyOn(b.ctx.sessions, 'create')
+    const commands = faceOf(b.slots.entries('sidebar.workspaces.research')[0]!) as ResearchInjected
+    await expect(commands.createConversation(paperId)).rejects.toThrow('requires an updated Host')
+    expect(create).not.toHaveBeenCalled()
+    const notice = faceOf(entry(b.slots, 'shell.overlay', 'research.action-toast')) as ResearchNoticeInjected
+    expect(notice.hooks.notice.getSnapshot()).toMatchObject({ message: 'conversationBackendRestart', success: false })
+    expect(b.ctx.research.state.getSnapshot().catalog.papers[0]?.sessionId).toBe(sid('paper'))
   })
 
   it('reports a default Workspace creation failure through the shared notice overlay', async () => {
@@ -258,7 +284,7 @@ describe('ui-workspace apply', () => {
     // The row actions follow the browser's own declaration, whenever it lands.
     expect(after.slots.entries(MENU_ITEM)).toHaveLength(4)
     expect(after.slots.entries(ROW_ACTION)).toHaveLength(2)
-    expect(after.slots.entries('shell.overlay')).toHaveLength(3)
+    expect(after.slots.entries('shell.overlay')).toHaveLength(4)
   })
 
   it('declares the two Session row lists and registers the shipped actions and overlay surfaces into them', async () => {
@@ -285,6 +311,7 @@ describe('ui-workspace apply', () => {
       ['pin', 200, PinSessionRowButton, 'workspace'],
     ])
     expect(rows('shell.overlay')).toEqual([
+      ['research.action-toast', undefined, ResearchActionToast, 'research'],
       ['workspace.session-rename', undefined, SessionRenameDialog, 'workspace'],
       ['workspace.session-archive', undefined, SessionArchiveConfirmDialog, 'workspace'],
       ['workspace.row-toast', undefined, RowActionToast, 'workspace'],
@@ -788,7 +815,7 @@ describe('ui-workspace apply', () => {
     await fiber.await()
     expect(b.slots.entries(MENU_ITEM)).toHaveLength(4)
     expect(b.slots.entries(ROW_ACTION)).toHaveLength(2)
-    expect(b.slots.entries('shell.overlay')).toHaveLength(3)
+    expect(b.slots.entries('shell.overlay')).toHaveLength(4)
     await fiber.dispose()
     expect(b.slots.entries('sidebar.workspaces')).toHaveLength(0)
     expect(b.slots.entries('conversation.hero.workspace')).toHaveLength(0)

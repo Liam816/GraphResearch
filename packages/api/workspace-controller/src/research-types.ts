@@ -62,12 +62,39 @@ export interface ResearchTopic {
   readonly notes?: ResearchNote | undefined
 }
 
-/** A paper with its own Agent session, original PDF and notebooks. */
+/** Independent conversation metadata; paper resources remain shared. */
+export interface ResearchConversation {
+  readonly sessionId: SessionId
+  /** Empty until the first question supplies a default name. */
+  readonly title: string
+  readonly pinned: boolean
+  readonly archived: boolean
+  readonly createdAt: number
+  readonly progress?: string | undefined
+}
+
+/** Attach a fresh, unseeded Session to an existing paper; retry with the same Session is idempotent. */
+export interface ResearchCreateConversationRequest {
+  readonly paperId: ResearchPaperId
+  readonly sessionId: SessionId
+}
+
+/** Change conversation metadata without replacing its transcript or paper files. */
+export interface ResearchUpdateConversationRequest extends ResearchCreateConversationRequest {
+  readonly title?: string
+  readonly expectedTitle?: string
+  readonly pinned?: boolean
+  readonly archived?: boolean
+}
+
+/** A paper with independent Agent conversations, an original PDF and shared notebooks. */
 export interface ResearchPaper {
   readonly id: ResearchPaperId
   readonly title: string
   readonly topicIds: readonly ResearchTopicId[]
   readonly sessionId: SessionId
+  /** Absent in legacy libraries; the original Session remains the first conversation. */
+  readonly conversations?: readonly ResearchConversation[] | undefined
   /** Managed PDF path; empty until an original is attached. */
   readonly pdfPath: string
   readonly repositoryUrl: string
@@ -95,7 +122,7 @@ export interface ResearchCatalog {
   readonly topics: readonly ResearchTopic[]
   readonly papers: readonly ResearchPaper[]
   /** Runtime capabilities of the responding Host; absent in older backends and never persisted. */
-  readonly capabilities?: { readonly pdfHighlights: true; readonly pdfTranslations?: true } | undefined
+  readonly capabilities?: { readonly pdfHighlights: true; readonly pdfTranslations?: true; readonly paperConversations?: true } | undefined
   /** Absolute managed library root. */
   readonly directory?: string | undefined
 }
@@ -207,6 +234,12 @@ export interface ResearchSaveFileRequest extends ResearchFileRequest {
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
+    /** Another editor renamed this conversation. */
+    'research/conversation-conflict': { readonly sessionId: SessionId }
+    /** Another conversation for this paper owns the current Agent turn. */
+    'research/conversation-busy': { readonly sessionId: SessionId }
+    /** Restore the conversation before submitting another prompt. */
+    'research/conversation-archived': { readonly sessionId: SessionId }
     /** Another writer renamed the Topic; retain the draft and request a new edit from the current name. */
     'research/topic-conflict': { readonly topicId: ResearchTopicId; readonly title: string }
     /** The paper moved since confirmation; display the new path and request confirmation again. */

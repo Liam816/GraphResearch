@@ -1,6 +1,8 @@
 /** Paper-local sorting previews leave all reading bodies mounted until a drop commits the order. */
 import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionProviderComponent } from '@deepseek-ai/dsh-client-ui-slots'
+import type { CSSProperties, ReactNode } from 'react'
 import clsx from 'clsx'
 import { DragDropProvider, DragOverlay } from '@dnd-kit/react'
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/react'
@@ -31,8 +33,9 @@ interface PaperPanelsProps extends PanelSeats {
   askTranslation: (translation: ResearchTranslation) => Promise<void>
   view: PaperView
   id: string
-  phase: 'settling' | 'hero' | 'active'
-  hero: boolean
+  agent: ReactNode
+  resources: SessionReference | undefined
+  SessionProvider: SessionProviderComponent
 }
 interface DragPreview {
   source: ResearchPanel
@@ -58,7 +61,7 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
   preview: DragPreview | null
   placePanel: ResearchWorkbenchProps['viewActions']['place']
 }) {
-  const { t, paper, view, viewActions: actions } = props
+  const { t, paper, view, viewActions: actions, SessionProvider } = props
   const [menuOpen, setMenuOpen] = useState(false)
   const index = order.indexOf(panel)
   const { sourceRef, targetRef, handleRef } = useSortable({
@@ -103,8 +106,8 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
       </div>
     </div>
     <div className={css.panelBody}>
-      {panel === 'agent' ? props.renderFactorySlot('conversation.content', { variant: 'embedded', phase: props.phase, hero: props.hero })
-        : panel === 'pdf' ? paper.pdfPath === ''
+      {panel === 'agent' ? props.agent
+        : <SessionProvider session={props.resources}>{panel === 'pdf' ? paper.pdfPath === ''
           ? <div className={css.allClosed}><h2>{t('pdfMissing')}</h2><p>{t('pdfMissingHint')}</p></div>
           : <><PaperMarkdownStatus paper={paper} t={t} extractMarkdown={props.extractMarkdown} />
             {props.renderFactorySlot('document.pdf', { path: paper.pdfPath, viewKey: paper.id,
@@ -119,7 +122,7 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
               } })}</>
           : <PaperFiles paper={paper} view={view} t={t} viewActions={actions} saveNote={props.saveNote} refresh={props.refresh}
             listFiles={props.listFiles} readFile={props.readFile} saveFile={props.saveFile}
-            renderFactorySlot={props.renderFactorySlot} revision={props.revision} />}
+            renderFactorySlot={props.renderFactorySlot} revision={props.revision} />}</SessionProvider>}
     </div>
   </section>
 }

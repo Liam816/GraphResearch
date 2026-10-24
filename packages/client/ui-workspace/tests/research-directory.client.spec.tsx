@@ -22,6 +22,9 @@ function fixture(managed: boolean, collapsed = false) {
   } })
   const props: ResearchDirectoryProps = {
     t: makeTranslate(en), actions: view.actions, useStore: bindSnapshotSelector(view), useResearch: bindSnapshotSelector(research),
+    useResources: select => select(undefined),
+    createConversation: vi.fn(async () => {}), updateConversation: vi.fn(async () => {}), openConversation: vi.fn(),
+    insertText: vi.fn(() => true), insertReferences: vi.fn(async () => true),
     useSessions: select => select({ phase: 'ready', ids: [], byId: {}, projectionsBySession: {} }),
     useWorkspaces: select => select({ phase: 'ready', state: 'idle', items: [], archivedSessionIds: [], pinnedSessionIds: [], error: null }),
     useSessionStatus: select => select(new Map()), useSessionRetainInfo: () => undefined,

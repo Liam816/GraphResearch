@@ -18,6 +18,8 @@ import type { WorkspaceFollowFrame } from '../src/types.ts'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import { pdfFixture } from '../../../client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
 import type { ResearchHighlight, ResearchHighlightId, ResearchPaperId } from '../src/research-types.ts'
+import { paperConversations, conversationBackup } from '../src/research-conversations.ts'
+import { restoreResearchSessions } from '../src/research-session-backup.ts'
 import { ResearchFiles, digest } from '../src/research-files.ts'
 
 // The controller relays whatever families the providers report; this suite merges its own.
@@ -501,6 +503,68 @@ describe('Research catalog', () => {
     return { ...fixture, topic: catalog.topics[0]!, workspace }
   }
 
+  it('adds fresh paper conversations idempotently and retains shared paper resources', async () => {
+    const { controller, topic, ctx, root } = await researchFixture()
+    const before = await controller.researchCreatePaper({ topicId: topic.id, title: 'Several chats', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = before.papers[0]!
+    const created = await controller.researchCreateConversation({ paperId: paper.id, sessionId: SessionId('paper-b') })
+    expect(paperConversations(created.papers[0]!).map(item => item.sessionId)).toEqual([paper.sessionId, 'paper-b'])
+    expect(created.papers[0]).toMatchObject({ id: paper.id, directory: paper.directory, ai: paper.ai, learning: paper.learning })
+    expect(ctx.sessions.get(SessionId('paper-b'))!.snapshotEvents().filter(event => event.type === 'user/message')).toEqual([])
+    expect(JSON.parse(readFileSync(join(root, 'data', 'library.json'), 'utf8'))).toMatchObject({ version: 3 })
+    expect((await controller.researchCreateConversation({ paperId: paper.id, sessionId: SessionId('paper-b') })).revision).toBe(created.revision)
+  })
+
+  it('rejects conversation adoption of an existing history or another entity Session', async () => {
+    const { controller, topic, ctx } = await researchFixture()
+    const before = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const paper = before.papers[0]!
+    await expect(controller.researchCreateConversation({ paperId: paper.id, sessionId: topic.sessionId })).rejects.toMatchObject({ code: 'research/invalid' })
+    ctx.sessions.get(SessionId('paper-b'))!.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'Old question' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+    await expect(controller.researchCreateConversation({ paperId: paper.id, sessionId: SessionId('paper-b') })).rejects.toMatchObject({ code: 'research/invalid' })
+    expect(paperConversations((await controller.researchList()).papers[0]!)).toHaveLength(1)
+  })
+
+  it('persists conversation names, pins, archives and independent continuation points', async () => {
+    const { controller, topic, ctx } = await researchFixture()
+    const paper = (await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })).papers[0]!
+    await controller.researchCreateConversation({ paperId: paper.id, sessionId: SessionId('paper-b') })
+    const renamed = await controller.researchUpdateConversation({ paperId: paper.id, sessionId: SessionId('paper-b'), title: '  Architecture  ', expectedTitle: '', pinned: true })
+    expect(renamed.papers[0]?.conversations?.[1]).toMatchObject({ title: 'Architecture', pinned: true })
+    await expect(controller.researchUpdateConversation({ paperId: paper.id, sessionId: SessionId('paper-b'), title: 'Stale', expectedTitle: '' }))
+      .rejects.toMatchObject({ code: 'research/conversation-conflict' })
+    const progressed = await controller.researchProgress(paper.id, 'Review action head', SessionId('paper-b'))
+    expect(progressed.papers[0]?.progress).toBe(paper.progress)
+    expect(progressed.papers[0]?.conversations?.[1]?.progress).toBe('Review action head')
+    const stop = ctx.on('workspace/session-activity', async (_request, next) => [...await next(), { kind: 'probe' as const }])
+    await expect(controller.researchUpdateConversation({ paperId: paper.id, sessionId: SessionId('paper-b'), archived: true }))
+      .rejects.toMatchObject({ code: 'research/conversation-busy' })
+    stop()
+    const archived = await controller.researchUpdateConversation({ paperId: paper.id, sessionId: SessionId('paper-b'), archived: true })
+    expect(archived.papers[0]?.conversations?.[1]?.archived).toBe(true)
+    const restored = await controller.researchUpdateConversation({ paperId: paper.id, sessionId: SessionId('paper-b'), archived: false })
+    expect(restored.papers[0]?.conversations?.[1]).toMatchObject({ title: 'Architecture', pinned: true, archived: false, progress: 'Review action head' })
+  })
+
+  it('restores both conversation backups without replacing existing native histories', async () => {
+    const { controller, topic, ctx, root } = await researchFixture({ nativeSessions: true })
+    const paper = (await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })).papers[0]!
+    const catalog = await controller.researchCreateConversation({ paperId: paper.id, sessionId: SessionId('paper-b') })
+    for (const id of [paper.sessionId, SessionId('paper-b')]) {
+      const session = ctx.sessions.get(id)!
+      const filename = join(paper.directory!, ...conversationBackup(paper, id))
+      mkdirSync(join(filename, '..'), { recursive: true })
+      writeFileSync(filename, JSON.stringify({ header: session.header, inheritedEventCount: 0, events: session.snapshotEvents() }))
+    }
+    const files = await ResearchFiles.open(join(root, 'data'), { maxNoteBytes: 4096, lockTimeoutMs: 1000 })
+    await restoreResearchSessions(ctx, files, catalog)
+    expect(await ctx.sessionPersistence.stat(paper.sessionId)).toBeDefined()
+    const before = await ctx.sessionPersistence.stat(SessionId('paper-b'))
+    expect(before).toBeDefined()
+    await restoreResearchSessions(ctx, files, catalog)
+    expect((await ctx.sessionPersistence.stat(SessionId('paper-b')))?.revision).toBe(before?.revision)
+  })
+
   it('renames a Topic durably while retaining its notes, Session and child-paper associations', async () => {
     const { controller, topic, root } = await researchFixture()
     await controller.researchTopicNote(topic.id, '# Reading order', 0)
@@ -677,7 +741,7 @@ describe('Research catalog', () => {
     const first = make('first'), second = make('second')
     await Promise.all([first, second].map(highlight => controller.researchHighlight({ paperId: paper.id, change: { type: 'add', highlight } })))
     const confirmed = await controller.researchList()
-    expect(confirmed.capabilities).toEqual({ pdfHighlights: true })
+    expect(confirmed.capabilities).toMatchObject({ pdfHighlights: true, paperConversations: true })
     expect(JSON.parse(readFileSync(join(root, 'data', 'library.json'), 'utf8')) as { capabilities?: object }).not.toHaveProperty('capabilities')
     expect(confirmed.papers[0]?.highlights).toEqual([first, second])
     expect((JSON.parse(readFileSync(join(paper.directory!, 'paper.json'), 'utf8')) as { highlights: ResearchHighlight[] }).highlights).toEqual([first, second])

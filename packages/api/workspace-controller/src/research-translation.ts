@@ -1,3 +1,4 @@
+import { paperConversations } from './research-conversations.ts'
 /** Independent, audited paper translation with occurrence-aware files and revision-checked notebook export. */
 import { mkdir, readFile, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
@@ -13,7 +14,8 @@ import type { ResearchPronunciation, ResearchTranslation, ResearchTranslationExp
 
 const positionSchema = z.object({ page: z.number().int().positive(),
   item: z.number().int().nonnegative(), offset: z.number().int().nonnegative() })
-const requestSchema = z.object({ paperId: z.string().min(1), text: z.string().trim().min(1), start: positionSchema, end: positionSchema })
+const requestSchema = z.object({ sessionId: z.string().optional(), paperId: z.string().min(1),
+  text: z.string().trim().min(1), start: positionSchema, end: positionSchema })
 const explanationSchema: z.ZodType<ResearchTranslationExplanation> = z.object({
   kind: z.enum(['word', 'phrase', 'sentence']), lemma: z.string().min(1), partOfSpeech: z.string(),
   meanings: z.array(z.string().min(1)).min(1).max(5), contextualMeaning: z.string().min(1),
@@ -137,6 +139,8 @@ export class PaperTranslations {
       if (!requestSchema.safeParse(request).success) throw failure('selection')
       if (request.text.length > this.policy.maxContextCharacters) throw failure('limit')
       const { paper, files, catalog } = await this.source(request.paperId)
+      const sessionId = request.sessionId ?? paper.sessionId
+      if (!paperConversations(paper).some(item => item.sessionId === sessionId && !item.archived)) throw failure('selection')
       stopped.throwIfAborted()
       const originalPath = await files.paperPath(paper, 'paper.pdf')
       if ((await stat(originalPath)).size > this.policy.maxPdfBytes) throw failure('limit')
@@ -159,7 +163,7 @@ export class PaperTranslations {
       }
       const context = paperSelectionContext(index, request, this.policy.maxContextCharacters)
       stopped.throwIfAborted()
-      const resolved = await this.ctx.sessionController.resolveAgent(paper.sessionId)
+      const resolved = await this.ctx.sessionController.resolveAgent(sessionId)
       if ('error' in resolved) throw resolved.error
       const agent = resolved.agent
       const { provider, model, reasoningEffort } = agent.options
@@ -185,7 +189,7 @@ export class PaperTranslations {
       let size = 0, finish: FinishReason | undefined
       try {
         const stream = prepared.stream({ ...prepared.config, system: modelRequest.system, messages,
-          sessionId: paper.sessionId, signal: stopped })
+          sessionId, signal: stopped })
         for await (const chunk of stream) {
           stopped.throwIfAborted()
           size += Buffer.byteLength(JSON.stringify(chunk))

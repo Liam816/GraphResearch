@@ -176,6 +176,8 @@ Workspace 控制器还管理科研资料库，Topic 和论文身份独立于 Wor
 
 `ResearchFileRequest` 使用 `paperId` 和论文内相对 `path` 定位文件，空路径表示论文根目录。`ResearchDirectoryListing` 返回目录路径与直接子项的 `name`、`path`、`kind` 和可选 `bytes`。`ResearchFileContent` 区分带版本的完整 UTF-8 `text`、限额内的 `image` 预览，以及二进制或超限的 `unsupported` 结果。`ResearchSaveFileRequest` 增加 Markdown `text` 与 SHA-256 `expectedVersion`；文件预览和草稿不修改 Session 历史。
 
+`ResearchConversation` 保存论文下会话的 `sessionId`、名称、置顶与归档标志、创建时间及可选续读点。`ResearchCreateConversationRequest` 指定论文与全新会话；`ResearchUpdateConversationRequest` 增加可选名称、预期旧名称、置顶及归档更新。旧版单会话论文可省略 `ResearchPaper.conversations`。[控制器参考](../../packages/api/workspace-controller/README.zh.md#research-catalog) 定义准入、持久化与执行规则。
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -456,6 +458,20 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('researchCreatePaper') async researchCreatePaper(request: ResearchCreatePaperRequest): Promise<ResearchCatalog>
 
 /**
+ * Attach a fresh independent Session to a paper.
+ * @param request - paper and the newly created Session.
+ * @returns the catalog with the attached conversation.
+ */
+@Remote('researchCreateConversation') async researchCreateConversation(request: ResearchCreateConversationRequest): Promise<ResearchCatalog>
+
+/**
+ * Rename, pin, archive, or restore a paper conversation.
+ * @param request - conversation metadata changes.
+ * @returns the committed library.
+ */
+@Remote('researchUpdateConversation') researchUpdateConversation(request: ResearchUpdateConversationRequest): Promise<ResearchCatalog>
+
+/**
  * Permanently remove one paper's directory and catalog entry, retaining its archived native Session.
  * @param request - paper identity and the absolute directory confirmed by the user.
  * @returns the remaining library after deletion completes.
@@ -568,9 +584,10 @@ researchCurrent(): ResearchCatalog
  * Save the paper continuation point.
  * @param paperId - owning paper.
  * @param text - continuation point and questions.
+ * @param sessionId - optional owning conversation; omission updates the original paper continuation.
  * @returns committed library.
  */
-@Remote('researchProgress') researchProgress(paperId: ResearchPaperId, text: string): Promise<ResearchCatalog>
+@Remote('researchProgress') researchProgress(paperId: ResearchPaperId, text: string, sessionId?: SessionId): Promise<ResearchCatalog>
 
 /**
  * Save a revision-checked Topic summary.
@@ -581,6 +598,8 @@ researchCurrent(): ResearchCatalog
  */
 @Remote('researchTopicNote') researchTopicNote(topicId: ResearchTopicId, text: string, revision: number): Promise<ResearchCatalog>
 ```
+
+Types: [SessionId](core.zh.md)
 
 Source: [`packages/api/workspace-controller/src/index.ts`](../../packages/api/workspace-controller/src/index.ts)
 

@@ -3,6 +3,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { UiWorkspace } from '../navigation.ts'
 import type { ResearchInjected } from './contract.ts'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { paperConversations, paperForSession } from './conversation-records.ts'
+import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
+import { ResearchAgentPane } from './Conversations.tsx'
 import type { ResearchCatalog, ResearchPaper, WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -15,13 +18,13 @@ import { paperDeleteFailure } from './DeletePaper.tsx'
 import { topicRenameFailure } from './TopicActions.tsx'
 
 /**
- * Register research navigation and its session-bound workbench.
+ * Register research navigation, stable reading resources, and Session-scoped conversations.
  * @param ctx - Client services and Slot registry.
  * @param navigation - existing Session navigation owner.
  */
 export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
   const panelId = 'research' as MainPanelId
-  const open: ResearchInjected['open'] = (id) => { navigation.openSession(id); ctx.layout.selectPanel(panelId) }
+  const rawOpen: ResearchInjected['open'] = (id) => { navigation.openSession(id); ctx.layout.selectPanel(panelId) }
   const handle = createResearchViewStore()
   const instance = handle.create()
   const store: typeof handle = { ...handle, create: () => instance }
@@ -31,10 +34,24 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
   const finishRemoval = (paper: ResearchPaper, catalog: ResearchCatalog, wasOpen: boolean): void => {
     instance.actions.forgetPaper(paper.id)
     const current = currentSession()
-    if (current !== paper.sessionId && !(current === undefined && wasOpen)) return
+    if (!paperConversations(paper).some(item => item.sessionId === current) && !(current === undefined && wasOpen)) return
     const topic = catalog.topics.find(item => item.id === instance.getSnapshot().topicId && paper.topicIds.includes(item.id))
       ?? catalog.topics.find(item => paper.topicIds.includes(item.id))
     if (topic !== undefined) { instance.actions.topic(topic.id); open(topic.sessionId) }
+  }
+  const resources = createSnapshotStore<SessionReference | undefined>(undefined)
+  const openConversation: ResearchInjected['openConversation'] = (paperId, id) => {
+    instance.actions.conversation(paperId, id)
+    rawOpen(id)
+  }
+  const open: ResearchInjected['open'] = (id) => {
+    const paper = paperForSession(ctx.research.state.getSnapshot().catalog, id)
+    if (paper === undefined) { rawOpen(id); return }
+    const conversations = paperConversations(paper)
+    const selected = instance.getSnapshot().papers[paper.id]?.activeSession
+    const target = conversations.find(item => item.sessionId === selected && !item.archived)
+      ?? conversations.find(item => !item.archived) ?? conversations[0]
+    if (target !== undefined) openConversation(paper.id, target.sessionId)
   }
   const pending = new Map<string, Promise<Parameters<ResearchInjected['open']>[0]>>()
   const createSession = (key: string, workspaceId: WorkspaceId) => {
@@ -46,8 +63,25 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     }
     return session
   }
+  let input: Context['conversation']['input'] | undefined
   const injected = (): ResearchInjected => ({
-    hooks: { research: ctx.research.state },
+    hooks: { research: ctx.research.state, resources },
+    openConversation,
+    insertText: (id, text) => {
+      if (currentSession() !== id) return false
+      const binding = ctx.sessions.binding(id)
+      if (binding === undefined || input === undefined) return false
+      const actions = input.for(binding.ctx).actions
+      return actions.insertText(text, actions.captureInsertion())
+    },
+    insertReferences: async (id, ids) => {
+      if (currentSession() !== id) return false
+      const binding = ctx.sessions.binding(id)
+      if (binding === undefined || input === undefined) return false
+      const actions = input.for(binding.ctx).actions, span = actions.captureInsertion()
+      const mentions = await ctx.research.mentions(ids)
+      return currentSession() === id && actions.insertText(`${mentions.join(' ')} `, span)
+    },
     open,
     refresh: () => ctx.research.refresh(),
     listFiles: request => ctx.research.listFiles(request),
@@ -55,10 +89,51 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     saveFile: request => ctx.research.saveFile(request),
     highlight: request => ctx.research.highlight(request),
     extractMarkdown: id => ctx.research.extractMarkdown(id),
-    translate: (request, signal) => ctx.research.translate(request, signal),
+    translate: (request, signal) => {
+      const sessionId = currentSession()
+      return ctx.research.translate({ ...request, ...sessionId === undefined ? {} : { sessionId } }, signal)
+    },
     saveTranslation: (id, key) => ctx.research.saveTranslation(id, key),
     saveNote: request => ctx.research.saveNote(request),
     configureDirectory: request => ctx.research.configure(request),
+    createConversation: async (paperId) => {
+      const catalog = ctx.research.state.getSnapshot().catalog
+      const paper = catalog.papers.find(item => item.id === paperId)
+      const topic = catalog.topics.find(item => paper?.topicIds.includes(item.id))
+      if (topic === undefined) throw new Error('The paper Topic is unavailable')
+      if (catalog.capabilities?.paperConversations !== true) {
+        notice.set({ seq: ++noticeSeq, message: 'conversationBackendRestart', success: false })
+        throw new Error('Paper conversation management requires an updated Host')
+      }
+      const selectedAtStart = currentSession()
+      const key = `conversation:${paperId}`
+      try {
+        const sessionId = await createSession(key, topic.workspaceId)
+        await ctx.research.createConversation({ paperId, sessionId })
+        pending.delete(key)
+        if (currentSession() === selectedAtStart) {
+          instance.actions.focus(paperId, 'agent')
+          openConversation(paperId, sessionId)
+        }
+      } catch (error: unknown) {
+        notice.set({ seq: ++noticeSeq, message: 'conversationCreateFailed', success: false })
+        throw error
+      }
+    },
+    updateConversation: async (request) => {
+      try {
+        await ctx.research.updateConversation(request)
+        if (request.archived === true && currentSession() === request.sessionId) {
+          const paper = ctx.research.state.getSnapshot().catalog.papers.find(item => item.id === request.paperId)
+          const next = paper === undefined ? undefined : paperConversations(paper).find(item => !item.archived)
+          if (next !== undefined) openConversation(request.paperId, next.sessionId)
+        }
+        notice.set({ seq: ++noticeSeq, message: request.archived === true ? 'conversationArchived' : 'conversationSaved', success: true })
+      } catch (error: unknown) {
+        notice.set({ seq: ++noticeSeq, message: 'conversationUpdateFailed', success: false })
+        throw error
+      }
+    },
     renameTopic: async (request) => {
       try { await ctx.research.renameTopic(request) }
       catch (error: unknown) {
@@ -72,7 +147,7 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     deletePaper: async (request) => {
       const catalog = ctx.research.state.getSnapshot().catalog
       const paper = catalog.papers.find(item => item.id === request.paperId)
-      const wasOpen = paper !== undefined && currentSession() === paper.sessionId
+      const wasOpen = paper !== undefined && paperConversations(paper).some(item => item.sessionId === currentSession())
       try {
         await ctx.research.deletePaper(request)
       } catch (error: unknown) {
@@ -123,11 +198,71 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     inject: (): ResearchNoticeInjected => ({ hooks: { notice }, dismiss: () => { notice.set(null) } }),
   }, ResearchActionToast))
   ctx.slots.inject('main', () => ctx.slots.register({
-    name: 'main', key: panelId, store, children: { 'main.research': { kind: 'single', scope: 'session-maybe' } },
+    name: 'main', key: panelId, store, children: { 'main.research': { kind: 'single', scope: 'root' } },
   }, ResearchPanel))
   ctx.slots.inject('main.research', () => ctx.slots.register({
-    name: 'main.research', locale: 'research', inject: injected,
+    name: 'main.research', locale: 'research', inject: injected, children: { 'research.agent': { kind: 'single', scope: 'session-maybe' } },
   }, ResearchWorkbench))
+  ctx.slots.inject('research.agent', () => ctx.slots.register({
+    name: 'research.agent', locale: 'research', inject: injected,
+  }, ResearchAgentPane))
+  let resourcePaper: string | undefined
+  const ownedBlocks = new Map<import('@deepseek-ai/dsh-session/types').SessionId, string>()
+  ctx.inject(['conversation'], scope => scope.effect(() => {
+    input = scope.conversation.input
+    const sync = (): void => {
+      const catalog = ctx.research.state.getSnapshot().catalog, list = ctx.sessions.list.getSnapshot().byId
+      const wanted = new Map<import('@deepseek-ai/dsh-session/types').SessionId, string>()
+      const t = ctx.locale.bind('research')
+      for (const paper of catalog.papers) {
+        const entries = paperConversations(paper)
+        for (const conversation of entries) {
+          if (conversation.archived) wanted.set(conversation.sessionId, t('conversationIsArchived'))
+          else if (entries.some(other => other.sessionId !== conversation.sessionId && list[other.sessionId]?.running === true)) {
+            wanted.set(conversation.sessionId, t('conversationOtherRunning'))
+          }
+        }
+      }
+      for (const [id, reason] of ownedBlocks) {
+        if (!wanted.has(id) && scope.conversation.blocks.storeFor(id).getSnapshot()?.reason === reason) {
+          scope.conversation.blocks.set(id, undefined)
+        }
+      }
+      for (const [id, reason] of wanted) {
+        const previous = scope.conversation.blocks.storeFor(id).getSnapshot()
+        if (previous === undefined || previous.reason === ownedBlocks.get(id)) scope.conversation.blocks.set(id, { reason })
+      }
+      ownedBlocks.clear(); for (const [id, reason] of wanted) ownedBlocks.set(id, reason)
+      const current = currentSession(), paper = paperForSession(ctx.research.state.getSnapshot().catalog, current)
+      if (paper !== undefined && current !== undefined) instance.actions.conversation(paper.id, current)
+      if (paper?.id === resourcePaper) return
+      const previous = resources.getSnapshot()
+      resourcePaper = paper?.id
+      const reference = paper === undefined ? undefined : ctx.sessions.retain(paper.sessionId, { source: 'researchResources' })
+      resources.set(reference)
+      previous?.release()
+      void reference?.ready.catch((error: unknown) => {
+        if (resources.getSnapshot() === reference) console.error('Paper resource Session failed to open:', error)
+      })
+    }
+    let queued = false, live = true
+    const schedule = (): void => {
+      if (queued || !live) return
+      queued = true
+      queueMicrotask(() => { queued = false; if (live) sync() })
+    }
+    const stopSessions = ctx.sessions.list.subscribe(schedule), stopCatalog = ctx.research.state.subscribe(schedule)
+    schedule()
+    return () => {
+      live = false
+      input = undefined
+      stopSessions(); stopCatalog(); resources.getSnapshot()?.release(); resources.set(undefined); resourcePaper = undefined
+      for (const [id, reason] of ownedBlocks) {
+        if (scope.conversation.blocks.storeFor(id).getSnapshot()?.reason === reason) scope.conversation.blocks.set(id, undefined)
+      }
+      ownedBlocks.clear()
+    }
+  }))
   let restored = false
   const restore = (): void => {
     if (restored || ctx.research.state.getSnapshot().phase !== 'ready') return
@@ -135,7 +270,7 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     const current = Object.values(ctx.sessions.list.getSnapshot().byId).find(item => (item.retainedBy.mainView ?? 0) > 0)?.id
     if (current === undefined) return
     restored = true
-    if (catalog.topics.some(item => item.sessionId === current) || catalog.papers.some(item => item.sessionId === current)) {
+    if (catalog.topics.some(item => item.sessionId === current) || paperForSession(catalog, current) !== undefined) {
       ctx.layout.selectPanel(panelId)
     }
   }

@@ -1,0 +1,9 @@
+- dialog "Paper conversations":
+  - textbox "Search this paper’s conversations"
+  - paragraph: Pinned
+  - button "Method details Current"
+  - button "Conversation actions for Method details"
+  - paragraph: Recent
+  - button "Initial reading"
+  - button "Conversation actions for Initial reading"
+  - button "Show archived conversations"

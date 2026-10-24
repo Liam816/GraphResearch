@@ -4,6 +4,7 @@ import {
   Button, Input, Modal, Tooltip, IconPlusOutlineRegular, IconNewChatOutlineMedium,
   IconChevronDownOutlineRegular, IconChevronRightOutlineRegular, IconFolderCloseRegular, IconSearchOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { paperForSession } from './conversation-records.ts'
 import type { ResearchPaper, ResearchTopic, ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchDirectoryProps } from './contract.ts'
 import { ResearchLibrarySettings } from './LibrarySettings.tsx'
@@ -87,7 +88,7 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
             </Tooltip>
           </div>
           {expanded && <ul className={css.children}>{papers.map(paper => <ResearchPaperRow key={paper.id}
-            paper={paper} selected={current === paper.sessionId} t={t}
+            paper={paper} selected={paperForSession(catalog, current)?.id === paper.id} t={t}
             onOpen={() => { actions.topic(topic.id); props.open(paper.sessionId) }} onDelete={() => { setDeleting(paper) }} />)}</ul>}
         </li>
       })}</ul>

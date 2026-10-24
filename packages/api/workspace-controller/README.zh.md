@@ -47,6 +47,8 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 <a id="research-catalog"></a>
 ### 研究目录
 
+每篇论文可拥有多个独立 Agent 会话（Session）。运行时响应通过 `capabilities.paperConversations` 标明支持；旧后端不提供此标志，标志也不会持久化。`researchCreateConversation` 关联论文 Topic 工作区内全新、未继承历史的会话，拒绝其他实体已使用的会话或已有聊天记录。`researchUpdateConversation` 管理名称、置顶和归档；改名校验 `expectedTitle`，归档拒绝仍在运行的任务。未保存 `conversations` 的论文将原 `sessionId` 视为首个阅读会话。管理会话后，论文库索引写为版本 3。PDF、文件和笔记由论文共享，新会话获取相同的科研工具和工作目录，不复制旧聊天。续读点和首问生成的名称归当前会话所有。同一论文同时只执行一个 Agent 会话的任务；已归档会话须先恢复才能提问。原备份仍为 `session.json`，新增会话分别保存到 `sessions/conversation-<encoded-session-id>/session.json`。恢复论文库时，每个缺失的原生会话均可从备份恢复，已有历史不会被覆盖。 [会话迁移说明](../../../docs/upgrade-guide/v0.2.1-alpha.2/paper-conversations/guide.zh.md)。
+
 论文资料库初始位置为 `<启动目录>/data`；`researchDirectory` 配置初始后端绝对路径，之后以界面持久化的目录选择为准。`library.json` 管理 Topic 和论文元数据。稳定的 `papers/<paper-id>/` 子目录包含可选的 `paper.pdf` 和生成的 `paper.md`、`paper.json`、`notes/ai.md`、`notes/learning.md`、`extracted/`、`code/` 和 `assets/`。Markdown 文件保存笔记正文，索引记录版本与内容摘要。Topic 使用 `topics/<topic-id>/notes.md`。首次使用会迁移已有科研 domain 记录，此后 domain 仅保留选中的资料目录。缺失的旧 PDF 不影响笔记读取，可补充到对应的 `paper.pdf` 位置。
 
 `researchImportPaper` 可仅凭标题创建论文，也可同时复制本地 PDF 或下载 HTTP(S) 来源。未添加原文时 `pdfPath` 为空。`researchAttachPdf` 为现有论文补充 PDF，保留论文身份、Session 和笔记；相同内容可安全重试，不同的已有 PDF 拒绝覆盖。显式补充 PDF 时，即使另一论文具有相同内容，也保留目标实体。匹配的 arXiv/DOI 身份或相同 PDF 字节复用现有论文并增加 Topic 关联。带版本的 arXiv 标识保留版本。各实体使用独立 Session。`researchReadPaper` 返回有页码的有限原文，并在论文目录下缓存结果；纯图片页面需要 OCR。`researchProgress` 保存续读位置，`researchTopicNote` 保存有版本检查的对比总结。

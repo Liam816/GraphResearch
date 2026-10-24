@@ -3,6 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
+import { paperConversations, paperForSession } from './research-conversations.ts'
 import type { ResearchCatalog, ResearchPaperId, ResearchTopicId } from './research-types.ts'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -24,13 +25,13 @@ const output = {
 export function apply(ctx: Context): void {
   const controller = ctx.workspaceController
   const currentPaper = (catalog: ResearchCatalog, exec: ToolRunContext, id?: string) => {
-    const paper = id === undefined ? catalog.papers.find(item => item.sessionId === exec.agent?.session.id)
+    const paper = id === undefined ? paperForSession(catalog, exec.agent?.session.id)
       : catalog.papers.find(item => item.id === id)
     if (paper === undefined) throw new Error('Choose a paper_id from research_context before operating on a paper')
     return paper
   }
   const currentTopic = (catalog: ResearchCatalog, exec: ToolRunContext, id?: string) => {
-    const paper = catalog.papers.find(item => item.sessionId === exec.agent?.session.id)
+    const paper = paperForSession(catalog, exec.agent?.session.id)
     const topic = id === undefined ? catalog.topics.find(item => item.sessionId === exec.agent?.session.id)
       ?? catalog.topics.find(item => paper?.topicIds.includes(item.id)) : catalog.topics.find(item => item.id === id)
     if (topic === undefined) throw new Error('Choose a topic_id from research_context before importing a paper')
@@ -41,10 +42,11 @@ export function apply(ctx: Context): void {
     text: ({ agent }) => {
       if (agent === undefined) return ''
       const catalog = controller.researchCurrent()
-      const paper = catalog.papers.find(item => item.sessionId === agent.session.id)
+      const paper = paperForSession(catalog, agent.session.id)
       const topic = catalog.topics.find(item => item.sessionId === agent.session.id)
       return `Research library: ${catalog.directory ?? ''}\n${JSON.stringify({
-        paper: paper === undefined ? null : { id: paper.id, title: paper.title, directory: paper.directory, progress: paper.progress,
+        paper: paper === undefined ? null : { id: paper.id, title: paper.title, directory: paper.directory,
+          progress: paperConversations(paper).find(item => item.sessionId === agent.session.id)?.progress,
           pdf: paper.pdfPath, markdown: paper.markdown, repository: paper.repositoryUrl,
           aiNoteRevision: paper.ai.revision, learningNoteRevision: paper.learning.revision },
         topic: topic === undefined ? null : { id: topic.id, title: topic.title },
@@ -65,7 +67,7 @@ export function apply(ctx: Context): void {
   ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
     if (context.agent !== undefined) {
       const catalog = await controller.researchList()
-      const paper = catalog.papers.find(item => item.sessionId === context.agent?.session.id)
+      const paper = paperForSession(catalog, context.agent.session.id)
       const topic = catalog.topics.find(item => item.sessionId === context.agent?.session.id)
       const directory = paper?.directory
         ?? (topic === undefined ? undefined : `${catalog.directory}/topics/${topic.id}`)
@@ -81,9 +83,18 @@ export function apply(ctx: Context): void {
     parameters: { paper_id: { type: 'string', description: 'Optional paper to read in detail; omitted returns the current paper or topic catalog.' } }, output,
     async execute(args, exec) {
       const catalog = await controller.researchList()
-      const paper = args.paper_id === undefined ? catalog.papers.find(item => item.sessionId === exec.agent?.session.id)
+      const paper = args.paper_id === undefined ? paperForSession(catalog, exec.agent?.session.id)
         : currentPaper(catalog, exec, args.paper_id)
-      return JSON.stringify(paper === undefined ? catalog : { directory: catalog.directory, paper, topics: catalog.topics }, null, 2)
+      const conversation = paper === undefined ? undefined
+        : paperConversations(paper).find(item => item.sessionId === exec.agent?.session.id)
+      const entity = paper === undefined ? undefined : (({ conversations: _conversations, ...metadata }) => ({
+        ...metadata,
+        ...(conversation === undefined || conversation.sessionId === paper.sessionId) ? {} : {
+          sessionId: conversation.sessionId, progress: conversation.progress,
+        },
+      }))(paper)
+      const result = entity === undefined ? catalog : { directory: catalog.directory, paper: entity, topics: catalog.topics }
+      return JSON.stringify(result, null, 2)
     },
   }))
   ctx.tools.register(defineTool({
@@ -167,7 +178,8 @@ export function apply(ctx: Context): void {
     }, output,
     async execute(args, exec) {
       const paper = currentPaper(await controller.researchList(), exec, args.paper_id)
-      await controller.researchProgress(brandString<ResearchPaperId>(paper.id), args.text)
+      const sessionId = paperConversations(paper).find(item => item.sessionId === exec.agent?.session.id)?.sessionId
+      await controller.researchProgress(brandString<ResearchPaperId>(paper.id), args.text, sessionId)
       return JSON.stringify({ paperId: paper.id, progress: args.text })
     },
   }))
