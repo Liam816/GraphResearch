@@ -10,6 +10,8 @@ import {
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
+const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/fresh-round-trip/session.v3.jsonl', import.meta.url))
 const EXPECTED = fileURLToPath(new URL('../../../snapshots/web/default-workspace/ui.expected.md', import.meta.url))
 const FAILURE_EXPECTED = fileURLToPath(new URL('./expected/default-workspace/failure.expected.md', import.meta.url))
@@ -26,7 +28,7 @@ describe.skipIf(MODE === 'record')('web e2e: default Workspace', () => {
       paceMs: 5,
     })
     onTestFinished(() => scaffold.close())
-    const browser = await chromium.launch()
+    const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
     try {
       const page = await newEnglishPage(browser)
       const tripwire = watchConsole(page)
@@ -34,10 +36,7 @@ describe.skipIf(MODE === 'record')('web e2e: default Workspace', () => {
         await page.goto(scaffold.authenticatedUrl)
         const input = page.locator('[data-composer-input][contenteditable="true"]').first()
         await input.waitFor()
-        // Language-neutral on disk, localized in the hero chip. The chip's
-        // aria-label is its fixed call to action, so the label is its text.
-        await expect.poll(() => page.getByRole('button', { name: 'Choose workspace', exact: true }).textContent())
-          .toBe('Default workspace')
+        expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).count()).toBe(0)
         expect(scaffold.ctx.workspaceRegistry.list()).toHaveLength(1)
         const initialSession = scaffold.ctx.sessions.list()[0]!
         expect(scaffold.ctx.sessions.list()).toHaveLength(1)
@@ -79,7 +78,7 @@ describe.skipIf(MODE === 'record')('web e2e: default Workspace', () => {
     await writeFile(join(parent, 'default-workspace'), 'occupied')
     const chosen = join(scaffold.workspaceCwd, 'chosen')
     await mkdir(chosen)
-    const browser = await chromium.launch()
+    const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
     try {
       const page = await browser.newPage({ locale: 'zh-CN', timezoneId: 'Asia/Shanghai' })
       const tripwire = watchConsole(page)
@@ -93,7 +92,7 @@ describe.skipIf(MODE === 'record')('web e2e: default Workspace', () => {
         await compareOrRefreshGolden(FAILURE_EXPECTED, await notice.ariaSnapshot(), MODE)
         expect(await page.getByRole('dialog').count()).toBe(0)
         expect(await input.count()).toBe(0)
-        await page.getByRole('button', { name: '选择工作区', exact: true }).click()
+        await page.getByRole('textbox', { name: '选择工作区', exact: true }).click()
         const picker = page.getByRole('dialog', { name: '选择工作区目录' })
         await picker.waitFor()
         await picker.getByRole('button', { name: '编辑路径', exact: true }).click()
@@ -122,13 +121,13 @@ describe.skipIf(MODE === 'record')('web e2e: default Workspace', () => {
   it('keeps an explicitly deleted default absent on startup', async () => {
     const scaffold = await launchWebScaffold()
     onTestFinished(() => scaffold.close())
-    const browser = await chromium.launch()
+    const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
     try {
       const page = await newEnglishPage(browser)
       const attempted = page.waitForResponse(response => response.url().includes('/api/workspace/initializeDefault'))
       await page.goto(scaffold.authenticatedUrl)
       expect((await attempted).ok()).toBe(true)
-      await page.getByRole('button', { name: 'Choose workspace', exact: true }).waitFor()
+      await page.getByRole('textbox', { name: 'Choose workspace', exact: true }).waitFor()
       expect(await page.getByRole('alert').filter({ hasText: 'Unable to create default workspace' }).count()).toBe(0)
       expect(await page.locator('[data-composer-input][contenteditable="true"]').count()).toBe(0)
       expect(scaffold.ctx.workspaceRegistry.list()).toEqual([])

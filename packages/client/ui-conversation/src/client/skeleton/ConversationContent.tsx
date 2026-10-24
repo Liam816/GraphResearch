@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
-import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
+import { HeroShell } from './EmptyHero.tsx'
 import css from './ConversationRoot.module.css'
 
 function ConversationSessionView({ renderSlot }: ConversationViewsProps) {
@@ -40,7 +39,7 @@ export function ConversationContent(props: ConversationContentProps) {
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
-  const pickerAnchor = useRef<HTMLButtonElement>(null)
+  const pickerAnchor = useRef<HTMLDivElement>(null)
 
   // Publishes the two live measurements floating View chrome reads off the
   // scroll body: the seat's height as --dsh-composer-height, so controls clear
@@ -86,36 +85,13 @@ export function ConversationContent(props: ConversationContentProps) {
   const zone: InputZone | undefined =
     session === undefined || inputState === undefined ? undefined : { session, input: inputState }
 
-  // The chip is a selector; label resolution walks the flow top-down:
-  //   1. a just-picked workspace (pending) → its title;
-  //   2. cold start, no session yet → placeholder ("Choose workspace");
-  //   3. the blank session's workspace is in the list → its title;
-  //   4. list still loading → cwd folder name bridges so the title does not
-  //      flash on refresh (empty cwd → placeholder);
-  //   5. list ready but no owning workspace (deleted from the sidebar) →
-  //      placeholder, never the deleted folder's name via cwd.
-  // A title still automatic reads in the reader's language, matching the
-  // sidebar row the same Workspace has there.
-  const storedChipTitle = pendingWorkspace?.title
-    ?? (sessionId === undefined
-      ? undefined
-      : sessionWorkspace?.title
-        ?? (workspaces.phase === 'ready' || cwd === undefined || cwd === ''
-          ? undefined
-          : workspaceLabel(cwd)))
-  const chipTitle = storedChipTitle === undefined
-    ? undefined
-    : workspaceDisplayTitle(storedChipTitle, t('workspace.defaultName'))
+  // A loading registry can still use the Session's cwd; a settled registry
+  // without that Workspace requires another directory selection.
+  const workspaceAvailable = pendingWorkspace !== undefined || sessionWorkspace !== undefined
+    || (workspaces.phase !== 'ready' && cwd !== undefined && cwd !== '')
 
   const heroWorkspaceRow = (
-    <div className={css.heroWorkspaceRow}>
-      <WorkspaceChip
-        buttonRef={pickerAnchor}
-        label={chipTitle}
-        menuOpen={pickerOpen}
-        onClick={() => { setPickerOpen(open => !open) }}
-        t={t}
-      />
+    <div ref={pickerAnchor} className={css.heroWorkspaceRow}>
       {renderSlot('conversation.hero.workspace', {
         open: pickerOpen,
         anchorRef: pickerAnchor,
@@ -133,12 +109,9 @@ export function ConversationContent(props: ConversationContentProps) {
     </div>
   )
 
-  // The placeholder chip ("Choose workspace") and the Workspace-trigger input travel
-  // together: no workspace picked yet (cold start, no session at all), or a
-  // blank session whose workspace vanished (deleted from the sidebar). The
-  // bar is ONE session-maybe slot rendered unconditionally — inert is a prop,
-  // not a different tree, so the textarea DOM survives the transition.
-  const inert = sessionId === undefined || (hero && chipTitle === undefined)
+  // Without a Workspace, the resident input opens the directory picker;
+  // choosing one keeps the same editor mounted and makes it editable.
+  const inert = sessionId === undefined || (hero && !workspaceAvailable)
   // A raised block is the same inert posture with the blocker's own reason:
   // one disabled textarea, never a second tree. The no-workspace state wins
   // when both hold — picking a workspace is the earlier prerequisite.

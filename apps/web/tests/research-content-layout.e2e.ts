@@ -27,7 +27,25 @@ it('starts empty, names attached originals, and previews freely organized docume
   onTestFinished(() => browser.close())
   const page = await newEnglishPage(browser)
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-  await page.getByRole('region', { name: 'Research library', exact: true }).getByRole('button', { name: paper.title, exact: true }).click()
+  const checkLeadingMode = async () => {
+    expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).count()).toBe(0)
+    const row = page.locator('[class*="heroWorkspaceRow"]').filter({ visible: true })
+    const mode = row.getByRole('button', { name: 'Standard mode', exact: true })
+    await mode.waitFor()
+    await expect.poll(async () => {
+      const bounds = await row.boundingBox(), button = await mode.boundingBox()
+      return bounds === null || button === null ? Number.POSITIVE_INFINITY : button.x - bounds.x
+    }).toBeLessThanOrEqual(24)
+    expect(await row.getByRole('button').count()).toBe(1)
+    await mode.click()
+    await page.getByRole('menuitem', { name: /^Standard mode/ }).waitFor()
+    await page.keyboard.press('Escape')
+  }
+  const library = page.getByRole('region', { name: 'Research library', exact: true })
+  await library.getByRole('button', { name: topic.title, exact: true }).click()
+  await checkLeadingMode()
+  await library.getByRole('button', { name: paper.title, exact: true }).click()
+  await checkLeadingMode()
   await page.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'Related content', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Related content', exact: true })
   const tree = panel.getByRole('tree', { name: 'Paper files', exact: true })

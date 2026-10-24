@@ -545,32 +545,20 @@ it('rematches the current draft after a delayed real skills catalog without repl
   expect(console.warnings).toEqual([])
 })
 
-it('carries all reference capsules through the real Workspace picker and leaves the source draft empty', async () => {
-  const { scaffold, page, console, first, firstId, second } = await launchDraftFixture()
-  for (const workspace of [first, second]) {
-    await mkdir(join(workspace.path, '目录'))
-    await writeFile(join(workspace.path, FILE_NAME), FILE_BODY)
-  }
-  const draft = structuredDraft(firstId, '切换工作区携带')
+it('retains reference capsules in the current Workspace while the Workspace button is hidden', async () => {
+  const { scaffold, page, console, first, firstId } = await launchDraftFixture()
+  await mkdir(join(first.path, '目录'))
+  await writeFile(join(first.path, FILE_NAME), FILE_BODY)
+  const draft = structuredDraft(firstId, '当前工作区草稿')
   await restoreStoredDrafts(page, [{ sessionId: firstId, draft }])
   await assertDraft(page, firstId, draft)
-  await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
-  await page.getByRole('menuitem', { name: second.title, exact: true }).click()
-  await expect.poll(() => second.sessionIds.length, SETTLE).toBe(1)
-  const secondId = second.sessionIds[0]!
-  await assertDraft(page, secondId, draft)
-  await expect.poll(() => storedDraft(page, firstId), SETTLE).toEqual(EMPTY)
-
-  await reopenWorkspaceDraft(page, first, firstId)
-  await assertDraft(page, firstId, EMPTY)
-  await reopenWorkspaceDraft(page, second, secondId)
-  await assertDraft(page, secondId, draft)
+  expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).count()).toBe(0)
   await page.reload({ waitUntil: 'load' })
-  await assertDraft(page, secondId, draft)
+  await assertDraft(page, firstId, draft)
   await composer(page).locator('[data-composer-chip]').first().click()
   await expect.poll(() => page.locator('[data-document-markdown]').textContent(), SETTLE)
     .toContain('Unsubmitted file reference: 雪 🧭.')
-  await assertUnsubmitted(scaffold, [firstId, secondId])
+  await assertUnsubmitted(scaffold, [firstId])
   expect(console.pageErrors).toEqual([])
   expect(console.warnings).toEqual([])
 })

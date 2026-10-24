@@ -522,10 +522,9 @@ button.crumb:hover {
   align-items: center;
   gap: 2px;
   min-width: 0;
+  min-height: 28px;
   margin-top: 4px;
-  /* figma drew px 8; left nudged +12 so the chip's folder glyph lines up
-     closer to the card's inner controls below; right keeps the trailing
-     preset seat off the card edge. */
+  /* Align the preset control with the former Workspace control position. */
   padding: 0 16px 0 20px;
 }
 

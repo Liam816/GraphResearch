@@ -556,14 +556,11 @@ describe('ConversationRoot resident composer', () => {
     expect(host?.contains(box)).toBe(true)
     act(() => { b.wiring.setDraft('draft in hero') })
     expect(b.store.store.getSnapshot().draft).toEqual({ text: 'draft in hero', references: [] })
-    // Picker: open through the chip; a pick switches to the other
-    // workspace's blank session (draft carry is apply-layer wiring).
-    fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
-    const owner = b.pickerOwner() as { open: boolean; onPick(id: WorkspaceId): void }
-    expect(owner.open).toBe(true)
-    act(() => { owner.onPick(wid('second')) })
-    expect(b.retargetWorkspace).toHaveBeenCalledWith(wid('second'))
-    expect(b.view.getByText('Selected Folder')).toBeTruthy()
+    expect(b.view.queryByRole('button', { name: '选择工作区' })).toBeNull()
+    const owner = b.pickerOwner() as { open: boolean; selectedId: WorkspaceId }
+    expect(owner.open).toBe(false)
+    expect(owner.selectedId).toBe(wid('one'))
+
   })
 
   it('keeps a rejected first prompt engaging instead of returning to the Hero', () => {
@@ -656,7 +653,7 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.getByRole('tablist').hasAttribute('data-conversation-tabs')).toBe(true)
   })
 
-  it('rolls the pending workspace label back when switching fails', async () => {
+  it('retains the current Workspace and usable input when a directory selection fails', async () => {
     const selectWorkspace = vi.fn(async () => { throw new Error('connect failed') })
     const b = mount(
       sessionSnapshotOf({ blank: true }),
@@ -666,22 +663,22 @@ describe('ConversationRoot resident composer', () => {
       ],
       selectWorkspace,
     )
-    fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
+    expect(b.view.queryByRole('button', { name: '选择工作区' })).toBeNull()
     const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
     await act(async () => { owner.onPick(wid('second')); await Promise.resolve() })
     expect(selectWorkspace).toHaveBeenCalledWith(wid('second'))
     expect(b.view.queryByText('Selected Folder')).toBeNull()
-    expect(b.view.getByText('one')).toBeTruthy()
+    expect((b.pickerOwner() as { selectedId: WorkspaceId }).selectedId).toBe(wid('one'))
+    expect(b.view.getByRole('textbox').getAttribute('contenteditable')).toBe('true')
   })
 
-  it('blank session keeps the interactive picker chip (workspace switchable until the first message)', () => {
+  it('hides the Workspace button and places the preset seat first above the blank composer', () => {
     const b = mount(sessionSnapshotOf({ blank: true }))
-    const chip = b.view.getByRole('button', { name: '选择工作区' })
-    expect((chip as HTMLButtonElement).disabled).toBe(false)
+    expect(b.view.queryByRole('button', { name: '选择工作区' })).toBeNull()
     expect(b.slotCalls).toContain('conversation.hero.workspace')
-    // The agent-preset chip sits in the same row, for the same reason: both
-    // choices are only open before the first message.
-    expect(b.slotCalls).toContain('conversation.hero.agentPreset')
+    const preset = b.view.getByTestId('view-conversation.hero.agentPreset')
+    expect(preset.parentElement?.firstElementChild).toBe(preset)
+    expect(preset.parentElement?.children).toHaveLength(1)
   })
 
   it('prompt failure renders the promptError strip (ordinary failure, no transaction UI)', () => {

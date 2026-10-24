@@ -28,6 +28,8 @@ import { openSettings,
   connectFreshWorkspace, newEnglishPage, saveFailureShot, writeComposerDraft,
 } from './support.ts'
 
+const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/agent-preset-selection', import.meta.url))
 const HERO_EXPECTED = join(SNAPSHOT_DIR, 'hero.expected.md')
 const MENU_EXPECTED = join(SNAPSHOT_DIR, 'menu.expected.md')
@@ -238,7 +240,7 @@ describe('web e2e: agent-preset selection', () => {
     const seededId = await seedSession(scaffold, seedLog(), SEED_ID, 'minimal')
     await seedSubagent(scaffold, seededId)
     await seedWorkspaceSkill(scaffold.workspaceCwd)
-    browser = await chromium.launch()
+    browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -254,6 +256,7 @@ describe('web e2e: agent-preset selection', () => {
   it('clears an unapplied hidden pick and creates a Standard session with the roster editable in Settings', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-hero'))
     expect(await livePreset(scaffold)).toBeUndefined()
+    expect(await page.getByRole('button', { name: 'Choose workspace', exact: true }).count()).toBe(0)
     await page.getByRole('button', { name: 'Standard mode', exact: true }).click()
     await page.getByRole('menuitem', { name: /^Minimal mode/ }).click()
     await page.getByRole('button', { name: 'Minimal mode', exact: true }).waitFor()
@@ -439,7 +442,7 @@ it.each([false, true])('starts Creator from Plugins with Coding Tools=%s without
   const scaffold = await launchWebScaffold({ developerTools, agentPresets: { default: 'standard' } })
   let browser: Browser | undefined
   try {
-    browser = await chromium.launch()
+    browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
     const page = await newEnglishPage(browser)
     const tripwire = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-creator'))

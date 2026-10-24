@@ -33,7 +33,7 @@ describe.skipIf(MODE === 'record')('web e2e: refused New Session', () => {
         await page.goto(scaffold.authenticatedUrl)
         // Startup prepares the default Workspace, and its own blank-Session
         // attempt is refused without a notice: the hero stays on the picker.
-        await page.getByRole('button', { name: '选择工作区', exact: true }).waitFor()
+        await page.getByRole('textbox', { name: '选择工作区', exact: true }).waitFor()
         await expect.poll(() => scaffold.ctx.workspaceRegistry.list().length).toBe(1)
         expect(scaffold.ctx.sessions.list()).toEqual([])
         expect(await page.getByRole('alert').count()).toBe(0)

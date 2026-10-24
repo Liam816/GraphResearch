@@ -14,7 +14,6 @@
   - button "Collapse Agent chat"
   - button "Switch conversation": Initial reading
   - button "New conversation"
-  - button "Choose workspace": research-library
   - button "Standard mode"
   - textbox "Describe what you want to build, / commands, @ files or sessions"
   - button "Add files or run commands"
