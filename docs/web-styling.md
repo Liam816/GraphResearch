@@ -29,6 +29,13 @@ Global style sheets belong in `ui-theme/src/styles/`. Component styles live besi
 - Flat borders and separators that use a neutral `--dsw-alias-border-*` token draw at `0.5px` — buttons, inputs, cards, row dividers, and separators drawn as filled boxes (menu separators, the conversation header seam, markdown `hr`, vertical rails) share the hairline weight, which Chromium paints as one device pixel. Dashed affordances and state-colored borders keep 1px; spinner ring tracks keep their width through the spec's explicit allowlist. The ui-theme elevation spec rejects wider neutral solid borders.
 - Clickable artifact links (markdown anchors, prose file mentions, web source and fetch links, produced-file chips, workflow member links) color through `--dsw-alias-link` at `font-weight: 500`, with no underline at rest and a dotted 3px-offset underline on hover/focus. Compact Thinking Markdown keeps tertiary text color and a resting dotted underline ([compact presentation](../packages/client/ui-primitives/README.md#rendering-agent-output)). Text-leading anchors also lead with the ui-primitives `LinkIconMedium` category glyph riding `currentColor`, which for a well-known external host is that site's own mark instead of the globe; workflow member links and image-only anchors carry no glyph, and tool-row file links keep their grey dotted affordance.
 
+<a id="row-action-menus"></a>
+## Row action menus
+
+A label and its overflow menu share one rounded hover surface. Mark their existing enclosing row with `data-dsh-action-row`, the primary text button with `data-dsh-action-label`, and the independent overflow trigger with `data-dsh-action-menu`. The row paints hover, keyboard focus, selection and open-menu states; the text button stays transparent. Only hovering, keyboard-focusing or opening the overflow trigger adds its own inset R8 fill. `aria-current` on the label, `aria-selected` on a selectable row, and `aria-expanded` on the menu trigger retain their existing meanings and drive the shared appearance.
+
+The [theme sheet](../packages/client/ui-theme/src/styles/action-row.css) owns these styles and both palettes. Owners retain sizing, layout, focus outlines, disabled behavior and click handlers; the menu button remains independent of text navigation. Keep enough inset for its rounded fill, and use the existing portal when a menu escapes the row. A single button containing both label and ellipsis can mark its decorative ellipsis wrapper as `data-dsh-action-menu` instead of nesting another button. Automatically restored pointer focus does not keep a row highlighted after dismissal.
+
 <a id="corner-radii-and-settings-cards"></a>
 ## Corner radii and settings cards
 

@@ -27,8 +27,8 @@ export function ResearchPaperRow({ paper, selected, t, onOpen, onDelete }: {
     return () => { observer?.disconnect() }
   }, [paper.title])
   const menuLabel = t('paperActions', { title: paper.title })
-  return <li className={`${css.treeRow} ${css.paperRow}`} data-menu-open={menuOpen || undefined}>
-    <button type="button" className={css.treeTitle} aria-current={selected ? 'page' : undefined} onClick={onOpen}
+  return <li data-dsh-action-row="" className={`${css.treeRow} ${css.paperRow}`} data-menu-open={menuOpen || undefined}>
+    <button type="button" className={css.treeTitle} data-dsh-action-label="" aria-current={selected ? 'page' : undefined} onClick={onOpen}
       onPointerEnter={marquee.enter} onPointerLeave={marquee.leave} onFocus={marquee.enter} onBlur={marquee.leave}>
       <span ref={title} className={css.paperTitle}>{paper.title}</span>
     </button>
@@ -36,7 +36,7 @@ export function ResearchPaperRow({ paper, selected, t, onOpen, onDelete }: {
       <Menu open={menuOpen} onClose={() => { setMenuOpen(false) }} portal autoFocus closeOnPointerLeave align="end" dense
         items={[{ id: 'delete', label: t('deletePaper'), icon: <IconTrashOutlineRegular size={16} />, danger: true }]}
         onSelect={() => { setMenuOpen(false); marquee.leave(); onDelete() }}
-        anchor={<Tooltip label={menuLabel} portal side="right"><button type="button" className={css.paperMore}
+        anchor={<Tooltip label={menuLabel} portal side="right"><button type="button" className={css.paperMore} data-dsh-action-menu=""
           aria-label={menuLabel} aria-haspopup="menu" aria-expanded={menuOpen}
           onClick={() => { setMenuOpen(value => !value) }}><IconEllipsisOutlineRegular size={16} /></button></Tooltip>} />
     </span>

@@ -5,6 +5,7 @@
 .trigger:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .avatar { display: flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; border-radius: 50%;
   corner-shape: round; background: var(--dsw-alias-bg-skeleton); color: var(--dsw-alias-label-tertiary); }
+.overflowGlyph { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; }
 .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Signed-out launcher: a 32px More row carrying the 14px ellipsis. */
 .trigger[data-signed-out='true']:not([data-collapsed='true']) { height: 32px; padding: 6px 2px 6px 6px; line-height: 20px; }

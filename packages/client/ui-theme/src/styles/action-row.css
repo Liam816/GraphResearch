@@ -1,0 +1,32 @@
+/* Shared enclosure for a label and its independently clickable menu trigger. */
+[data-dsh-action-row] {
+  border-radius: var(--dsw-radius-md);
+}
+
+[data-dsh-action-row]:hover,
+[data-dsh-action-row][aria-selected='true'],
+[data-dsh-action-row][aria-expanded='true'][aria-haspopup],
+[data-dsh-action-row]:has([data-dsh-action-label][aria-current]),
+[data-dsh-action-row]:has([data-dsh-action-menu][aria-expanded='true']),
+html:not([data-input-modality='pointer']) [data-dsh-action-row]:focus-visible:not([data-dsh-automatic-focus]),
+html:not([data-input-modality='pointer']) [data-dsh-action-row]:has(:focus-visible:not([data-dsh-automatic-focus])) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* The shared row paints the label's hover and selected fill. */
+[data-dsh-action-row] [data-dsh-action-label],
+[data-dsh-action-row] [data-dsh-action-label]:not(:disabled):is(:hover, :active, :focus-visible, [aria-current]) {
+  background: transparent;
+}
+
+[data-dsh-action-row] [data-dsh-action-menu] {
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+}
+
+[data-dsh-action-row] [data-dsh-action-menu]:not(:disabled):is(:hover, [aria-expanded='true']),
+html:not([data-input-modality='pointer']) [data-dsh-action-row] [data-dsh-action-menu]:focus-visible:not([data-dsh-automatic-focus]),
+[data-dsh-action-row][aria-haspopup][aria-expanded='true'] [data-dsh-action-menu],
+html:not([data-input-modality='pointer']) [data-dsh-action-row][aria-haspopup]:focus-visible:not([data-dsh-automatic-focus]) [data-dsh-action-menu] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}

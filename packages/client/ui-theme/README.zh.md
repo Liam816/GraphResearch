@@ -25,6 +25,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+上下文三点菜单采用[共享的行内菜单悬停样式](../../../docs/web-styling.zh.md#row-action-menus)。
+
 用户从设置（「通用」分区）的各行中切换配色方案、字号与字体；在回环浏览器上，这些选择都会跨重启持久化。功能插件通过 `ctx.theme` 消费当前快照，并在 CSS 中读取 `--dsw-*` token；它们不自行管理主题状态。
 
 ### 外观与字号

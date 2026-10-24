@@ -73,6 +73,7 @@
     "tests/document-preview.e2e.ts",
     "tests/research-files.helpers.ts",
     "tests/research-workspace.e2e.ts",
+    "tests/overflow-menu-hover.e2e.ts",
     "tests/research-highlights.e2e.ts",
     "tests/research-reading.e2e.ts",
     "tests/research-agent.snapshot.ts",

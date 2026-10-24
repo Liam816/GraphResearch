@@ -29,6 +29,13 @@
 - 使用中性 `--dsw-alias-border-*` token 的平面边框与分割线一律 `0.5px`——按钮、输入框、卡片、行分割线，以及以填充盒绘制的分隔线（菜单分隔、对话标题栏接缝、markdown `hr`、竖向轨道线）共用发丝线粗细，Chromium 将其绘制为一个设备像素。dashed 记号与状态色 border 保持 1px；spinner 圆环经 spec 的显式豁免保留原宽度。更宽的中性 solid border 会被 ui-theme elevation spec 拒绝。
 - 可点击产物链接（Markdown 锚点、正文文件引用、网页来源与抓取链接、产物 chips、workflow 成员链接）经 `--dsw-alias-link` 着色、`font-weight: 500`，默认无下划线，hover/focus 时为 3px offset 的点状下划线。紧凑 Thinking Markdown 保持 tertiary 文字色和默认点状下划线（[紧凑展示](../packages/client/ui-primitives/README.zh.md#rendering-agent-output)）。带文字的锚点另以 ui-primitives 的 `LinkIconMedium` 分类图形（随 `currentColor`）作前置；目的地是已知外部站点时改用该站点自己的标记而非地球；workflow 成员链接与只包图片的锚点不带图形，工具行文件链接保持其灰色点线示能。
 
+<a id="row-action-menus"></a>
+## 行内操作菜单
+
+文字与三点菜单共用一个圆角悬停背景。在现有外层行上标记 `data-dsh-action-row`，在主要文字按钮上标记 `data-dsh-action-label`，在独立菜单按钮上标记 `data-dsh-action-menu`。整行承接悬停、键盘焦点、选中及菜单打开状态，文字按钮自身保持透明。只有移入三点按钮、通过键盘聚焦该按钮或打开菜单时，才为它增加内层 R8 背景。文字的 `aria-current`、可选行的 `aria-selected` 及菜单按钮的 `aria-expanded` 保留原有语义，并驱动共享外观。
+
+[主题样式](../packages/client/ui-theme/src/styles/action-row.css)统一管理这一效果及明暗配色。各组件继续负责尺寸、布局、焦点轮廓、禁用状态与点击处理；菜单操作与文字导航保持独立。为按钮的内层圆角留出适当间距，菜单需要越出行时继续使用现有 portal。若文字与三点本就属于同一个按钮，可在装饰性三点容器上标记 `data-dsh-action-menu`，不要嵌套另一个按钮。菜单关闭后，自动恢复的鼠标焦点不会使整行继续高亮。
+
 <a id="corner-radii-and-settings-cards"></a>
 ## 圆角与设置卡片
 

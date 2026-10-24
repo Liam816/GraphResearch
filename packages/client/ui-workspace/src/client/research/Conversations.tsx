@@ -85,8 +85,8 @@ function ConversationToolbar(props: ToolbarProps) {
         {filtered.map((item, index) => <div key={item.sessionId}>
           {(index === 0 || filtered[index - 1]?.pinned !== item.pinned) && <p className={css.conversationGroup}>
             {t(item.pinned ? 'pinnedConversations' : archived ? 'archivedConversations' : 'recentConversations')}</p>}
-          <div className={css.conversationRow}>
-            <button type="button" data-conversation-option aria-current={item.sessionId === sessionId ? 'page' : undefined}
+          <div className={css.conversationRow} data-dsh-action-row="">
+            <button type="button" data-conversation-option data-dsh-action-label="" aria-current={item.sessionId === sessionId ? 'page' : undefined}
               className={css.conversationOption} onClick={() => {
                 close()
                 if (item.archived) void run(async () => {
@@ -111,7 +111,8 @@ function ConversationToolbar(props: ToolbarProps) {
                 if (id === 'rename') { setRenaming(item); setName(conversationTitle(item, paper, t)); setFailed(false) }
                 else void run(() => props.updateConversation({ paperId: paper.id, sessionId: item.sessionId,
                   ...id === 'pin' ? { pinned: !item.pinned } : { archived: !item.archived } }))
-              }} anchor={<button type="button" className={css.conversationMore} disabled={busy}
+              }} anchor={<button type="button" className={css.conversationMore} data-dsh-action-menu="" disabled={busy}
+                aria-haspopup="menu" aria-expanded={actionsFor === item.sessionId}
                 aria-label={t('conversationActions', { title: conversationTitle(item, paper, t) })}
                 onClick={() => { setActionsFor(item.sessionId) }}><IconEllipsisOutlineRegular size={16} /></button>} />
           </div>

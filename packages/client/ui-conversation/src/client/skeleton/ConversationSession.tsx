@@ -66,7 +66,7 @@ export function ConversationSessionHeader({
   const showTabs = !hideChrome && tabs.length > 1
   return (
     <>
-      <div className={css.titleRow}>
+      <div className={css.titleRow} data-dsh-action-row={hideChrome ? undefined : ''}>
         {!hideChrome && (
           <>
             <div className={css.titleCluster}>
@@ -86,6 +86,7 @@ export function ConversationSessionHeader({
                     : (
                       <button
                         type="button"
+                        data-dsh-action-label=""
                         className={clsx(css.crumb, summary.subagent && css.crumbSubagent)}
                         onClick={() => { open(summary.id) }}
                       >

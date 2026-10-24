@@ -25,6 +25,8 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
+Contextual overflow controls use the [shared row-menu hover treatment](../../../docs/web-styling.md#row-action-menus).
+
 Users switch the color scheme, font sizes, and fonts from rows in Settings (General section); the choices persist across restarts on a loopback browser. Feature plugins consume the current snapshot through `ctx.theme` and read the `--dsw-*` tokens in CSS; they do not manage theme state themselves.
 
 ### Appearance and font size

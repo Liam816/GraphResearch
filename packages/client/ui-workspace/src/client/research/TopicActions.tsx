@@ -24,7 +24,7 @@ export function ResearchTopicActions({ topic, t, onRename }: Pick<ResearchSeats,
   return <Menu open={open} onClose={() => { setOpen(false) }} portal autoFocus closeOnPointerLeave dense align="end"
     items={[{ id: 'rename', label: t('renameTopic'), icon: <IconEditOutlineRegular size={16} /> }]}
     onSelect={() => { setOpen(false); onRename() }}
-    anchor={<Tooltip label={label} side="right" portal><button type="button" className={css.topicMore}
+    anchor={<Tooltip label={label} side="right" portal><button type="button" className={css.topicMore} data-dsh-action-menu=""
       aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(value => !value) }}>
       <IconEllipsisOutlineRegular size={16} />
     </button></Tooltip>} />

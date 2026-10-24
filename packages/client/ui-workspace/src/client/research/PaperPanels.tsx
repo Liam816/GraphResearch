@@ -79,7 +79,7 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
     hidden={!view.panels[panel]} data-active={view.active === panel} data-research-panel={panel}
     data-drag-source={preview?.source === panel} data-drop-edge={preview?.target === panel ? preview.placement : undefined}
     style={{ '--dsh-paper-panel-width': view.widths[panel] } as CSSProperties} aria-label={heading}>
-    <div className={css.panelHeader} ref={targetRef}>
+    <div className={css.panelHeader} ref={targetRef} data-dsh-action-row="">
       <div className={css.panelHeading} ref={sourceRef}>
         <Tooltip label={t('dragHandle', { panel: heading })} side="bottom" portal>
           <button type="button" ref={handleRef} className={css.dragHandle} aria-label={t('dragHandle', { panel: heading })}
@@ -96,7 +96,7 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
             { id: 'right', label: t('moveRight'), icon: <IconChevronRightOutlineRegular />, disabled: index === order.length - 1 },
           ]} onSelect={(value) => { if (value === 'left') move(-1); else if (value === 'right') move(1) }}
           anchor={<Tooltip label={t('arrangePanel', { panel: heading })} side="bottom" portal>
-            <button type="button" aria-label={t('arrangePanel', { panel: heading })} aria-haspopup="menu" aria-expanded={menuOpen}
+            <button type="button" data-dsh-action-menu="" aria-label={t('arrangePanel', { panel: heading })} aria-haspopup="menu" aria-expanded={menuOpen}
               onClick={() => { setMenuOpen(!menuOpen) }}><IconEllipsisOutlineRegular size={14} /></button>
           </Tooltip>} />
         <Tooltip label={t('collapse', { panel: heading })} side="bottom" portal>

@@ -693,7 +693,7 @@ export function TaskDetail({
 
   return <>
     <aside ref={panelRef} className={css.detail} id={id} tabIndex={-1} aria-label={t('detail.label')}>
-      <div className={css.detailTabsBar}>
+      <div className={css.detailTabsBar} data-dsh-action-row="">
         <div ref={detailTabsRef} className={css.detailTabs} role="tablist" aria-label={t('detail.tabs')}>
           {(['rule', 'records'] as const).map(value => (
             <button
@@ -739,6 +739,7 @@ export function TaskDetail({
               <Button
                 size={linkedCompact ? 'sm' : 'md'}
                 className={linkedCompact ? css.detailIconButton : css.linkedSession}
+                data-dsh-action-label=""
                 title={linkedCompact ? undefined : linkedSession.titled ? linkedSession.text : task.sessionId}
                 aria-label={linkedAction}
                 aria-describedby={linkedDescribedBy}
@@ -782,6 +783,7 @@ export function TaskDetail({
               anchor={<Button
                 size="sm"
                 className={css.detailIconButton}
+                data-dsh-action-menu=""
                 aria-label={t('detail.more')}
                 title={t('detail.more')}
                 aria-haspopup="menu"

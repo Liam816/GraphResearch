@@ -103,7 +103,7 @@
 }
 
 .projectRow .rowActions {
-  height: 20px;
+  height: 24px;
 }
 
 /* Session cell (figma): pad 8, a 16px status slot, then a 4px title gap. */
@@ -252,14 +252,12 @@
   flex: none;
 }
 
-/* Trailing action buttons surface on hover only (figma 27:4668 / 27:4656):
-   bare 16px glyphs, tertiary grey; the figma gap 12 reads too airy beside
-   the 16px glyphs, so the buttons sit at 10. */
+/* Trailing 24px controls keep 16px glyphs and a 4px gap within the row's shared hover fill. */
 .rowActions {
   flex: none;
   display: none;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
 }
 
 .projectRow:hover .rowActions,
@@ -395,10 +393,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   border: none;
-  border-radius: var(--dsw-radius-xs);
+  border-radius: var(--dsw-radius-sm);
   padding: 0;
   background: transparent;
   cursor: pointer;

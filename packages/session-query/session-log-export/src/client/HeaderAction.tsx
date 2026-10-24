@@ -53,6 +53,7 @@ export function SessionLogDownloadHeaderAction(props: SessionLogDownloadHeaderPr
           <Button
             size="sm"
             className={css.moreButton}
+            data-dsh-action-menu=""
             aria-label={t('header.more')}
             aria-haspopup="menu"
             aria-expanded={open}

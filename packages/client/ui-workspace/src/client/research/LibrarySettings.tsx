@@ -19,7 +19,7 @@ export function ResearchLibrarySettings({ directory, t, configureDirectory }: Pi
   }
   return <>
     <Tooltip label={t('librarySettings')} side="bottom" portal>
-      <Button size="sm" className={css.librarySettings} aria-label={t('librarySettings')} aria-haspopup="dialog"
+      <Button size="sm" className={css.librarySettings} data-dsh-action-menu="" aria-label={t('librarySettings')} aria-haspopup="dialog" aria-expanded={open}
         onClick={() => { setPath(directory ?? ''); setMode('open'); setFailed(false); setOpen(true) }}>
         <IconEllipsisOutlineRegular size={16} />
       </Button>

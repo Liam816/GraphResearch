@@ -50,7 +50,7 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
   }
 
   return <section className={css.directory} aria-label={t('research')}>
-    <div className={css.directoryHeader}>
+    <div className={css.directoryHeader} data-dsh-action-row="">
       {catalog.directory !== undefined && <p className={css.libraryLocation} title={catalog.directory}>{catalog.directory}</p>}
       <ResearchLibrarySettings directory={catalog.directory} t={t} configureDirectory={props.configureDirectory} />
     </div>
@@ -74,10 +74,10 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
         const expanded = filter !== '' || view.expanded[topic.id] !== false
         const Chevron = expanded ? IconChevronDownOutlineRegular : IconChevronRightOutlineRegular
         return <li key={topic.id}>
-          <div className={css.treeRow}>
+          <div className={css.treeRow} data-dsh-action-row="">
             <button className={css.chevron} type="button" aria-label={t(expanded ? 'fold' : 'expand', { title: topic.title })}
               aria-expanded={expanded} onClick={() => { actions.expand(topic.id, !expanded) }}><Chevron size={14} /></button>
-            <button type="button" className={css.treeTitle} aria-current={current === topic.sessionId ? 'page' : undefined}
+            <button type="button" className={css.treeTitle} data-dsh-action-label="" aria-current={current === topic.sessionId ? 'page' : undefined}
               onClick={() => { actions.topic(topic.id); props.open(topic.sessionId) }}>
               <IconFolderCloseRegular size={16} /><span>{topic.title}</span>
             </button>

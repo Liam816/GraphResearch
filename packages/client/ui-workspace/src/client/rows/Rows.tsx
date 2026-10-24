@@ -159,6 +159,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
     <div
       className={clsx(css.projectRow, menuOpen && css.menuOpen)}
       data-row-key={`workspace:${group.key}`}
+      data-dsh-action-row=""
       role="treeitem"
       aria-expanded={row.expanded}
       onClick={onToggle}
@@ -203,6 +204,7 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
                 type="button"
                 className={css.iconButton}
                 aria-label={t('actions.workspace.aria', { name: label })}
+                data-dsh-action-menu="" aria-haspopup="menu" aria-expanded={menuOpen}
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v) }}
               >
                 <IconEllipsisOutlineRegular />
@@ -503,6 +505,7 @@ export function SessionNodeItem({
     <div
       ref={rowRef}
       data-row-key={`session:${node.id}`}
+      data-dsh-action-row=""
       className={clsx(
         css.sessionRow, selected && css.selected, menuOpen && css.menuOpen,
         row.archived && css.archived,
@@ -588,6 +591,7 @@ export function SessionNodeItem({
                 type="button"
                 className={css.iconButton}
                 aria-label={t('actions.session.aria', { name: title })}
+                data-dsh-action-menu="" aria-haspopup="menu" aria-expanded={menuOpen}
                 onClick={() => { setMenuOpen(v => !v) }}
               >
                 <IconEllipsisOutlineRegular />
