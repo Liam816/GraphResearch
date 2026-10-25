@@ -33,6 +33,7 @@ export const researchHighlightSchema: z.ZodType<ResearchHighlight> = z.object({
 const topic = z.object({
   id: topicId, title: z.string(), workspaceId: z.string().transform(value => brandString<ResearchCatalog['topics'][number]['workspaceId']>(value)),
   sessionId: z.string().transform(value => brandString<ResearchCatalog['topics'][number]['sessionId']>(value)), notes: note.optional(),
+  paperOrder: z.array(paperId).refine(ids => new Set(ids).size === ids.length).readonly().optional(),
 })
 const paper = z.object({
   id: paperId, title: z.string(), abbreviation: z.string().optional(), topicIds: z.array(topicId),

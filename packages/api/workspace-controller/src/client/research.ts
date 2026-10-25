@@ -5,6 +5,7 @@ import type {
   ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
 } from '../research-types.ts'
 import type { ResearchCreateConversationRequest, ResearchUpdateConversationRequest } from '../research-types.ts'
+import type { ResearchReorderPapersRequest } from '../research-types.ts'
 import type { WorkspaceRemote } from './model.ts'
 import type { ResearchTranslation, ResearchTranslationRequest } from '../research-translation-types.ts'
 import type {
@@ -30,7 +31,17 @@ export class ClientResearchModel {
    * @param remote - generated Workspace namespace.
    */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeleteTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+    'researchReorderPapers' | 'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeleteTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+
+  /**
+   * Save a Topic's reading order and publish only the confirmed response.
+   * @param request - complete target order and last confirmed order.
+   */
+  async reorderPapers(request: ResearchReorderPapersRequest): Promise<void> {
+    const result = await this.remote.researchReorderPapers(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
 
   /**
    * Attach an independent conversation and accept its confirmed metadata.

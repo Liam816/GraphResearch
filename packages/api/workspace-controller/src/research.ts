@@ -15,6 +15,8 @@ import { WorkspaceActiveSessionError } from '@deepseek-ai/dsh-workspace'
 import { digest, missing, ResearchFiles, researchCatalogSchema, researchHighlightSchema } from './research-files.ts'
 import type { ResearchFilePolicy } from './research-files.ts'
 import { listPaperContents, readPaperContent, savePaperContent } from './research-contents.ts'
+import { orderedTopicPapers } from './research-order.ts'
+import type { ResearchReorderPapersRequest } from './research-types.ts'
 import type {
   ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
 } from './research-types.ts'
@@ -316,6 +318,33 @@ export class ResearchCatalogHost {
         })
       }
       return { ...catalog, topics: catalog.topics.map(item => item.id === topic.id ? { ...item, title } : item) }
+    })
+  }
+
+  /**
+   * Commit one Topic's reading order under the same lock as library membership.
+   * @param request - complete target order and the last observed order.
+   * @returns confirmed catalog; stale orders and incomplete permutations write nothing.
+   */
+  reorderPapers(request: ResearchReorderPapersRequest): Promise<ResearchCatalog> {
+    return this.mutate((catalog) => {
+      const topic = catalog.topics.find(item => item.id === request.topicId)
+      if (topic === undefined) throw new RemoteError('research/not-found', 'Topic not found', { id: request.topicId })
+      const current = orderedTopicPapers(catalog, topic).map(paper => paper.id)
+      const same = (ids: readonly ResearchPaperId[]) => ids.length === current.length && ids.every((id, index) => id === current[index])
+      if (same(request.paperIds)) return catalog
+      if (!same(request.expectedPaperIds)) {
+        throw new RemoteError('research/order-conflict', 'The reading order or Topic contents changed; read the current order before retrying', {
+          topicId: topic.id, paperIds: current,
+        })
+      }
+      const members = new Set(current)
+      if (request.paperIds.length !== members.size || new Set(request.paperIds).size !== members.size
+        || request.paperIds.some(id => !members.has(id))) {
+        throw new RemoteError('research/invalid', 'Include every paper in this Topic exactly once', { field: 'paperIds' })
+      }
+      return { ...catalog,
+        topics: catalog.topics.map(item => item.id === topic.id ? { ...item, paperOrder: [...request.paperIds] } : item) }
     })
   }
 

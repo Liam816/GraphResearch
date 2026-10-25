@@ -22,6 +22,24 @@
 .tree .children { padding-left: 16px; }
 .treeRow { padding-inline: 4px; display: flex; align-items: center; min-height: 34px; gap: 2px; }
 .paperRow { margin-left: 24px; }
+.paperRow[data-sortable] { margin-left: 0; position: relative; }
+.tree .paperGrip { display: flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 28px; padding: 0; opacity: 0; color: var(--dsw-alias-label-secondary); cursor: grab; touch-action: none; }
+.paperRow:hover .paperGrip, .paperRow:focus-within .paperGrip, .paperRow[data-drag-source] .paperGrip { opacity: 1; }
+.tree .paperGrip:disabled { cursor: default; opacity: 0; }
+.tree .paperGrip:active { cursor: grabbing; }
+.tree .paperGrip:focus-visible { opacity: 1; outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
+.paperRow[data-drag-source] { opacity: 0.45; }
+.paperRow[data-drop-edge]::after { content: ''; position: absolute; inset-inline: 28px 4px; height: 2px; border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-state-business-primary); pointer-events: none; }
+.paperRow[data-drop-edge=before]::after { top: 0; }
+.paperRow[data-drop-edge=after]::after { bottom: 0; }
+.children[aria-busy=true] .paperTitle { opacity: 0.65; }
+.paperDragOverlay { max-width: 260px; padding: 8px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-sm); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: no-preference) {
+  .tree .paperGrip { transition: opacity var(--ds-transition-duration-fast) var(--ds-ease-in-out); }
+}
+@media (hover: none), (pointer: coarse) {
+  .tree .paperGrip { opacity: 1; width: 44px; height: 44px; }
+}
 .paperActions { flex: none; display: flex; opacity: 0; pointer-events: none; }
 .paperRow:hover .paperActions, .paperRow[data-menu-open] .paperActions,
 html:not([data-input-modality='pointer']) .paperRow:has(:focus-visible:not([data-dsh-automatic-focus])) .paperActions { opacity: 1; pointer-events: auto; }

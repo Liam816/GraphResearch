@@ -135,6 +135,16 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
         throw error
       }
     },
+    reorderPapers: async (request) => {
+      try { await ctx.research.reorderPapers(request) }
+      catch (error: unknown) {
+        notice.set({ seq: ++noticeSeq, message: 'paperOrderFailed', success: false })
+        try { await ctx.research.refresh() }
+        catch (refreshError: unknown) { console.error('Research refresh after reorder failed:', refreshError) }
+        throw error
+      }
+      notice.set({ seq: ++noticeSeq, message: 'paperOrderSaved', success: true })
+    },
     renameTopic: async (request) => {
       try { await ctx.research.renameTopic(request) }
       catch (error: unknown) {

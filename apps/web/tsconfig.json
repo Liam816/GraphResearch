@@ -80,6 +80,8 @@
     "tests/research-agent.snapshot.ts",
     "tests/research-translation.snapshot.ts",
     "tests/edit-question.snapshot.ts",
+    "tests/research-ui.snapshot.ts",
+    "tests/research-paper-order.e2e.ts",
     "tests/excel-opc.e2e.ts",
     "tests/office-fixture.ts",
     "tests/sidebar-browser.e2e.ts",

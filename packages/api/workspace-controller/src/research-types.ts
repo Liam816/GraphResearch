@@ -58,6 +58,8 @@ export interface ResearchTopic {
   readonly title: string
   readonly workspaceId: WorkspaceId
   readonly sessionId: SessionId
+  /** Topic-local reading order; absent legacy entries retain catalog creation order. */
+  readonly paperOrder?: readonly ResearchPaperId[] | undefined
   /** Browser projection of the topic's Markdown summary. */
   readonly notes?: ResearchNote | undefined
 }
@@ -150,6 +152,13 @@ export interface ResearchRenameTopicRequest {
   readonly topicId: ResearchTopicId
   readonly title: string
   readonly expectedTitle: string
+}
+
+/** Replace one Topic's complete reading order without overwriting intervening moves or membership changes. */
+export interface ResearchReorderPapersRequest {
+  readonly topicId: ResearchTopicId
+  readonly paperIds: readonly ResearchPaperId[]
+  readonly expectedPaperIds: readonly ResearchPaperId[]
 }
 
 /** Register a paper with an independent Session and an optional original. */
@@ -250,6 +259,8 @@ export interface ResearchSaveFileRequest extends ResearchFileRequest {
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
+    /** Another reader changed the order or membership; reread before moving again. */
+    'research/order-conflict': { readonly topicId: ResearchTopicId; readonly paperIds: readonly ResearchPaperId[] }
     /** Another editor renamed this conversation. */
     'research/conversation-conflict': { readonly sessionId: SessionId }
     /** Another conversation for this paper owns the current Agent turn. */

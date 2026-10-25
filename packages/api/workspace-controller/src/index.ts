@@ -20,6 +20,10 @@ import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import * as ResearchAgent from './research-agent.ts'
+import * as UiAgent from './ui-agent.ts'
+import { UiModuleRegistry } from './ui-modules.ts'
+import { researchDirectoryModule } from './research-ui.ts'
+import type { ResearchReorderPapersRequest } from './research-types.ts'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
@@ -48,6 +52,7 @@ import type {
 
 export type * from './types.ts'
 export { DirectoryPickerController } from './directory-picker.ts'
+export type { UiModule, UiModuleContext, UiModuleDescriptor, UiModuleInput, UiModuleValue } from './ui-modules.ts'
 
 /** First-use directory policy for the Host account. */
 export interface Config {
@@ -161,6 +166,9 @@ export class WorkspaceController extends TypertRemoteService {
   private readonly research: ResearchCatalogHost
   private readonly translations: PaperTranslations
   private readonly researchAgents = new WeakSet<Agent>()
+  /** Explicit interface operations shared by every Agent; contributions register through ctx.effect. */
+  readonly uiModules: UiModuleRegistry = new UiModuleRegistry()
+  private readonly uiAgents = new WeakSet<Agent>()
 
   /**
    * @param ctx - Host context containing the Workspace registry.
@@ -196,11 +204,18 @@ export class WorkspaceController extends TypertRemoteService {
       dictionaryEndpoint: this.config.researchDictionaryEndpoint, dictionaryTimeoutMs: this.config.researchDictionaryTimeoutMs,
       maxNoteBytes: this.config.researchMaxNoteBytes, lockTimeoutMs: this.config.researchLockTimeoutMs,
     }, { read: () => this.research.read(), saveNote: request => this.research.saveNote(request) })
+    ctx.effect(() => this.uiModules.register(researchDirectoryModule({
+      list: () => this.researchList(), reorder: request => this.researchReorderPapers(request),
+    })))
     ctx.on('agent/created', async ({ agent }) => {
+      await this.bindUiAgent(agent)
       const catalog = this.research.current()
       if (catalog.topics.some(item => item.sessionId === agent.id) || paperForSession(catalog, agent.id) !== undefined) {
         await this.bindResearchAgent(agent)
       }
+    })
+    ctx.inject(['agents'], async () => {
+      for (const agent of ctx.agents.list()) await this.bindUiAgent(agent)
     })
     // This package is the Loader entry for both Remote owners it hosts: the
     // directory-picking seam is abstract and never an entry itself. The child
@@ -358,6 +373,14 @@ export class WorkspaceController extends TypertRemoteService {
    */
   @Remote('researchRenameTopic')
   researchRenameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog> { return this.research.renameTopic(request) }
+
+  /**
+   * Replace one Topic's complete paper order after checking its last observed order.
+   * @param request - current membership in desired and last observed order.
+   * @returns committed catalog broadcast to connected readers.
+   */
+  @Remote('researchReorderPapers')
+  researchReorderPapers(request: ResearchReorderPapersRequest): Promise<ResearchCatalog> { return this.research.reorderPapers(request) }
 
   /**
    * Remove a Topic and its exclusive papers, preserving shared papers and archived histories.
@@ -574,6 +597,15 @@ export class WorkspaceController extends TypertRemoteService {
       const agent = agents.get(id)
       if (agent !== undefined) await this.bindResearchAgent(agent)
     }
+  }
+
+  private async bindUiAgent(agent: Agent): Promise<void> {
+    if (this.uiAgents.has(agent)) return
+    this.uiAgents.add(agent)
+    try {
+      const fiber = await agent.ctx.plugin(UiAgent)
+      this.ctx.effect(() => () => fiber.dispose(), 'workspace-controller: interface Agent tools')
+    } catch (error: unknown) { this.uiAgents.delete(agent); throw error }
   }
 
   private async bindResearchAgent(agent: Agent): Promise<void> {

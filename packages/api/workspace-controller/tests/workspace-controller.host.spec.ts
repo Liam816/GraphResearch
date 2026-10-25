@@ -21,6 +21,7 @@ import type { ResearchHighlight, ResearchHighlightId, ResearchPaperId } from '..
 import { paperConversations, conversationBackup } from '../src/research-conversations.ts'
 import { restoreResearchSessions } from '../src/research-session-backup.ts'
 import { ResearchFiles, digest } from '../src/research-files.ts'
+import { orderedTopicPapers } from '../src/research-order.ts'
 
 // The controller relays whatever families the providers report; this suite merges its own.
 declare module '@deepseek-ai/dsh-workspace/types' {
@@ -502,6 +503,63 @@ describe('Research catalog', () => {
     const catalog = await fixture.controller.researchCreateTopic({ title: 'Robot VLA', workspaceId: workspace.workspaceId, sessionId: SessionId('topic-agent') })
     return { ...fixture, topic: catalog.topics[0]!, workspace }
   }
+
+  it('persists a Topic reading order without moving files, conversations or another Topic', async () => {
+    const { controller, topic, root } = await researchFixture()
+    await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const before = await controller.researchCreatePaper({ topicId: topic.id, title: 'B', repositoryUrl: '', sessionId: SessionId('paper-b') })
+    const ids = before.papers.map(paper => paper.id)
+    const request = { topicId: topic.id, paperIds: [...ids].reverse(), expectedPaperIds: ids }
+    const saved = await controller.researchReorderPapers(request)
+    expect(saved.papers).toEqual(before.papers)
+    expect(saved.topics[0]).toMatchObject({ ...topic, paperOrder: request.paperIds })
+    const files = await ResearchFiles.open(join(root, 'data'), { maxNoteBytes: 4096, lockTimeoutMs: 1000 })
+    const reopened = await files.read()
+    expect(orderedTopicPapers(reopened, reopened.topics[0]!).map(paper => paper.id)).toEqual(request.paperIds)
+    expect((await controller.researchReorderPapers(request)).revision).toBe(saved.revision)
+    expect(existsSync(before.papers[0]!.directory!)).toBe(true)
+    expect(controller.uiModules.list().map(module => module.name)).toContain('research.directory')
+    await expect(controller.uiModules.read('research.directory', {}, { sessionId: undefined, signal: new AbortController().signal }))
+      .resolves.toMatchObject({ topics: [{ topicId: topic.id, paperIds: request.paperIds }] })
+  })
+
+  it('rejects stale reading orders and incomplete permutations without changing confirmed state', async () => {
+    const { controller, topic } = await researchFixture()
+    await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const before = await controller.researchCreatePaper({ topicId: topic.id, title: 'B', repositoryUrl: '', sessionId: SessionId('paper-b') })
+    const ids = before.papers.map(paper => paper.id)
+    for (const paperIds of [[], [ids[0]!], [ids[0]!, ids[0]!], [ids[0]!, 'missing' as ResearchPaperId]]) {
+      await expect(controller.researchReorderPapers({ topicId: topic.id, paperIds, expectedPaperIds: ids }))
+        .rejects.toMatchObject({ code: 'research/invalid' })
+    }
+    const saved = await controller.researchReorderPapers({ topicId: topic.id, paperIds: [...ids].reverse(), expectedPaperIds: ids })
+    await expect(controller.researchReorderPapers({ topicId: topic.id, paperIds: ids, expectedPaperIds: ids }))
+      .rejects.toMatchObject({ code: 'research/order-conflict', details: { paperIds: [...ids].reverse() } })
+    expect((await controller.researchList()).revision).toBe(saved.revision)
+  })
+
+  it('keeps shared-paper orders independent and appends new members without restoring deleted members', async () => {
+    const { controller, topic, ctx, root, workspace } = await researchFixture()
+    ctx.sessions.create(SessionId('second-topic'), { meta: { cwd: root } })
+    await ctx.workspaceRegistry.get(workspace.workspaceId)!.attachSession(SessionId('second-topic'))
+    const second = (await controller.researchCreateTopic({ title: 'Other topic', workspaceId: workspace.workspaceId, sessionId: SessionId('second-topic') })).topics[1]!
+    await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const before = await controller.researchCreatePaper({ topicId: topic.id, title: 'B', repositoryUrl: '', sessionId: SessionId('paper-b') })
+    const ids = before.papers.map(paper => paper.id)
+    const files = await ResearchFiles.open(join(root, 'data'), { maxNoteBytes: 4096, lockTimeoutMs: 1000 })
+    await files.withLock(() => files.write({ ...before, revision: before.revision + 1,
+      papers: before.papers.map(paper => ({ ...paper, topicIds: [topic.id, second.id] })),
+    }, before))
+    const saved = await controller.researchReorderPapers({ topicId: topic.id, paperIds: [...ids].reverse(), expectedPaperIds: ids })
+    expect(orderedTopicPapers(saved, saved.topics[1]!).map(paper => paper.id)).toEqual(ids)
+    const a = saved.papers[0]!, b = saved.papers[1]!
+    const changed = { ...saved, papers: [{ ...a, topicIds: [second.id] }, b] }
+    expect(orderedTopicPapers(changed, saved.topics[0]!).map(paper => paper.id)).toEqual([b.id])
+    const appended = { ...saved, papers: [...saved.papers, { ...a, id: 'new-paper' as ResearchPaperId }] }
+    expect(orderedTopicPapers(appended, saved.topics[0]!).map(paper => paper.id)).toEqual([b.id, a.id, 'new-paper'])
+    await expect(controller.researchReorderPapers({ topicId: second.id, paperIds: ids, expectedPaperIds: [] }))
+      .resolves.toMatchObject({ revision: saved.revision })
+  })
 
   it('adds fresh paper conversations idempotently and retains shared paper resources', async () => {
     const { controller, topic, ctx, root } = await researchFixture()

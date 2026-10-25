@@ -11,6 +11,10 @@ import type { ResearchDirectoryProps } from '../src/client/research/contract.ts'
 import { createResearchViewStore } from '../src/client/research/store.ts'
 import { en } from '../src/client/research/locales.ts'
 
+vi.hoisted(() => {
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+})
+
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 beforeEach(() => { localStorage.clear() })
 
@@ -30,7 +34,7 @@ function fixture(managed: boolean, collapsed = false) {
     useSessionStatus: select => select(new Map()), useSessionRetainInfo: () => undefined,
     usePanelInfo: select => select({ activePanelId: null }),
     useResource: () => ({ status: 'none', value: undefined, failure: undefined, reload: () => {} }),
-    renameTopic: vi.fn(async () => {}), deleteTopic: vi.fn(async () => {}),
+    reorderPapers: vi.fn(async () => {}), renameTopic: vi.fn(async () => {}), deleteTopic: vi.fn(async () => {}),
     deletePaper: vi.fn(async () => {}), refresh: vi.fn(async () => {}), open: vi.fn(),
     createTopic: vi.fn(async () => {}), createPaper: vi.fn(async () => {}),
     listFiles: vi.fn(async () => ({ path: '', entries: [] })),

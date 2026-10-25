@@ -1,0 +1,10 @@
+version: 1
+scenario: research-paper-order
+profile: web
+composition: web-research
+recording: authored
+header:
+  class: web-research-order
+  pin: true
+workspace:
+  final: true

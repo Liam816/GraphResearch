@@ -25,6 +25,8 @@
     "apps/web/tests/research-agent.snapshot.ts",
     "apps/web/tests/research-translation.snapshot.ts",
     "apps/web/tests/edit-question.snapshot.ts",
+    "apps/web/tests/research-ui.snapshot.ts",
+    "apps/web/tests/research-paper-order.e2e.ts",
     "apps/web/tests/scaffold.ts",
     "apps/web/tests/voice-input.e2e.ts",
     "apps/web/tests/cot-translation.e2e.ts",

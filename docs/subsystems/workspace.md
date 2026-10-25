@@ -178,6 +178,10 @@ The Workspace controller also manages a research library whose Topic and paper i
 
 `ResearchConversation` records a paper-owned `sessionId`, title, pin/archive flags, creation time and optional continuation point. `ResearchCreateConversationRequest` identifies a paper and a fresh Session; `ResearchUpdateConversationRequest` adds optional title, expected title, pin and archive updates. `ResearchPaper.conversations` is optional for legacy single-Session libraries. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns admission, persistence and execution rules.
 
+## Agent-managed interface modules
+
+The Workspace Controller owns a registry of explicitly exposed interface modules. Each module declares validated JSON targets and changes, reads authoritative state, and commits through its owning service; all Agent scopes discover, read and update registered modules with the same three tools. The research directory stores an independent `ResearchTopic.paperOrder` and accepts complete, conflict-checked `ResearchReorderPapersRequest` permutations. Registration, disposal, failure guarantees and canvas extension guidance are in the [controller reference](../../packages/api/workspace-controller/README.md#research-catalog).
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -449,6 +453,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the committed catalog; stale names reject without replacing the latest title.
  */
 @Remote('researchRenameTopic') researchRenameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog>
+
+/**
+ * Replace one Topic's complete paper order after checking its last observed order.
+ * @param request - current membership in desired and last observed order.
+ * @returns committed catalog broadcast to connected readers.
+ */
+@Remote('researchReorderPapers') researchReorderPapers(request: ResearchReorderPapersRequest): Promise<ResearchCatalog>
 
 /**
  * Remove a Topic and its exclusive papers, preserving shared papers and archived histories.

@@ -128,6 +128,9 @@ describe('minimal agent preset', () => {
         "prompt": "You are a helpful software engineer assistant.",
         "tools": [
           "bash",
+          "ui_capabilities",
+          "ui_read",
+          "ui_update",
           "working_directory",
         ],
       }

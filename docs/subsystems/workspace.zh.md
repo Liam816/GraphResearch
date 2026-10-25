@@ -178,6 +178,10 @@ Workspace 控制器还管理科研资料库，Topic 和论文身份独立于 Wor
 
 `ResearchConversation` 保存论文下会话的 `sessionId`、名称、置顶与归档标志、创建时间及可选续读点。`ResearchCreateConversationRequest` 指定论文与全新会话；`ResearchUpdateConversationRequest` 增加可选名称、预期旧名称、置顶及归档更新。旧版单会话论文可省略 `ResearchPaper.conversations`。[控制器参考](../../packages/api/workspace-controller/README.zh.md#research-catalog) 定义准入、持久化与执行规则。
 
+## Agent 可管理的界面模块
+
+Workspace Controller 维护显式开放的界面模块注册表。各模块声明经过校验的 JSON 目标和修改，读取权威状态，并通过自身服务提交；所有 Agent 作用域使用同样的三个工具发现、读取和修改已注册模块。科研目录通过 `ResearchTopic.paperOrder` 为 Topic 独立保存顺序，并接受经过冲突检查的完整 `ResearchReorderPapersRequest` 排列。注册、卸载、失败保证及画布扩展说明见[控制器参考](../../packages/api/workspace-controller/README.zh.md#research-catalog)。
+
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
 <a id="cordis-surface"></a>
@@ -449,6 +453,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the committed catalog; stale names reject without replacing the latest title.
  */
 @Remote('researchRenameTopic') researchRenameTopic(request: ResearchRenameTopicRequest): Promise<ResearchCatalog>
+
+/**
+ * Replace one Topic's complete paper order after checking its last observed order.
+ * @param request - current membership in desired and last observed order.
+ * @returns committed catalog broadcast to connected readers.
+ */
+@Remote('researchReorderPapers') researchReorderPapers(request: ResearchReorderPapersRequest): Promise<ResearchCatalog>
 
 /**
  * Remove a Topic and its exclusive papers, preserving shared papers and archived histories.

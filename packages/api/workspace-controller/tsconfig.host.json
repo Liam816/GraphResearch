@@ -25,7 +25,11 @@
     "src/research-markdown.ts",
     "src/research-translation-types.ts",
     "src/research-text-index.ts",
-    "src/research-translation.ts"
+    "src/research-translation.ts",
+    "src/research-order.ts",
+    "src/ui-modules.ts",
+    "src/ui-agent.ts",
+    "src/research-ui.ts"
   ],
   "references": [
     {

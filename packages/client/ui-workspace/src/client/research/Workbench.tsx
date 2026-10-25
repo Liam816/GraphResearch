@@ -7,6 +7,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { paperForSession } from './conversation-records.ts'
 import type { ResearchPaperId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { orderedTopicPapers } from './paper-order.ts'
 import type { ResearchWorkbenchProps } from './contract.ts'
 import { defaultPaperView, resolvePanelOrder, type PaperView } from './store.ts'
 import { ResearchPaperPanels } from './PaperPanels.tsx'
@@ -58,9 +59,8 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
     : catalog.topics.find(item => item.id === state.topicId && paper.topicIds.includes(item.id))
       ?? catalog.topics.find(item => paper.topicIds.includes(item.id))
   const view = paper === undefined ? defaultPaperView() : state.papers[paper.id] ?? defaultPaperView()
-  const topicId = topic?.id
   const topicPapers = useMemo(
-    () => catalog.papers.filter(item => topicId !== undefined && item.topicIds.includes(topicId)), [catalog.papers, topicId],
+    () => topic === undefined ? [] : orderedTopicPapers(catalog, topic), [catalog, topic],
   )
   const panelId = useId()
   const [referencesOpen, setReferencesOpen] = useState(false)

@@ -88,6 +88,7 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   readonly researchCreateConversation = vi.fn<WorkspaceRemote['researchCreateConversation']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchUpdateConversation = vi.fn<WorkspaceRemote['researchUpdateConversation']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchRenameTopic = vi.fn<WorkspaceRemote['researchRenameTopic']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
+  readonly researchReorderPapers = vi.fn<WorkspaceRemote['researchReorderPapers']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchDeleteTopic = vi.fn<WorkspaceRemote['researchDeleteTopic']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchDeletePaper = vi.fn<WorkspaceRemote['researchDeletePaper']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchCreatePaper = vi.fn<WorkspaceRemote['researchCreatePaper']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))

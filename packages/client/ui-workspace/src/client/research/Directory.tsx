@@ -6,9 +6,10 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { paperForSession } from './conversation-records.ts'
 import type { ResearchPaper, ResearchTopic, ResearchTopicId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { orderedTopicPapers } from './paper-order.ts'
 import type { ResearchDirectoryProps } from './contract.ts'
 import { ResearchLibrarySettings } from './LibrarySettings.tsx'
-import { ResearchPaperRow } from './PaperRow.tsx'
+import { ResearchPaperList } from './PaperList.tsx'
 import { DeletePaperDialog } from './DeletePaper.tsx'
 import { DeleteTopicDialog } from './DeleteTopic.tsx'
 import { ResearchTopicActions, RenameTopicDialog } from './TopicActions.tsx'
@@ -71,8 +72,8 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
     {catalog.topics.length > 0 && topics.length === 0 && <p className={css.hint}>{t('noResults')}</p>}
     <nav aria-label={t('research')} className={css.tree}>
       <ul>{topics.map((topic) => {
-        const papers = catalog.papers.filter(paper => paper.topicIds.includes(topic.id)
-          && (topic.title.toLocaleLowerCase().includes(filter) || paper.title.toLocaleLowerCase().includes(filter)))
+        const papers = orderedTopicPapers(catalog, topic).filter(paper =>
+          topic.title.toLocaleLowerCase().includes(filter) || paper.title.toLocaleLowerCase().includes(filter))
         const expanded = filter !== '' || view.expanded[topic.id] !== false
         const Chevron = expanded ? IconChevronDownOutlineRegular : IconChevronRightOutlineRegular
         return <li key={topic.id}>
@@ -86,9 +87,9 @@ export function ResearchDirectory(props: ResearchDirectoryProps) {
             <ResearchTopicActions topic={topic} t={t} onAddPaper={() => { start(topic.id) }}
               onRename={() => { setRenaming(topic) }} onDelete={() => { setDeletingTopic(topic) }} />
           </div>
-          {expanded && <ul className={css.children}>{papers.map(paper => <ResearchPaperRow key={paper.id}
-            paper={paper} selected={paperForSession(catalog, current)?.id === paper.id} t={t}
-            onOpen={() => { actions.topic(topic.id); props.open(paper.sessionId) }} onDelete={() => { setDeleting(paper) }} />)}</ul>}
+          {expanded && <ResearchPaperList topicId={topic.id} papers={papers} selectedId={paperForSession(catalog, current)?.id}
+            filtered={filter !== '' || phase !== 'ready' || needsRestart} t={t} reorderPapers={props.reorderPapers}
+            onOpen={(paper) => { actions.topic(topic.id); props.open(paper.sessionId) }} onDelete={setDeleting} />}
         </li>
       })}</ul>
     </nav>

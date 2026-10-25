@@ -1,5 +1,10 @@
 /** Product and accessibility copy for the research workspace. */
 export const zh = {
+  paperDragHandle: '拖拽调整「{title}」的顺序', paperDragRole: '可排序论文', paperMoveUp: '上移', paperMoveDown: '下移',
+  paperDragInstructions: '按空格键开始排序，用上下方向键移动，再按空格键保存；按 Escape 取消。搜索时暂停排序',
+  paperDragStart: '正在移动「{title}」', paperDragBefore: '放到「{title}」前面', paperDragAfter: '放到「{title}」后面',
+  paperOrderSaving: '正在保存论文顺序', paperOrderSaved: '论文顺序已保存',
+  paperOrderFailed: '顺序保存未完成，请确认刷新后的目录再重试',
   newConversation: '新会话', initialConversation: '初次阅读', chooseConversation: '切换会话', paperConversations: '本论文的会话',
   searchConversations: '搜索本论文的会话', noConversations: '没有匹配的会话', pinnedConversations: '置顶', recentConversations: '最近',
   archivedConversations: '已归档', currentConversation: '当前', conversationRunning: '运行中', conversationActions: '{title} 的会话操作',
@@ -88,6 +93,11 @@ export const zh = {
 export type ResearchKey = keyof typeof zh
 /** English research dictionary. */
 export const en = {
+  paperDragHandle: 'Reorder paper: {title}', paperDragRole: 'Sortable paper', paperMoveUp: 'Move up', paperMoveDown: 'Move down',
+  paperDragInstructions: 'Press Space to start sorting, use the arrow keys to move, then Space to save. Escape cancels. Clear search before sorting.',
+  paperDragStart: 'Moving {title}', paperDragBefore: 'Place before {title}', paperDragAfter: 'Place after {title}',
+  paperOrderSaving: 'Saving paper order', paperOrderSaved: 'Paper order saved',
+  paperOrderFailed: 'The order could not be confirmed. Check the refreshed directory before retrying.',
   newConversation: 'New conversation', initialConversation: 'Initial reading', chooseConversation: 'Switch conversation', paperConversations: 'Paper conversations',
   searchConversations: 'Search this paper’s conversations', noConversations: 'No matching conversations', pinnedConversations: 'Pinned', recentConversations: 'Recent',
   archivedConversations: 'Archived', currentConversation: 'Current', conversationRunning: 'Running', conversationActions: 'Conversation actions for {title}',

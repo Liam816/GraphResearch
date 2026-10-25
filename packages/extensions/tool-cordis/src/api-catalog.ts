@@ -3692,6 +3692,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'canonical prompt references for the selected paper sessions.',
       },
       {
+        signature: 'readonly uiModules: UiModuleRegistry = new UiModuleRegistry()',
+        description: 'Explicit interface operations shared by every Agent; contributions register through ctx.effect.',
+        parameters: [],
+      },
+      {
         signature: '@Remote(\'create\') create(request: WorkspaceCreateRequest): Promise<WorkspaceCreateValue>',
         description: 'Create or idempotently resolve one Workspace over an existing directory.',
         parameters: [{ name: 'request', description: 'directory path to register.' }],
@@ -3774,6 +3779,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Persist a Topic name while retaining its identity and research resources.',
         parameters: [{ name: 'request', description: 'Topic, replacement title, and last displayed title for conflict detection.' }],
         returns: 'the committed catalog; stale names reject without replacing the latest title.',
+      },
+      {
+        signature: '@Remote(\'researchReorderPapers\') researchReorderPapers(request: ResearchReorderPapersRequest): Promise<ResearchCatalog>',
+        description: 'Replace one Topic\'s complete paper order after checking its last observed order.',
+        parameters: [{ name: 'request', description: 'current membership in desired and last observed order.' }],
+        returns: 'committed catalog broadcast to connected readers.',
       },
       {
         signature: '@Remote(\'researchDeleteTopic\') researchDeleteTopic(request: ResearchDeleteTopicRequest): Promise<ResearchCatalog>',
@@ -6764,6 +6775,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResearchRenameTopicRequest {\n    readonly topicId: ResearchTopicId;\n    readonly title: string;\n    readonly expectedTitle: string;\n}',
   },
   {
+    name: 'ResearchReorderPapersRequest',
+    declaration: 'export interface ResearchReorderPapersRequest {\n    readonly topicId: ResearchTopicId;\n    readonly paperIds: readonly ResearchPaperId[];\n    readonly expectedPaperIds: readonly ResearchPaperId[];\n}',
+  },
+  {
     name: 'ResearchSaveFileRequest',
     declaration: 'export interface ResearchSaveFileRequest extends ResearchFileRequest {\n    readonly text: string;\n    readonly expectedVersion: string;\n}',
   },
@@ -6777,7 +6792,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResearchTopic',
-    declaration: 'export interface ResearchTopic {\n    readonly id: ResearchTopicId;\n    readonly title: string;\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n    readonly notes?: ResearchNote | undefined;\n}',
+    declaration: 'export interface ResearchTopic {\n    readonly id: ResearchTopicId;\n    readonly title: string;\n    readonly workspaceId: WorkspaceId;\n    readonly sessionId: SessionId;\n    readonly paperOrder?: readonly ResearchPaperId[] | undefined;\n    readonly notes?: ResearchNote | undefined;\n}',
   },
   {
     name: 'ResearchTopicId',
@@ -8514,6 +8529,30 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'UiLogOptions',
     declaration: 'export interface UiLogOptions {\n    to?: \'transcript\' | \'debug\';\n}',
+  },
+  {
+    name: 'UiModule',
+    declaration: 'export interface UiModule<Target, Change> {\n    readonly name: string;\n    readonly description: string;\n    readonly target: UiModuleInput<Target>;\n    readonly change: UiModuleInput<Change>;\n    read: (target: Target, context: UiModuleContext) => Promise<UiModuleValue>;\n    update: (target: Target, change: Change, context: UiModuleContext) => Promise<UiModuleValue>;\n}',
+  },
+  {
+    name: 'UiModuleContext',
+    declaration: 'export interface UiModuleContext {\n    readonly sessionId: SessionId | undefined;\n    readonly signal: AbortSignal;\n}',
+  },
+  {
+    name: 'UiModuleDescriptor',
+    declaration: 'export interface UiModuleDescriptor {\n    readonly name: string;\n    readonly description: string;\n    readonly targetSchema: Record<string, unknown>;\n    readonly changeSchema: Record<string, unknown>;\n}',
+  },
+  {
+    name: 'UiModuleInput',
+    declaration: 'export interface UiModuleInput<T> {\n    readonly jsonSchema: Record<string, unknown>;\n    parse: (value: unknown) => T;\n}',
+  },
+  {
+    name: 'UiModuleRegistry',
+    declaration: 'export class UiModuleRegistry {\n    register<Target, Change>(module: UiModule<Target, Change>): () => void;\n    list(): readonly UiModuleDescriptor[];\n    async read(name: string, target: unknown, context: UiModuleContext): Promise<UiModuleValue>;\n    async update(name: string, target: unknown, change: unknown, context: UiModuleContext): Promise<UiModuleValue>;\n}',
+  },
+  {
+    name: 'UiModuleValue',
+    declaration: 'export type UiModuleValue = z.core.util.JSONType;',
   },
   {
     name: 'UiNode',

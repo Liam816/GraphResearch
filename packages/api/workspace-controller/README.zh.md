@@ -61,6 +61,12 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 `researchHighlight` 新增或删除一个稳定的文字选区标识。新增时验证颜色、页码和归一化矩形；相同的重复新增和不存在的删除可安全重试，并发编辑保留其他选区。高亮保存于私有论文元数据和资料库索引，随资料库迁移，通过已有的科研快照流更新。`researchMaxHighlightBytes` 限制每篇论文完整高亮列表的序列化大小，默认为 4 MiB。保存失败时保留已确认目录，可能留下可恢复的事务日志；重复相同操作可完成恢复而不重复创建高亮。尚无高亮的资料库无需转换。目录响应通过 `capabilities.pdfHighlights` 声明支持高亮；此运行时标志不写入资料库。
 
+`researchReorderPapers` 为每个 Topic 保存完整的 `paperOrder`。`expectedPaperIds` 必须匹配当前解析后的顺序；不完整排列、重复 ID 和其他 Topic 的论文会被拒绝。已应用的目标顺序可幂等重试。旧 Topic 保持创建顺序，新成员追加，已移除成员忽略。共享论文在不同 Topic 中独立排序。资料库锁、可恢复日志与现有流将同一确认状态发布给拖拽控件及 Agent；文件、成员关系与 Session 保持不变。写入结果未确认时，先刷新再重试。
+
+`workspaceController.uiModules` 注册可由 Agent 管理的界面模块。提供方声明稳定名称、说明、target/change JSON Schema 及匹配的校验器，并实现异步 read/update。通过 `ctx.effect(() => ctx.workspaceController.uiModules.register(module))` 贡献；重复名称在注册时失败，卸载同时移除发现与执行入口。提供方负责作用域授权、冲突检查、持久化及提交后的通知。读取返回权威 JSON，修改返回确认状态。后续画布模块复用同一注册和工具协议，不暴露 DOM 选择器或任意脚本。目录模块委托给 `researchReorderPapers`。
+
+所有 Agent，包括普通、Topic、论文和委派会话，均获得 `ui_capabilities`、`ui_read` 与 `ui_update`。发现返回已注册的参数格式；以空 target 读取 `research.directory` 可列出 Topic 标识与阅读顺序，指定 `topicId` 可缩小范围。修改必须指定 `topicId`、完整 `paperIds` 及读取时的 `expectedPaperIds`。未注册模块和不合法参数在执行提供方之前失败；顺序冲突需重新读取并合并。调用和结果沿用 Session 的持久化工具事件，即使 Agent 面板关闭，变更也会同步到已连接客户端。
+
 `researchRenameTopic` 接收 Topic 标识、新名称及编辑框的 `expectedTitle`。它去除首尾空白并校验名称，拒绝不存在的 Topic；其他写入者已改名时返回 `research/topic-conflict`。重复已成功应用的改名不会再次增加修订号。现有资料库事务更新 `agent-lib/library.json` 和私有 Topic 元数据；Topic 标识、笔记、Session、目录和论文关联保持稳定。写入失败时可能保留可恢复日志，重试前应先刷新资料库。
 
 `researchDeleteTopic` 在归档或暂存文件前，核对 Topic 的完整路径及全部专属论文身份和路径。相关任务运行或内容过期时拒绝删除。单个 `agent-lib/.transaction.json` 暂存 Topic 与专属论文，一并发布移除结果和共享论文的关联变更，再清理暂存文件与私有运行记录。读取会恢复中断的暂存或清理；目标被占用时停止并保留两份副本。共享论文及其会话继续可用。原始历史归档保留，不删除共享 Workspace。
@@ -93,15 +99,15 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 #### 模型看到的内容
 
-普通 Workspace 组织不贡献提示词或工具。科研实体的 Agent 获得作用域内的 `research_context`、`research_import_paper`、`research_attach_pdf`、`research_read_paper`、`research_write_note`、`research_update_progress` 和 `research_write_topic_note` 工具。必要的运行上下文包含资料库、论文目录、PDF 原文、Markdown 转换状态、笔记版本和续读位置。这些信息通过已有提示词上下文准入记录；工具调用和结果使用标准 Session 工具事件。笔记正文通过 `research_context` 显式读取，同时返回已保存高亮的文字、颜色和页面相对矩形。高亮操作本身不启动模型回合。修改学习笔记要求用户明确提出。
+界面管理为每个 Agent 提供发现、读取和修改三个工具 schema；模块说明和参数格式仅在调用发现工具时进入历史。科研实体的 Agent 获得作用域内的 `research_context`、`research_import_paper`、`research_attach_pdf`、`research_read_paper`、`research_write_note`、`research_update_progress` 和 `research_write_topic_note` 工具。必要的运行上下文包含资料库、论文目录、PDF 原文、Markdown 转换状态、笔记版本和续读位置。这些信息通过已有提示词上下文准入记录；工具调用和结果使用标准 Session 工具事件。笔记正文通过 `research_context` 显式读取，同时返回已保存高亮的文字、颜色和页面相对矩形。高亮操作本身不启动模型回合。修改学习笔记要求用户明确提出。
 
 #### Token 影响
 
-科研工具在科研 Agent 请求中增加 schema。必要上下文包含路径、身份标识、版本和续读位置；读取笔记或 PDF 时，通过工具结果加入所请求的正文。PDF 页数和字符数限制约束每次提取的内容量。
+三个界面工具 schema 由所有 Agent 共享；科研工具仅在科研 Agent 请求中额外增加 schema。必要上下文包含路径、身份标识、版本和续读位置；读取笔记或 PDF 时，通过工具结果加入所请求的正文。PDF 页数和字符数限制约束每次提取的内容量。
 
 #### KV Cache 影响
 
-普通 Workspace 变更不会改变请求。科研笔记版本、目录变化和续读位置在请求准入时替换已记录的运行上下文；工具 schema 仅属于科研实体的 Agent 作用域。
+普通 Workspace 变更不会改变请求。科研笔记版本、目录变化和续读位置在请求准入时替换已记录的运行上下文；科研专用工具 schema 仅属于科研实体的 Agent 作用域。注册或卸载模块不会改变界面工具的 schema；下一次发现返回当前注册内容。
 
 ### 论文划词翻译
 
