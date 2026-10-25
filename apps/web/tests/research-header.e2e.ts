@@ -39,14 +39,43 @@ it('centers reading controls and opens paper references from Topic and paper Age
   await expect.poll(() => workbench.locator('[data-composer-input]').textContent()).not.toBe('')
 
   await library.getByRole('button', { name: title, exact: true }).click()
-  const centered = async (groupName: string) => {
-    const group = header.getByRole('group', { name: groupName, exact: true })
-    await expect.poll(async () => {
-      const controls = await group.boundingBox(), bounds = await header.boundingBox()
-      return controls === null || bounds === null ? Infinity : Math.abs(controls.x + controls.width / 2 - bounds.x - bounds.width / 2)
-    }).toBeLessThan(2)
+  const topicPosition = () => header.locator('[data-research-topic-title]').evaluate((element) => {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    const text = range.getBoundingClientRect(), bounds = element.closest('header')!.getBoundingClientRect()
+    const style = getComputedStyle(element)
+    return { x: text.x - bounds.x, y: text.y - bounds.y, font: style.font, color: style.color }
+  })
+  const centered = async () => {
+    await expect.poll(() => header.evaluate((element) => {
+      const group = Array.from(element.querySelectorAll<HTMLElement>('[role="group"]')).find(item =>
+        /^(?:Panel visibility|Reading panel)$/.test(item.getAttribute('aria-label') ?? '') && item.getBoundingClientRect().height > 0)
+      if (group === undefined) return false
+      const controls = group.getBoundingClientRect(), bounds = element.getBoundingClientRect()
+      if (Math.abs(controls.x + controls.width / 2 - bounds.x - bounds.width / 2) >= 2) return false
+      const buttons = Array.from(group.querySelectorAll('button'))
+      return buttons.length === 3 && buttons.every((button) => {
+        const target = button.getBoundingClientRect(), anchor = button.parentElement!.getBoundingClientRect()
+        return target.height === 28 && target.y >= bounds.y && target.bottom <= bounds.bottom
+          && button.contains(document.elementFromPoint(anchor.x + anchor.width / 2, anchor.y + 1))
+      })
+    })).toBe(true)
+    const bounds = (await header.boundingBox())!
+    const paperTopicPosition = await topicPosition()
+    await header.getByRole('button', { name: topic.title, exact: true }).click()
+    await expect.poll(() => header.locator('strong').textContent()).toBe(topic.title)
+    expect(Math.abs((await header.boundingBox())!.height - bounds.height)).toBeLessThan(1)
+    const topicPagePosition = await topicPosition()
+    expect(Math.abs(topicPagePosition.x - paperTopicPosition.x)).toBeLessThan(0.5)
+    expect(Math.abs(topicPagePosition.y - paperTopicPosition.y)).toBeLessThan(0.5)
+    expect(topicPagePosition.font).toBe(paperTopicPosition.font)
+    expect(topicPagePosition.color).toBe(paperTopicPosition.color)
+    if (await library.isVisible()) await library.getByRole('button', { name: title, exact: true }).click()
+    else await page.getByRole('navigation', { name: `Papers in ${topic.title}`, exact: true })
+      .getByRole('button', { name: `Open paper: ${title}`, exact: true }).click()
+    await expect.poll(() => header.locator('strong').textContent()).toBe(title)
   }
-  await centered('Panel visibility')
+  await centered()
   expect(await header.getByRole('button', { name: 'Reference papers', exact: true }).count()).toBe(0)
   const agent = workbench.getByRole('region', { name: 'agent', exact: true })
   await agent.getByRole('button', { name: 'Actions for agent', exact: true }).click()
@@ -63,11 +92,12 @@ it('centers reading controls and opens paper references from Topic and paper Age
   await page.screenshot({ path: '.artifacts/research-ui/centered-panel-controls-dark.png' })
 
   await page.setViewportSize({ width: 1000, height: 800 })
-  await centered('Reading panel')
-  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
+  await centered()
+  const collapseSidebar = page.getByRole('button', { name: 'Collapse sidebar', exact: true })
+  if (await collapseSidebar.isVisible()) await collapseSidebar.click()
   for (const viewport of [{ width: 375, height: 812 }, { width: 812, height: 375 }]) {
     await page.setViewportSize(viewport)
-    await centered('Reading panel')
+    await centered()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await agent.getByRole('button', { name: 'Actions for agent', exact: true }).click()
     const menu = page.getByRole('menu')

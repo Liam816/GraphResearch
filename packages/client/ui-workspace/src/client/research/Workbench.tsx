@@ -88,8 +88,8 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
     {topic !== undefined && <PaperNavigator topic={topic} papers={topicPapers} activeId={paper?.id ?? null} t={t}
       open={(id) => { actions.topic(topic.id); props.open(id) }} />}
     <header className={css.workbenchHeader} data-paper-header={paper !== undefined || undefined}>
-      <div className={css.breadcrumb}>{paper !== undefined && topic !== undefined && <button type="button" onClick={() => { props.open(topic.sessionId) }}>{topic.title}</button>}
-        {paper !== undefined && topic !== undefined && <span aria-hidden="true">/</span>}<strong>{paper?.title ?? topic?.title ?? t('general')}</strong>
+      <div className={css.breadcrumb}>{paper !== undefined && topic !== undefined && <button type="button" data-research-topic-title="" onClick={() => { props.open(topic.sessionId) }}>{topic.title}</button>}
+        {paper !== undefined && topic !== undefined && <span aria-hidden="true">/</span>}<strong data-research-topic-title={paper === undefined && topic !== undefined ? '' : undefined}>{paper?.title ?? topic?.title ?? t('general')}</strong>
       </div>
       {paper !== undefined && <div className={css.workbenchTools}>
         <PanelControls paperId={paper.id} view={view} id={panelId} t={t} viewActions={actions} />
@@ -98,7 +98,6 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
     </header>
     {inserted && <div className={css.inlineStatus} role="status">{t('inserted')}<button type="button" aria-label={t('close')} onClick={() => { setInserted(false) }}><IconCloseOutlineRegular size={12} /></button></div>}
     {paper === undefined ? <div className={css.topicChat}>
-      {topic !== undefined && <div className={css.topicIntro}><span>{t('topic')}</span><h1>{topic.title}</h1><p>{t('topicDescription')}</p><small>{t('paperCount', { count: catalog.papers.filter(item => item.topicIds.includes(topic.id)).length })}</small></div>}
       {sessionId !== undefined && <div className={css.panelHeader} data-dsh-action-row="">
         <strong>{t('agent')}</strong>
         <ResearchPanelMenu panel="agent" t={t} open={agentMenuOpen} setOpen={setAgentMenuOpen} onReference={openReferences} />

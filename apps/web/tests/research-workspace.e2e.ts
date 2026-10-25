@@ -176,7 +176,7 @@ it('opens topic and paper sessions, restores folded panels and drafts, and persi
   await topicForm.getByLabel('Title', { exact: true }).fill('Robot VLA')
   await topicForm.getByRole('button', { name: 'Create', exact: true }).click()
   const workbench = page.locator('[data-research-workbench]')
-  await workbench.getByRole('heading', { name: 'Robot VLA', exact: true }).waitFor()
+  await expect.poll(() => workbench.locator('> header strong').textContent()).toBe('Robot VLA')
   expect(await workbench.getByRole('region', { name: 'pdf viewer', exact: true }).count()).toBe(0)
 
   expect(await library.getByRole('button', { name: 'Add paper to Robot VLA', exact: true }).count()).toBe(0)
