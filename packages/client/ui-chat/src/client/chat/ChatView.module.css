@@ -33,6 +33,10 @@
   container-type: inline-size;
 }
 
+:global([data-conversation-variant='embedded']) .frame:has(> [data-chat-turn-navigation]) .scroll {
+  padding-inline-end: calc(var(--dsh-composer-side-clearance) + 44px);
+}
+
 .root[data-chat-following-tail] .scroll,
 :global([data-conversation-scroll]):has(.root[data-chat-following-tail]) {
   overflow-anchor: none;

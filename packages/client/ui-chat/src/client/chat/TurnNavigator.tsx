@@ -35,7 +35,7 @@ function TurnNavigatorRail({ items, activeTurn, busyTurn, onNavigate, t }: TurnN
     scrollToTurn(turn) { rail.current?.scrollTo(String(turn)) },
   }), [byId, onNavigate])
   if (items.length < 2) return null
-  return <div className={css.slot}><NavigationRail ref={rail} className={css.frame}
+  return <div className={css.slot} data-chat-turn-navigation=""><NavigationRail ref={rail} className={css.frame}
     items={marks} activeId={activeTurn === null ? null : String(activeTurn)} busyId={busyTurn === null ? null : String(busyTurn)}
     label={t('chat.turnNavigation.label')} onNavigate={(item) => {
       const target = byId.get(item.id)

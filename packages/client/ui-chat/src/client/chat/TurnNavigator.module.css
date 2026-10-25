@@ -48,3 +48,7 @@
 @container (max-width: 900px) {
   .slot > .frame { display: none; }
 }
+
+:global([data-conversation-variant='embedded']) .slot > .frame {
+  display: block;
+}

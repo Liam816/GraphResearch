@@ -163,6 +163,7 @@ export function ConversationContent(props: ConversationContentProps) {
       ref={setBody}
       className={clsx(css.body, props.variant === 'embedded' && css.embeddedBody)}
       data-conversation-content=""
+      data-conversation-variant={props.variant}
       data-conversation-session={sessionId}
       data-conversation-region="chat"
       data-content-phase={phase}

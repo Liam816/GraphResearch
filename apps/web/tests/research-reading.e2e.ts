@@ -1,6 +1,6 @@
 import { openResearchNote } from './research-files.helpers.ts'
 /** Paper-local PDF, notebook, and older transcript positions survive switches and browser reloads. */
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
@@ -120,5 +120,99 @@ it('returns each paper to its PDF anchor, zoom, notebook selection and original 
   expect(editorPosition)
     .toEqual([440, 32, 48, 'backward'])
   expect(await editor.evaluate(node => node === document.activeElement)).toBe(false)
+  expect(console.pageErrors).toEqual([])
+})
+
+it('keeps paper conversation history navigation visible within narrow Agent columns', async () => {
+  const scaffold = await launchWebScaffold()
+  onTestFinished(() => scaffold.close())
+  const controller = scaffold.ctx.workspaceController
+  const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
+  const topicSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id })
+  const topic = (await controller.researchCreateTopic({ title: 'Conversation navigation', workspaceId: workspace.id,
+    sessionId: topicSession.sessionId })).topics[0]!
+  const fixtures = [
+    createChatScrollFixture({ markerPrefix: 'RAIL_A', title: 'Paper A', turns: 88 }),
+    createChatScrollFixture({ markerPrefix: 'RAIL_B', title: 'Paper B', turns: 4 }),
+  ] as const
+  const sessionIds = await Promise.all(fixtures.map(async (fixture, index) => {
+    const id = await seedSession(scaffold, fixture.log, `paper-rail-${String(index)}`)
+    await workspace.attachSession(id)
+    return id
+  }))
+  for (const index of [0, 1]) {
+    await controller.researchCreatePaper({ topicId: topic.id, title: fixtures[index]!.title, sessionId: sessionIds[index]!,
+      pdfPath: '', repositoryUrl: '' })
+  }
+  const paper = (await controller.researchList()).papers.find(item => item.sessionId === sessionIds[0])!
+  const alternate = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id })
+  await controller.researchCreateConversation({ paperId: paper.id, sessionId: alternate.sessionId })
+  await controller.researchUpdateConversation({ paperId: paper.id, sessionId: alternate.sessionId,
+    title: 'Method discussion', expectedTitle: '' })
+  await controller.researchProgress(paper.id, '', sessionIds[0])
+  const executablePath = process.env['DSH_TEST_BROWSER_EXECUTABLE']
+  const browser = await chromium.launch(executablePath === undefined ? {} : { executablePath })
+  onTestFinished(() => browser.close())
+  const page = await newEnglishPage(browser)
+  const console = watchConsole(page)
+  onTestFailed(() => saveFailureShot(page, 'research-turn-navigation'))
+  await page.setViewportSize({ width: 1800, height: 900 })
+  await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
+  const library = page.getByRole('region', { name: 'Research library', exact: true })
+  const workbench = page.locator('[data-research-workbench]')
+  const agent = workbench.getByRole('region', { name: 'agent', exact: true })
+  const rail = agent.getByRole('navigation', { name: 'Turn navigation', exact: true })
+  await library.getByRole('button', { name: 'Paper A', exact: true }).click()
+  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'files', exact: true }).click()
+  await rail.waitFor({ state: 'visible' })
+  expect((await agent.boundingBox())!.width).toBeLessThan(900)
+  const fitsAgent = async (): Promise<void> => {
+    await expect.poll(() => agent.evaluate((element) => {
+      const rail = element.querySelector('nav[aria-label="Turn navigation"]')
+      const column = element.querySelector('[data-chat-flow]')
+      const composer = element.querySelector('[data-composer-seat]')
+      if (rail === null || column === null || composer === null) return false
+      const bounds = element.getBoundingClientRect(), marks = rail.getBoundingClientRect()
+      return marks.left >= column.getBoundingClientRect().right + 8 && marks.right <= bounds.right
+        && marks.top >= bounds.top && marks.bottom <= composer.getBoundingClientRect().top
+    })).toBe(true)
+  }
+  await fitsAgent()
+  await rail.locator('> div').first().evaluate((element) => { element.scrollTop = 0; element.dispatchEvent(new Event('scroll')) })
+  await rail.getByRole('button', { name: /^(?:Load and jump|Jump) to turn 1$/ }).click()
+  await agent.getByText(fixtures[0].markers.user(1), { exact: false }).first().waitFor()
+  const firstTurn = rail.getByRole('button', { name: 'Jump to turn 1', exact: true })
+  await expect.poll(() => firstTurn.getAttribute('aria-current')).toBe('true')
+  await firstTurn.hover()
+  const preview = agent.getByRole('tooltip')
+  await expect.poll(() => preview.textContent()).toContain(fixtures[0].markers.user(1))
+  expect((await preview.boundingBox())!.x).toBeGreaterThanOrEqual((await agent.boundingBox())!.x)
+  await mkdir('.artifacts/research-ui', { recursive: true })
+  await page.screenshot({ path: '.artifacts/research-ui/paper-turn-navigation-light.png' })
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
+  await page.screenshot({ path: '.artifacts/research-ui/paper-turn-navigation-dark.png' })
+  await page.mouse.move(10, 10)
+  await library.getByRole('button', { name: 'Paper B', exact: true }).click()
+  await rail.getByRole('button', { name: 'Jump to turn 4', exact: true }).waitFor()
+  expect(await agent.textContent()).not.toContain(fixtures[0].markers.user(1))
+  await library.getByRole('button', { name: 'Paper A', exact: true }).click()
+  await agent.getByRole('button', { name: 'Switch conversation', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Paper conversations', exact: true })
+    .getByRole('button', { name: 'Method discussion', exact: true }).click()
+  await expect.poll(() => agent.locator('[data-conversation-content]').getAttribute('data-conversation-session')).toBe(alternate.sessionId)
+  expect(await rail.count()).toBe(0)
+  await library.getByRole('button', { name: 'Paper B', exact: true }).click()
+  const latest = rail.getByRole('button', { name: 'Jump to turn 4', exact: true })
+  await expect.poll(() => latest.getAttribute('aria-current')).toBe('true')
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
+  for (const viewport of [{ width: 375, height: 812 }, { width: 812, height: 375 }]) {
+    await page.setViewportSize(viewport)
+    await rail.waitFor({ state: 'visible' })
+    await fitsAgent()
+    await latest.focus()
+    await expect.poll(() => preview.textContent()).toContain(fixtures[1].markers.user(4))
+    expect((await preview.boundingBox())!.x).toBeGreaterThanOrEqual((await agent.boundingBox())!.x)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  }
   expect(console.pageErrors).toEqual([])
 })
