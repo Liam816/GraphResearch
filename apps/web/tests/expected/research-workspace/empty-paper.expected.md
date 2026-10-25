@@ -1,17 +1,15 @@
 - banner:
   - button "Robot VLA"
   - strong: RT-2
-  - text: Independent session
   - group "Panel visibility":
-    - button "Agent chat" [pressed]
-    - button "Original PDF" [pressed]
-    - button "Related content"
-  - button "Reference papers"
-- region "Agent chat":
-  - button "Reorder Agent chat"
-  - strong: Agent chat
-  - button "Arrange Agent chat"
-  - button "Collapse Agent chat"
+    - button "agent" [pressed]
+    - button "pdf viewer" [pressed]
+    - button "files"
+- region "agent":
+  - button "Reorder agent"
+  - strong: agent
+  - button "Actions for agent"
+  - button "Collapse agent"
   - button "Switch conversation": Initial reading
   - button "New conversation"
   - button "Standard mode"
@@ -20,11 +18,11 @@
   - 'button "Access mode, current: Workspace Write"': Workspace Write
   - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
   - button "Send message" [disabled]
-- separator "Resize Agent chat and Original PDF"
-- region "Original PDF":
-  - button "Reorder Original PDF"
-  - strong: Original PDF
-  - button "Arrange Original PDF"
-  - button "Collapse Original PDF"
+- separator "Resize agent and pdf viewer"
+- region "pdf viewer":
+  - button "Reorder pdf viewer"
+  - strong: pdf viewer
+  - button "Arrange pdf viewer"
+  - button "Collapse pdf viewer"
   - heading "No original PDF yet" [level=2]
   - paragraph: Ask the paper’s Agent to download the original, or share a paper link in the chat. The PDF will appear here automatically when ready.

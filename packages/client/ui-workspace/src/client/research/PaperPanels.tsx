@@ -12,9 +12,7 @@ import type { DragDropManagerInput } from '@dnd-kit/dom'
 import { SortableKeyboardPlugin } from '@dnd-kit/dom/sortable'
 import { RestrictToWindow } from '@dnd-kit/dom/modifiers'
 import {
-  Button, Menu, Tooltip, ReferenceIconRegular, IconCloseOutlineRegular,
-  IconChevronsUpDownOutlineRegular, IconChevronLeftOutlineRegular, IconChevronRightOutlineRegular,
-  IconEllipsisOutlineRegular,
+  Button, Tooltip, ReferenceIconRegular, IconCloseOutlineRegular, IconChevronsUpDownOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ResearchPaper, ResearchTranslation } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchWorkbenchProps } from './contract.ts'
@@ -22,6 +20,7 @@ import { isResearchPanel, reorderPanels, resolvePanelOrder } from './store.ts'
 import type { PaperView, PanelPlacement, ResearchPanel } from './store.ts'
 import { PaperFiles } from './Files.tsx'
 import { PaperMarkdownStatus } from './MarkdownStatus.tsx'
+import { ResearchPanelMenu } from './PanelMenu.tsx'
 import css from './Research.module.css'
 
 type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'listFiles' | 'readFile' | 'saveFile' | 'refresh' | 'highlight' | 'extractMarkdown' | 'translate' | 'saveTranslation'>
@@ -31,6 +30,7 @@ interface PaperPanelsProps extends PanelSeats {
   highlightAvailable: boolean
   translationAvailable: boolean
   askTranslation: (translation: ResearchTranslation) => Promise<void>
+  onReference: (() => void) | undefined
   view: PaperView
   id: string
   agent: ReactNode
@@ -90,15 +90,9 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
         <strong>{heading}</strong>
       </div>
       <div className={css.panelHeaderActions}>
-        <Menu open={menuOpen} onClose={() => { setMenuOpen(false) }} portal dense autoFocus align="end"
-          items={[
-            { id: 'left', label: t('moveLeft'), icon: <IconChevronLeftOutlineRegular />, disabled: index === 0 },
-            { id: 'right', label: t('moveRight'), icon: <IconChevronRightOutlineRegular />, disabled: index === order.length - 1 },
-          ]} onSelect={(value) => { if (value === 'left') move(-1); else if (value === 'right') move(1) }}
-          anchor={<Tooltip label={t('arrangePanel', { panel: heading })} side="bottom" portal>
-            <button type="button" data-dsh-action-menu="" aria-label={t('arrangePanel', { panel: heading })} aria-haspopup="menu" aria-expanded={menuOpen}
-              onClick={() => { setMenuOpen(!menuOpen) }}><IconEllipsisOutlineRegular size={14} /></button>
-          </Tooltip>} />
+        <ResearchPanelMenu panel={panel} t={t} open={menuOpen} setOpen={setMenuOpen} onReference={props.onReference}
+          movement={{ left: index === 0 ? undefined : () => { move(-1) },
+            right: index === order.length - 1 ? undefined : () => { move(1) } }} />
         <Tooltip label={t('collapse', { panel: heading })} side="bottom" portal>
           <button type="button" aria-label={t('collapse', { panel: heading })}
             onClick={() => { actions.panel(paper.id, panel) }}><IconCloseOutlineRegular size={14} /></button>

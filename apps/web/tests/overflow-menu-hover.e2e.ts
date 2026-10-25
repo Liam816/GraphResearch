@@ -94,7 +94,7 @@ it('groups overflow hover across research rows, conversation entries and header 
     const libraryMenu = library.getByRole('button', { name: 'Paper library directory', exact: true })
     const location = libraryMenu.locator('xpath=ancestor::*[@data-dsh-action-row][1]').locator('p')
     await hoverRow(libraryMenu, location)
-    for (const name of ['Agent chat', 'Original PDF']) {
+    for (const name of ['agent', 'pdf viewer']) {
       const panel = page.getByRole('region', { name, exact: true })
       await hoverRow(panel.getByRole('button', { name: `Arrange ${name}`, exact: true }), panel.locator('strong').first())
     }

@@ -1,17 +1,15 @@
 - banner:
   - button "Robot VLA"
   - strong: RT-2
-  - text: Independent session
   - group "Panel visibility":
-    - button "Agent chat" [pressed]
-    - button "Original PDF" [pressed]
-    - button "Related content" [pressed]
-  - button "Reference papers"
-- region "Agent chat":
-  - button "Reorder Agent chat"
-  - strong: Agent chat
-  - button "Arrange Agent chat"
-  - button "Collapse Agent chat"
+    - button "agent" [pressed]
+    - button "pdf viewer" [pressed]
+    - button "files" [pressed]
+- region "agent":
+  - button "Reorder agent"
+  - strong: agent
+  - button "Actions for agent"
+  - button "Collapse agent"
   - button "Switch conversation": Initial reading
   - button "New conversation"
   - button "Standard mode"
@@ -20,12 +18,12 @@
   - 'button "Access mode, current: Workspace Write"': Workspace Write
   - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
   - button "Send message" [disabled]
-- separator "Resize Agent chat and Original PDF"
-- region "Original PDF":
-  - button "Reorder Original PDF"
-  - strong: Original PDF
-  - button "Arrange Original PDF"
-  - button "Collapse Original PDF"
+- separator "Resize agent and pdf viewer"
+- region "pdf viewer":
+  - button "Reorder pdf viewer"
+  - strong: pdf viewer
+  - button "Arrange pdf viewer"
+  - button "Collapse pdf viewer"
   - img "PDF page 1"
   - text: Selectable PDF text
   - img "PDF page 2"
@@ -34,12 +32,12 @@
     - button "Zoom out"
     - button "Choose zoom": 100%
     - button "Zoom in"
-- separator "Resize Original PDF and Related content"
-- region "Related content":
-  - button "Reorder Related content"
-  - strong: Related content
-  - button "Arrange Related content"
-  - button "Collapse Related content"
+- separator "Resize pdf viewer and files"
+- region "files":
+  - button "Reorder files"
+  - strong: files
+  - button "Arrange files"
+  - button "Collapse files"
   - complementary "Paper files":
     - button "RT-2" [expanded]
     - button "Refresh files"

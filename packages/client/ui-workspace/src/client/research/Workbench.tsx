@@ -3,7 +3,7 @@ import { useId, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import {
   Button, Input, Modal, Pill, Tooltip, ReferenceIconRegular,
-  IconCheckOutlineRegular, IconCloseOutlineRegular, IconPlusOutlineRegular,
+  IconCloseOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { paperForSession } from './conversation-records.ts'
 import type { ResearchPaperId } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -12,6 +12,7 @@ import type { ResearchWorkbenchProps } from './contract.ts'
 import { defaultPaperView, resolvePanelOrder, type PaperView } from './store.ts'
 import { ResearchPaperPanels } from './PaperPanels.tsx'
 import { PaperNavigator } from './PaperNavigator.tsx'
+import { ResearchPanelMenu } from './PanelMenu.tsx'
 import css from './Research.module.css'
 
 /** Header controls toggle independent panels on wide screens and select one panel on narrow screens. */
@@ -37,8 +38,6 @@ function PanelControls({ paperId, view, id, navigation = false, t, viewActions }
               <ReferenceIconRegular kind={panel === 'agent' ? 'session' : panel === 'notes' ? 'folder' : 'file'} size={16} />
             </span>
             <span className={css.panelControlLabel}>{t(panel)}</span>
-            <span className={css.panelControlState} aria-hidden="true">{selected ? <IconCheckOutlineRegular size={12} />
-              : !navigation && <IconPlusOutlineRegular size={12} />}</span>
           </Pill>
         </span>
       </Tooltip>
@@ -64,12 +63,14 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
   )
   const panelId = useId()
   const [referencesOpen, setReferencesOpen] = useState(false)
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false)
   const [selected, setSelected] = useState<ResearchPaperId[]>([])
   const [query, setQuery] = useState('')
   const [referenceError, setReferenceError] = useState(false)
   const [referenceBusy, setReferenceBusy] = useState(false)
   const [inserted, setInserted] = useState(false)
   const agent = () => props.renderSlot('research.agent', { paper })
+  const openReferences = (): void => { setSelected([]); setQuery(''); setReferenceError(false); setReferencesOpen(true) }
   const insert = async (): Promise<void> => {
     if (sessionId === undefined || selected.length === 0 || selected.length > 3) { setReferenceError(true); return }
     setReferenceBusy(true); setReferenceError(false)
@@ -86,25 +87,26 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
   return <div className={css.workbench} data-research-workbench data-research-paper-navigation={topicPapers.length > 0 || undefined}>
     {topic !== undefined && <PaperNavigator topic={topic} papers={topicPapers} activeId={paper?.id ?? null} t={t}
       open={(id) => { actions.topic(topic.id); props.open(id) }} />}
-    <header className={css.workbenchHeader}>
+    <header className={css.workbenchHeader} data-paper-header={paper !== undefined || undefined}>
       <div className={css.breadcrumb}>{paper !== undefined && topic !== undefined && <button type="button" onClick={() => { props.open(topic.sessionId) }}>{topic.title}</button>}
         {paper !== undefined && topic !== undefined && <span aria-hidden="true">/</span>}<strong>{paper?.title ?? topic?.title ?? t('general')}</strong>
-        {(paper !== undefined || topic !== undefined) && <span className={css.sessionBadge}>{t('independent')}</span>}
       </div>
-      <div className={css.workbenchTools}>
-        {paper !== undefined && <>
-          <PanelControls paperId={paper.id} view={view} id={panelId} t={t} viewActions={actions} />
-          <PanelControls paperId={paper.id} view={view} id={panelId} t={t} viewActions={actions} navigation />
-        </>}
-        {sessionId !== undefined && <Button size="sm" onClick={() => { setSelected([]); setQuery(''); setReferenceError(false); setReferencesOpen(true) }}>{t('context')}</Button>}
-      </div>
+      {paper !== undefined && <div className={css.workbenchTools}>
+        <PanelControls paperId={paper.id} view={view} id={panelId} t={t} viewActions={actions} />
+        <PanelControls paperId={paper.id} view={view} id={panelId} t={t} viewActions={actions} navigation />
+      </div>}
     </header>
     {inserted && <div className={css.inlineStatus} role="status">{t('inserted')}<button type="button" aria-label={t('close')} onClick={() => { setInserted(false) }}><IconCloseOutlineRegular size={12} /></button></div>}
     {paper === undefined ? <div className={css.topicChat}>
       {topic !== undefined && <div className={css.topicIntro}><span>{t('topic')}</span><h1>{topic.title}</h1><p>{t('topicDescription')}</p><small>{t('paperCount', { count: catalog.papers.filter(item => item.topicIds.includes(topic.id)).length })}</small></div>}
+      {sessionId !== undefined && <div className={css.panelHeader} data-dsh-action-row="">
+        <strong>{t('agent')}</strong>
+        <ResearchPanelMenu panel="agent" t={t} open={agentMenuOpen} setOpen={setAgentMenuOpen} onReference={openReferences} />
+      </div>}
       <div className={css.agentContent}>{agent()}</div>
     </div> : <ResearchPaperPanels key={paper.id} paper={paper} view={view} id={panelId} agent={agent()}
       resources={resources} SessionProvider={props.SessionProvider}
+      onReference={sessionId === undefined ? undefined : openReferences}
       t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote}
       listFiles={props.listFiles} readFile={props.readFile} saveFile={props.saveFile} revision={`${catalog.revision}:${running}`}
       highlight={props.highlight} extractMarkdown={props.extractMarkdown}

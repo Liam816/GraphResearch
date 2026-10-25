@@ -1,17 +1,15 @@
 - banner:
   - button "Robot VLA"
   - strong: RT-2
-  - text: Independent session
   - group "Panel visibility":
-    - button "Related content" [pressed]
-    - button "Agent chat" [pressed]
-    - button "Original PDF" [pressed]
-  - button "Reference papers"
-- region "Related content":
-  - button "Reorder Related content"
-  - strong: Related content
-  - button "Arrange Related content"
-  - button "Collapse Related content"
+    - button "files" [pressed]
+    - button "agent" [pressed]
+    - button "pdf viewer" [pressed]
+- region "files":
+  - button "Reorder files"
+  - strong: files
+  - button "Arrange files"
+  - button "Collapse files"
   - complementary "Paper files":
     - button "RT-2" [expanded]
     - button "Refresh files"
@@ -35,12 +33,12 @@
   - textbox "Learning notes":
     - /placeholder: Record methods, findings, questions, and your understanding. Markdown is supported.
     - text: Notebook draft survives pane reordering
-- separator "Resize Related content and Agent chat"
-- region "Agent chat":
-  - button "Reorder Agent chat"
-  - strong: Agent chat
-  - button "Arrange Agent chat"
-  - button "Collapse Agent chat"
+- separator "Resize files and agent"
+- region "agent":
+  - button "Reorder agent"
+  - strong: agent
+  - button "Actions for agent"
+  - button "Collapse agent"
   - button "Switch conversation": Initial reading
   - button "New conversation"
   - button "Standard mode"
@@ -50,12 +48,12 @@
   - 'button "Access mode, current: Workspace Write"': Workspace Write
   - button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
   - button "Send message"
-- separator "Resize Agent chat and Original PDF"
-- region "Original PDF":
-  - button "Reorder Original PDF"
-  - strong: Original PDF
-  - button "Arrange Original PDF"
-  - button "Collapse Original PDF"
+- separator "Resize agent and pdf viewer"
+- region "pdf viewer":
+  - button "Reorder pdf viewer"
+  - strong: pdf viewer
+  - button "Arrange pdf viewer"
+  - button "Collapse pdf viewer"
   - img "PDF page 1"
   - text: Selectable PDF text
   - img "PDF page 2"

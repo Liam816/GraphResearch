@@ -41,8 +41,8 @@ it('returns each paper to its PDF anchor, zoom, notebook selection and original 
   const workbench = page.locator('[data-research-workbench]')
   await expect.poll(() => library.textContent()).toContain('Reading memory')
   await library.getByRole('button', { name: 'Paper A', exact: true }).click()
-  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'Related content', exact: true }).click()
-  const pdf = workbench.getByRole('region', { name: 'Original PDF', exact: true })
+  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'files', exact: true }).click()
+  const pdf = workbench.getByRole('region', { name: 'pdf viewer', exact: true })
   await pdf.getByRole('img', { name: 'PDF page 1', exact: true }).waitFor()
   await pdf.getByRole('button', { name: 'Choose zoom', exact: true }).focus()
   await pdf.getByRole('button', { name: 'Choose zoom', exact: true }).click()
@@ -89,7 +89,7 @@ it('returns each paper to its PDF anchor, zoom, notebook selection and original 
   let expectedChat = await chatOffset()
   expect(Math.abs(expectedChat - 60)).toBeLessThan(3)
   await library.getByRole('button', { name: 'Paper B', exact: true }).click()
-  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'Related content', exact: true }).click()
+  await workbench.getByRole('group', { name: 'Panel visibility', exact: true }).getByRole('button', { name: 'files', exact: true }).click()
   await openResearchNote(workbench, 'learning', true)
   await workbench.getByRole('textbox', { name: 'Learning notes', exact: true }).waitFor()
   expect(await workbench.getByRole('textbox', { name: 'Learning notes', exact: true }).evaluate(node => node.scrollTop)).toBe(0)
@@ -106,7 +106,7 @@ it('returns each paper to its PDF anchor, zoom, notebook selection and original 
   await chat.evaluate((node) => { node.scrollTop += 40; node.dispatchEvent(new Event('scroll')) })
   expectedChat = await chatOffset()
   const panelControls = workbench.getByRole('group', { name: 'Panel visibility', exact: true })
-  for (const name of ['Agent chat', 'Original PDF', 'Related content']) {
+  for (const name of ['agent', 'pdf viewer', 'files']) {
     await workbench.getByRole('button', { name: `Collapse ${name}`, exact: true }).click()
     await panelControls.getByRole('button', { name, exact: true }).click()
   }

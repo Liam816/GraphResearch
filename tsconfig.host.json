@@ -27,6 +27,7 @@
     "apps/web/tests/edit-question.snapshot.ts",
     "apps/web/tests/research-ui.snapshot.ts",
     "apps/web/tests/research-paper-order.e2e.ts",
+    "apps/web/tests/research-header.e2e.ts",
     "apps/web/tests/scaffold.ts",
     "apps/web/tests/voice-input.e2e.ts",
     "apps/web/tests/cot-translation.e2e.ts",
