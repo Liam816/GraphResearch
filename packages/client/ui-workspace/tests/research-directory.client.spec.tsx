@@ -41,7 +41,7 @@ function fixture(managed: boolean, collapsed = false) {
     readFile: vi.fn(async () => ({ kind: 'unsupported' as const, path: '', reason: 'binary' as const })),
     saveFile: vi.fn(async () => ({ kind: 'unsupported' as const, path: '', reason: 'binary' as const })),
     highlight: vi.fn(async () => {}), extractMarkdown: vi.fn(async () => {}), saveNote: vi.fn(async () => {}),
-    translate: vi.fn(), saveTranslation: vi.fn(async () => {}),
+    translate: vi.fn(), listTranslations: vi.fn(async () => []), saveTranslation: vi.fn(async () => {}),
     configureDirectory: vi.fn(async () => {}), mentions: vi.fn(async () => []),
   }
   if (collapsed) view.actions.expand('fixture-topic', false)

@@ -14,7 +14,7 @@ import { PaperTranslations } from './research-translation.ts'
 import type {
   ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
 } from './research-types.ts'
-import type { ResearchTranslation, ResearchTranslationRequest } from './research-translation-types.ts'
+import type { ResearchTranslation, ResearchTranslationRequest, ResearchTranslationHistoryEntry } from './research-translation-types.ts'
 import { resolve } from 'node:path'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -483,6 +483,17 @@ export class WorkspaceController extends TypertRemoteService {
   @Remote('researchTranslate')
   researchTranslate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation> {
     return this.translations.translate(request, signal)
+  }
+
+  /**
+   * Read saved explanations and reader locations for the paper's current PDF without inference.
+   * @param paperId - owning paper.
+   * @param signal - caller lifetime.
+   * @returns saved explanations; ambiguous older locations remain absent.
+   */
+  @Remote('researchListTranslations')
+  researchListTranslations(paperId: ResearchPaperId, signal: AbortSignal): Promise<readonly ResearchTranslationHistoryEntry[]> {
+    return this.translations.list(paperId, signal)
   }
 
   /**

@@ -12,6 +12,8 @@ import { openPdf } from './runtime.ts'
 import { PdfWorkerFailure } from './errors.ts'
 import type { PdfAnnotations, PdfTranslation } from './highlights.ts'
 import { AnnotatedPages, HighlightLayer } from './HighlightControls.tsx'
+import { TranslationLayer } from './TranslationMarkers.tsx'
+import type { ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { pdfTextRenderer } from './text.ts'
 import type { ZoomViewportProps } from '../zoom/ZoomViewport.tsx'
 import type { ZoomLabels, ZoomPreference } from '../zoom/types.ts'
@@ -113,25 +115,28 @@ export function PdfReader(props: PdfReaderProps): ReactNode {
       <Button size="sm" onClick={() => { setAttempt(value => value + 1) }}>{t('retry')}</Button>
     </div>
   }
-  const pages = <section className={css.body} data-pdf-preview>
-    {Array.from({ length: load.document.numPages }, (_, index) => (
-      <PdfPage key={index} document={load.document} page={index + 1}
-        restoreTarget={props.reading !== undefined && (view.position?.page ?? view.page) === index + 1}
-        requested={index === 0 || (view.position?.page ?? view.page) === index + 1} onVisible={pageVisible} signal={signal}
-        onWidth={index === 0 ? setPageWidth : undefined} zoom={renderZoom} zoomSurfaceClass={zoomSurfaceClass}
-        t={t} annotations={props.annotations} />
-    ))}
-  </section>
   return <ZoomViewport preference={preference} intrinsicWidth={pageWidth} horizontalInset={24} labels={labels}
     signal={signal} scrollportRef={scrollportRef} onPreference={setPreference} onRenderZoom={setRenderZoom}>
-    <AnnotatedPages annotations={props.annotations} translation={props.translation} t={t}>{pages}</AnnotatedPages>
+    <AnnotatedPages annotations={props.annotations} translation={props.translation} t={t}>
+      {entries => <section className={css.body} data-pdf-preview>
+        {Array.from({ length: load.document.numPages }, (_, index) => (
+          <PdfPage key={index} document={load.document} page={index + 1}
+            restoreTarget={props.reading !== undefined && (view.position?.page ?? view.page) === index + 1}
+            requested={index === 0 || (view.position?.page ?? view.page) === index + 1} onVisible={pageVisible} signal={signal}
+            onWidth={index === 0 ? setPageWidth : undefined} zoom={renderZoom} zoomSurfaceClass={zoomSurfaceClass}
+            t={t} annotations={props.annotations} translations={entries} />
+        ))}
+      </section>}
+    </AnnotatedPages>
   </ZoomViewport>
 }
 
 function PdfPage({
-  document, page, requested: initiallyRequested, restoreTarget, onVisible, signal, onWidth, zoom, zoomSurfaceClass, t, annotations,
+  document, page, requested: initiallyRequested, restoreTarget, onVisible, signal, onWidth, zoom, zoomSurfaceClass,
+  t, annotations, translations,
 }: {
   readonly annotations: PdfAnnotations | undefined
+  readonly translations: readonly ResearchTranslationHistoryEntry[]
   readonly document: PdfDocument
   readonly page: number
   readonly requested: boolean
@@ -143,6 +148,7 @@ function PdfPage({
   readonly zoomSurfaceClass: string
 } & PropsLocale<'sidebarPdf'>): ReactNode {
   const host = useRef<HTMLDivElement>(null)
+  const surface = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const text = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState<number>()
@@ -227,12 +233,13 @@ function PdfPage({
       <span>{failureText(failure.error, t)}</span>
       <Button size="sm" onClick={() => { setAttempt(value => value + 1) }}>{t('retry')}</Button>
     </div>}
-    <div className={`${css.surface} ${zoomSurfaceClass}`} data-document-zoom-surface
+    <div ref={surface} className={`${css.surface} ${zoomSurfaceClass}`} data-document-zoom-surface
       style={{ '--document-zoom-width': `${width ?? 0}px` } as CSSProperties}
       hidden={state !== 'ready'}>
       <canvas ref={canvas} className={css.canvas} role="img" aria-label={t('pageImage', { page })} />
       <HighlightLayer annotations={annotations} page={page} t={t} />
       <div ref={text} className={css.text} data-pdf-text />
+      <TranslationLayer entries={translations} page={page} surfaceRef={surface} ready={state === 'ready'} t={t} />
     </div>
   </div>
 }

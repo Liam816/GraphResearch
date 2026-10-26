@@ -168,7 +168,7 @@ interface SessionActivity {
 
 ## Research library
 
-The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, page-relative text highlights, whole-paper Markdown publication status, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [translation types](../../packages/api/workspace-controller/src/research-translation-types.ts) define PDF text-item positions, original sentence windows, structured vocabulary explanations and auxiliary request/result audit events. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
+The Workspace controller also manages a research library whose Topic and paper identities remain separate from Workspace and Session identities. Its [research types](../../packages/api/workspace-controller/src/research-types.ts) define `ResearchCatalog`, branded `ResearchTopicId` and `ResearchPaperId`, page-relative text highlights, whole-paper Markdown publication status, revision-checked notebook requests, directory selection and import requests, page-numbered PDF text, and complete `ResearchFollowFrame` snapshots. The [translation types](../../packages/api/workspace-controller/src/research-translation-types.ts) define PDF text-item positions, original sentence windows, structured vocabulary explanations and auxiliary request/result audit events. `ResearchTranslationHistoryEntry` combines a retained explanation with optional `ResearchTranslationSelection` positions and geometry, plus its save time; legacy entries may lack recovered locations or timestamps. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns file layout, migration, Agent context, and failure behavior.
 
 `ResearchRenameTopicRequest` carries a `topicId`, replacement `title`, and `expectedTitle` for concurrent-edit detection. It changes Topic metadata through the [controller](../../packages/api/workspace-controller/README.md#research-catalog).
 
@@ -538,6 +538,14 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns a durably recorded explanation; failures retain the original and notebooks.
  */
 @Remote('researchTranslate') researchTranslate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation>
+
+/**
+ * Read saved explanations and reader locations for the paper's current PDF without inference.
+ * @param paperId - owning paper.
+ * @param signal - caller lifetime.
+ * @returns saved explanations; ambiguous older locations remain absent.
+ */
+@Remote('researchListTranslations') researchListTranslations(paperId: ResearchPaperId, signal: AbortSignal): Promise<readonly ResearchTranslationHistoryEntry[]>
 
 /**
  * Append a confirmed translation and original-page link to learning notes exactly once.

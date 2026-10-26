@@ -168,7 +168,7 @@ interface SessionActivity {
 
 ## 科研资料库
 
-Workspace 控制器还管理科研资料库，Topic 和论文身份独立于 Workspace 与 Session 身份。[科研类型](../../packages/api/workspace-controller/src/research-types.ts)定义 `ResearchCatalog`、品牌类型 `ResearchTopicId` 和 `ResearchPaperId`、页面相对坐标的文字高亮、完整论文 Markdown 发布状态、带版本检查的笔记请求、目录选择与导入请求、有页码的 PDF 正文，以及完整的 `ResearchFollowFrame` 快照。[翻译类型](../../packages/api/workspace-controller/src/research-translation-types.ts)定义 PDF 文字项位置、原文句子范围、结构化词义解释及辅助请求／结果审计事件。[控制器参考](../../packages/api/workspace-controller/README.zh.md#research-catalog)说明文件布局、迁移、Agent 上下文和失败行为。
+Workspace 控制器还管理科研资料库，Topic 和论文身份独立于 Workspace 与 Session 身份。[科研类型](../../packages/api/workspace-controller/src/research-types.ts)定义 `ResearchCatalog`、品牌类型 `ResearchTopicId` 和 `ResearchPaperId`、页面相对坐标的文字高亮、完整论文 Markdown 发布状态、带版本检查的笔记请求、目录选择与导入请求、有页码的 PDF 正文，以及完整的 `ResearchFollowFrame` 快照。[翻译类型](../../packages/api/workspace-controller/src/research-translation-types.ts)定义 PDF 文字项位置、原文句子范围、结构化词义解释及辅助请求／结果审计事件。`ResearchTranslationHistoryEntry` 将已保存解释与可选的 `ResearchTranslationSelection` 位置、几何坐标及保存时间组合；旧记录可能没有可恢复的位置或时间戳。[控制器参考](../../packages/api/workspace-controller/README.zh.md#research-catalog)说明文件布局、迁移、Agent 上下文和失败行为。
 
 `ResearchRenameTopicRequest` 携带 `topicId`、替换用的 `title` 和检测并发编辑的 `expectedTitle`，通过[控制器](../../packages/api/workspace-controller/README.zh.md#research-catalog)修改 Topic 元数据。
 
@@ -538,6 +538,14 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns a durably recorded explanation; failures retain the original and notebooks.
  */
 @Remote('researchTranslate') researchTranslate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation>
+
+/**
+ * Read saved explanations and reader locations for the paper's current PDF without inference.
+ * @param paperId - owning paper.
+ * @param signal - caller lifetime.
+ * @returns saved explanations; ambiguous older locations remain absent.
+ */
+@Remote('researchListTranslations') researchListTranslations(paperId: ResearchPaperId, signal: AbortSignal): Promise<readonly ResearchTranslationHistoryEntry[]>
 
 /**
  * Append a confirmed translation and original-page link to learning notes exactly once.

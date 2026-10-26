@@ -7,28 +7,39 @@ import { BlockAssembler, type FinishReason, type RequestUserInput } from '@deeps
 import { RemoteError, remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { z } from 'zod'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import { digest, missing, ResearchFiles } from './research-files.ts'
 import { extractPaperTextIndex, paperSelectionContext, paperTextIndexSchema } from './research-text-index.ts'
 import type { ResearchCatalog, ResearchPaper, ResearchPaperId, ResearchSaveNoteRequest } from './research-types.ts'
-import type { ResearchPronunciation, ResearchTranslation, ResearchTranslationExplanation, ResearchTranslationRequest } from './research-translation-types.ts'
+import type { ResearchPronunciation, ResearchTranslation, ResearchTranslationExplanation, ResearchTranslationRequest, ResearchTranslationHistoryEntry, ResearchTranslationSelection } from './research-translation-types.ts'
 
 const positionSchema = z.object({ page: z.number().int().positive(),
   item: z.number().int().nonnegative(), offset: z.number().int().nonnegative() })
+const rectSchema = z.object({ page: z.number().int().positive(),
+  x: z.number().min(0).max(1), y: z.number().min(0).max(1),
+  width: z.number().positive().max(1), height: z.number().positive().max(1),
+}).refine(rect => rect.x + rect.width <= 1.000001 && rect.y + rect.height <= 1.000001)
+const selectionSchema = z.object({ start: positionSchema, end: positionSchema, rects: z.array(rectSchema).min(1).optional() })
 const requestSchema = z.object({ sessionId: z.string().optional(), paperId: z.string().min(1),
-  text: z.string().trim().min(1), start: positionSchema, end: positionSchema })
+  text: z.string().trim().min(1), ...selectionSchema.shape }).refine(request => request.rects === undefined
+    || request.rects.every(rect => rect.page >= request.start.page && rect.page <= request.end.page))
 const explanationSchema: z.ZodType<ResearchTranslationExplanation> = z.object({
   kind: z.enum(['word', 'phrase', 'sentence']), lemma: z.string().min(1), partOfSpeech: z.string(),
   meanings: z.array(z.string().min(1)).min(1).max(5), contextualMeaning: z.string().min(1),
   explanation: z.string().min(1), translation: z.string().min(1),
 })
 const pronunciationSchema = z.object({ status: z.enum(['ready', 'unavailable']), phonetics: z.array(z.string()), sourceUrl: z.string() })
-const translationSchema = z.object({ key: z.string(), paperId: z.string(), sourceSha256: z.string(),
+const translationSchema: z.ZodType<ResearchTranslation> = z.object({ key: z.string(),
+  paperId: z.string().transform(value => brandString<ResearchPaperId>(value)), sourceSha256: z.string(),
   context: z.object({ selected: z.string(), sentence: z.string(), selectionStart: z.number().int().nonnegative(),
     before: z.array(z.string()), after: z.array(z.string()),
     startPage: z.number().int().positive(), endPage: z.number().int().positive(), limited: z.boolean() }),
   result: explanationSchema, pronunciation: pronunciationSchema,
 })
-const storeSchema = z.object({ version: z.literal(1), entries: z.array(translationSchema) })
+const locationSchema: z.ZodType<{ readonly key: string; readonly selection: ResearchTranslationSelection; readonly createdAt: string }>
+  = z.object({ key: z.string(), selection: selectionSchema, createdAt: z.iso.datetime() })
+const storeSchema = z.object({ version: z.literal(1), entries: z.array(translationSchema), locations: z.array(locationSchema).optional() })
+type TranslationStore = z.infer<typeof storeSchema>
 
 /** Fixed explanation instructions; every dynamic source fragment is retained in the request record. */
 export const PAPER_TRANSLATION_PROMPT = 'Explain the selected English academic text in Simplified Chinese using only its supplied paper context. '
@@ -68,7 +79,7 @@ function failure(reason: 'unavailable' | 'selection' | 'no-text' | 'limit' | 'ti
 /** Auxiliary calls share the paper's Session writer while remaining outside its conversational history. */
 export class PaperTranslations {
   private readonly lifetime = new AbortController()
-  private readonly operations = new Set<Promise<ResearchTranslation>>()
+  private readonly operations = new Set<Promise<unknown>>()
 
   /**
    * @param ctx - optional inference and required Session authorities.
@@ -91,10 +102,60 @@ export class PaperTranslations {
    * @returns a saved or newly committed translation. Failures preserve the PDF, selection and notebooks.
    */
   translate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation> {
-    const work = this.run(request, signal)
+    return this.track(this.run(request, signal))
+  }
+
+  /**
+   * Read retained explanations belonging to the paper's current PDF bytes without making model requests.
+   * @param paperId - owning paper.
+   * @param signal - caller lifetime and original-file read cancellation.
+   * @returns saved explanations in commit order; legacy locations are recovered only when unambiguous.
+   */
+  list(paperId: ResearchPaperId, signal: AbortSignal): Promise<readonly ResearchTranslationHistoryEntry[]> {
+    return this.track(this.readHistory(paperId, signal))
+  }
+
+  private track<T>(work: Promise<T>): Promise<T> {
     this.operations.add(work)
     void work.then(() => { this.operations.delete(work) }, () => { this.operations.delete(work) })
     return work
+  }
+
+  private async readHistory(paperId: ResearchPaperId, signal: AbortSignal): Promise<readonly ResearchTranslationHistoryEntry[]> {
+    const deadline = AbortSignal.timeout(this.policy.timeoutMs)
+    const stopped = AbortSignal.any([signal, this.lifetime.signal, deadline])
+    try {
+      stopped.throwIfAborted()
+      const { paper, files } = await this.source(paperId)
+      const originalPath = await files.paperPath(paper, relative(await files.paperPath(paper), paper.pdfPath))
+      if ((await stat(originalPath)).size > this.policy.maxPdfBytes) throw failure('limit')
+      const bytes = new Uint8Array(await readFile(originalPath, { signal: stopped }))
+      const sourceSha256 = digest(bytes)
+      const store = await files.withLock(() => this.readStore(files, paper))
+      const entries = store.entries.filter(entry => entry.sourceSha256 === sourceSha256)
+      let index: z.infer<typeof paperTextIndexSchema> | undefined
+      const history: ResearchTranslationHistoryEntry[] = []
+      for (const translation of entries) {
+        stopped.throwIfAborted()
+        const location = store.locations?.find(item => item.key === translation.key)
+        if (location !== undefined) {
+          history.push({ translation, selection: location.selection, createdAt: location.createdAt })
+        } else {
+          index ??= await this.textIndex(files, paper, bytes, sourceSha256, stopped)
+          const selection = this.recoverSelection(index, translation)
+          history.push({ translation, ...selection === undefined ? {} : { selection } })
+        }
+      }
+      stopped.throwIfAborted()
+      if (digest(await readFile(originalPath, { signal: stopped })) !== sourceSha256) throw failure('source-changed')
+      return history
+    } catch (error: unknown) {
+      signal.throwIfAborted(); this.lifetime.signal.throwIfAborted()
+      if (deadline.aborted) throw failure('timeout', error)
+      if (remoteErrorOf(error)?.code === 'research/translation-failed') throw error
+      this.ctx.logger.warn('Paper translation history failed for %s: %s', paperId, error)
+      throw failure('storage', error)
+    }
   }
 
   /**
@@ -107,8 +168,8 @@ export class PaperTranslations {
     if (!/^[a-f0-9]{64}$/.test(key)) throw failure('selection')
     const { catalog, paper, files } = await this.source(paperId)
     const paperDirectory = await files.paperPath(paper)
-    const entries = await files.withLock(() => this.readStore(files, paper))
-    const saved = entries.find(item => item.key === key)
+    const store = await files.withLock(() => this.readStore(files, paper))
+    const saved = store.entries.find(item => item.key === key)
     if (saved === undefined) throw failure('selection')
     const marker = `<!-- research-translation:${key} -->`
     if (paper.learning.text.includes(marker)) return catalog
@@ -148,20 +209,7 @@ export class PaperTranslations {
       const bytes = new Uint8Array(await readFile(originalPath, { signal: stopped }))
       const sourceSha256 = digest(bytes)
       if (paper.pdfSha256 !== undefined && paper.pdfSha256 !== sourceSha256) throw failure('source-changed')
-      const cachePath = await files.runtimePaperPath(paper, 'cache', 'text-index.json')
-      let index: z.infer<typeof paperTextIndexSchema> | undefined
-      try {
-        if ((await stat(cachePath)).size > this.policy.maxIndexBytes) throw failure('limit')
-        index = paperTextIndexSchema.parse(JSON.parse(await readFile(cachePath, { signal: stopped, encoding: 'utf8' })))
-      } catch (error: unknown) {
-        if (!missing(error) && !(error instanceof z.ZodError) && !(error instanceof SyntaxError)) throw error
-        // This cache is derived exclusively from the original; invalid cache data is rebuilt.
-      }
-      if (index?.sourceSha256 !== sourceSha256) {
-        index = await extractPaperTextIndex(bytes, sourceSha256, this.policy.maxIndexBytes, stopped)
-        await mkdir(dirname(cachePath), { recursive: true, mode: 0o700 })
-        await writeFileAtomic(cachePath, `${JSON.stringify(index)}\n`, { mode: 0o600 })
-      }
+      const index = await this.textIndex(files, paper, bytes, sourceSha256, stopped)
       const context = paperSelectionContext(index, request, this.policy.maxContextCharacters)
       stopped.throwIfAborted()
       const resolved = await this.ctx.sessionController.resolveAgent(sessionId)
@@ -175,9 +223,12 @@ export class PaperTranslations {
         [request.end.page, request.end.item, request.end.offset], context, paper.title, route,
         PAPER_TRANSLATION_PROMPT, this.policy.dictionaryEndpoint,
       ]))
-      const cached = await files.withLock(async () => (await this.readStore(files, paper)).find(item => item.key === key))
+      const cached = await files.withLock(async () => (await this.readStore(files, paper)).entries.find(item => item.key === key))
       stopped.throwIfAborted()
-      if (cached !== undefined) return { ...cached, paperId: paper.id }
+      if (cached !== undefined) {
+        await this.retainLocation(files, paper, cached, request, stopped)
+        return { ...cached, paperId: paper.id }
+      }
       const llm = this.ctx.get('llm')
       if (llm === undefined) throw failure('unavailable')
       const prepared = await llm.prepareCall(route, stopped).catch((error: unknown) => { stopped.throwIfAborted(); throw failure('unavailable', error) })
@@ -217,13 +268,7 @@ export class PaperTranslations {
       agent.session.append('research/translation-result', { requestSeq: recorded.seq, translation })
       if (!(await this.ctx.sessions.flush(agent.session))) throw failure('storage')
       stopped.throwIfAborted()
-      await files.withLock(async () => {
-        stopped.throwIfAborted()
-        const entries = await this.readStore(files, paper)
-        const content = `${JSON.stringify({ version: 1, entries: [...entries.filter(item => item.key !== key), translation] })}\n`
-        if (Buffer.byteLength(content) > this.policy.maxStoredBytes) throw failure('limit')
-        await writeFileAtomic(await files.runtimePaperPath(paper, 'translations.json'), content, { mode: 0o600 })
-      })
+      await this.retainLocation(files, paper, translation, request, stopped)
       return translation
     } catch (error: unknown) {
       signal.throwIfAborted(); this.lifetime.signal.throwIfAborted()
@@ -234,16 +279,78 @@ export class PaperTranslations {
     }
   }
 
-  private async readStore(files: ResearchFiles, paper: ResearchPaper) {
+  private async readStore(files: ResearchFiles, paper: ResearchPaper): Promise<TranslationStore> {
     const path = await files.runtimePaperPath(paper, 'translations.json')
     let text: string
     try {
       if ((await stat(path)).size > this.policy.maxStoredBytes) throw failure('limit')
       text = await readFile(path, 'utf8')
-    } catch (error: unknown) { if (missing(error)) return []; throw error }
+    } catch (error: unknown) { if (missing(error)) return { version: 1 as const, entries: [] }; throw error }
     const parsed = storeSchema.parse(JSON.parse(text))
     if (parsed.entries.some(item => item.paperId !== paper.id)) throw failure('storage')
-    return parsed.entries
+    if (parsed.locations?.some(item => !parsed.entries.some(entry => entry.key === item.key))) throw failure('storage')
+    return parsed
+  }
+
+  private async retainLocation(
+    files: ResearchFiles, paper: ResearchPaper, translation: ResearchTranslation, request: ResearchTranslationRequest, signal: AbortSignal,
+  ): Promise<void> {
+    await files.withLock(async () => {
+      signal.throwIfAborted()
+      const store = await this.readStore(files, paper)
+      const previous = store.locations?.find(item => item.key === translation.key)
+      const rects = request.rects ?? previous?.selection.rects
+      const selection = { start: request.start, end: request.end, ...rects === undefined ? {} : { rects } }
+      const location = { key: translation.key, selection, createdAt: previous?.createdAt ?? new Date().toISOString() }
+      const updated: TranslationStore = { version: 1,
+        entries: store.entries.some(item => item.key === translation.key)
+          ? store.entries.map(item => item.key === translation.key ? translation : item) : [...store.entries, translation],
+        locations: [...store.locations?.filter(item => item.key !== translation.key) ?? [], location] }
+      const content = `${JSON.stringify(updated)}\n`
+      if (Buffer.byteLength(content) > this.policy.maxStoredBytes) throw failure('limit')
+      await writeFileAtomic(await files.runtimePaperPath(paper, 'translations.json'), content, { mode: 0o600 })
+    })
+  }
+
+  private async textIndex(files: ResearchFiles, paper: ResearchPaper, bytes: Uint8Array, sourceSha256: string, signal: AbortSignal) {
+    const cachePath = await files.runtimePaperPath(paper, 'cache', 'text-index.json')
+    let index: z.infer<typeof paperTextIndexSchema> | undefined
+    try {
+      if ((await stat(cachePath)).size > this.policy.maxIndexBytes) throw failure('limit')
+      index = paperTextIndexSchema.parse(JSON.parse(await readFile(cachePath, { signal, encoding: 'utf8' })))
+    } catch (error: unknown) {
+      if (!missing(error) && !(error instanceof z.ZodError) && !(error instanceof SyntaxError)) throw error
+      // This cache is derived exclusively from the original; invalid cache data is rebuilt.
+    }
+    if (index?.sourceSha256 !== sourceSha256) {
+      index = await extractPaperTextIndex(bytes, sourceSha256, this.policy.maxIndexBytes, signal)
+      await mkdir(dirname(cachePath), { recursive: true, mode: 0o700 })
+      await writeFileAtomic(cachePath, `${JSON.stringify(index)}\n`, { mode: 0o600 })
+    }
+    return index
+  }
+
+  private recoverSelection(
+    index: z.infer<typeof paperTextIndexSchema>, translation: ResearchTranslation,
+  ): ResearchTranslationSelection | undefined {
+    const candidates: ResearchTranslationSelection[] = []
+    for (const block of index.blocks) {
+      let at = block.text.indexOf(translation.context.sentence)
+      while (at >= 0) {
+        const from = at + translation.context.selectionStart, to = from + translation.context.selected.length
+        const start = block.anchors.find(item => item.start <= from && item.end > from)
+        const end = block.anchors.find(item => item.start < to && item.end >= to)
+        if (start !== undefined && end !== undefined
+          && start.page === translation.context.startPage && end.page === translation.context.endPage
+          && block.text.slice(from, to) === translation.context.selected) {
+          const selection = { start: { page: start.page, item: start.item, offset: from - start.start },
+            end: { page: end.page, item: end.item, offset: to - end.start } }
+          candidates.push(selection)
+        }
+        at = block.text.indexOf(translation.context.sentence, at + 1)
+      }
+    }
+    return candidates.length === 1 ? candidates[0] : undefined
   }
 
   private async pronunciation(lemma: string, signal: AbortSignal): Promise<ResearchPronunciation> {

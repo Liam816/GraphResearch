@@ -1,7 +1,7 @@
 /** Located paper excerpts and structured vocabulary explanations shared with the reader. */
 import type { LlmCallConfig, RequestUserInput } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { ResearchPaperId } from './research-types.ts'
+import type { ResearchHighlightRect, ResearchPaperId } from './research-types.ts'
 
 /** A UTF-16 position inside a nonempty PDF.js text item, independent of reader zoom. */
 export interface ResearchTextPosition {
@@ -17,6 +17,8 @@ export interface ResearchTranslationRequest {
   readonly text: string
   readonly start: ResearchTextPosition
   readonly end: ResearchTextPosition
+  /** Reader geometry retained for reopening this occurrence; never sent to the model. */
+  readonly rects?: readonly ResearchHighlightRect[] | undefined
 }
 
 /** Original sentences around a position-confirmed selection. */
@@ -58,6 +60,20 @@ export interface ResearchTranslation {
   readonly context: ResearchTranslationContext
   readonly result: ResearchTranslationExplanation
   readonly pronunciation: ResearchPronunciation
+}
+
+/** Saved reader occurrence without changing the model audit payload. */
+export interface ResearchTranslationSelection {
+  readonly start: ResearchTextPosition
+  readonly end: ResearchTextPosition
+  readonly rects?: readonly ResearchHighlightRect[] | undefined
+}
+
+/** Saved explanation and its reader location; older results may lack a recoverable location or timestamp. */
+export interface ResearchTranslationHistoryEntry {
+  readonly translation: ResearchTranslation
+  readonly selection?: ResearchTranslationSelection
+  readonly createdAt?: string
 }
 
 /** Exact auxiliary inference input, logged before dispatch without adding a conversation turn. */

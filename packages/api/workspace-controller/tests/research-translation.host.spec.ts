@@ -65,11 +65,12 @@ async function fixture(overrides: Partial<PaperTranslationPolicy> = {}) {
       papers: [{ ...paper, learning: { text: request.text, revision: paper.learning.revision + 1 } }] }
     return catalog
   })
-  const translations = new PaperTranslations(ctx, { ...policy, ...overrides }, { read: async () => catalog, saveNote })
+  const restart = () => new PaperTranslations(ctx, { ...policy, ...overrides }, { read: async () => catalog, saveNote })
+  const translations = restart()
   const request = { paperId, text: 'policy', start: { page: 1, item: 2, offset: 4 }, end: { page: 1, item: 2, offset: 10 } }
   const translate = (signal = new AbortController().signal) => translations.translate(request, signal)
   const events = async () => { await using handle = await ctx.sessionPersistence.open(session.id, 'read'); return (await handle.read()).events }
-  return { ctx, adapter, session, paperDirectory, translations, request, translate, events, saveNote }
+  return { ctx, adapter, session, paperDirectory, translations, request, translate, events, saveNote, restart }
 }
 
 it('logs exact context before inference, saves a reusable result, and leaves conversation messages and notes unchanged', async () => {
@@ -178,4 +179,64 @@ it('reads real phonetics from the configured dictionary and retains the explanat
   const other = await fixture({ dictionaryEndpoint })
   const missing = await other.translate()
   expect(missing.pronunciation.status).toBe('unavailable'); expect(missing.result).toEqual(explanation)
+})
+
+
+it('reopens saved translation locations without inference and keeps one history entry for cached requests', async () => {
+  const view = await fixture()
+  const rects = [{ page: 1, x: 0.15, y: 0.2, width: 0.12, height: 0.03 }]
+  const result = await view.translations.translate({ ...view.request, rects }, new AbortController().signal)
+  const history = await view.restart().list(view.request.paperId, new AbortController().signal)
+  expect(history).toHaveLength(1)
+  expect(history[0]?.translation).toEqual(result)
+  expect(history[0]?.selection).toEqual({ start: view.request.start, end: view.request.end, rects })
+  expect(typeof history[0]?.createdAt).toBe('string')
+  expect(Number.isNaN(Date.parse(history[0]!.createdAt!))).toBe(false)
+  await view.translate()
+  expect(await view.translations.list(view.request.paperId, new AbortController().signal)).toEqual(history)
+  expect(view.adapter.calls).toHaveLength(1)
+  expect((await view.events()).map(event => event.type)).toEqual(['research/translation-request', 'research/translation-result'])
+})
+
+it('recovers an older saved occurrence and retains its explanation when exact coordinates are unavailable', async () => {
+  const view = await fixture(), result = await view.translate()
+  const path = join(view.paperDirectory, '..', '..', 'agent-lib', 'papers', 'paper', 'translations.json')
+  await writeFile(path, JSON.stringify({ version: 1, entries: [result] }))
+  expect(await view.restart().list(view.request.paperId, new AbortController().signal)).toEqual([
+    { translation: result, selection: { start: view.request.start, end: view.request.end } },
+  ])
+  const unlocated = { ...result, context: { ...result.context, sentence: 'An excerpt without a unique position.' } }
+  await writeFile(path, JSON.stringify({ version: 1, entries: [unlocated] }))
+  expect(await view.translations.list(view.request.paperId, new AbortController().signal)).toEqual([{ translation: unlocated }])
+  expect(view.adapter.calls).toHaveLength(1)
+})
+
+it('retains previous PDF translations on disk while listing only the currently attached bytes', async () => {
+  const view = await fixture(), original = await view.translate()
+  await writeFile(join(view.paperDirectory, 'paper.pdf'), Buffer.concat([translationPdfFixture(), Buffer.from('\n% revised original\n')]))
+  expect(await view.translations.list(view.request.paperId, new AbortController().signal)).toEqual([])
+  const revised = await view.translate()
+  expect(revised.sourceSha256).not.toBe(original.sourceSha256)
+  const history = await view.translations.list(view.request.paperId, new AbortController().signal)
+  expect(history.map(item => item.translation)).toEqual([revised])
+  const path = join(view.paperDirectory, '..', '..', 'agent-lib', 'papers', 'paper', 'translations.json')
+  const stored = JSON.parse(await readFile(path, 'utf8')) as { entries: unknown[] }
+  expect(stored.entries).toEqual([original, revised])
+})
+
+it('rejects invalid reader rectangles before inference and never publishes malformed saved history', async () => {
+  const view = await fixture()
+  const outsidePage = { ...view.request, rects: [{ page: 1, x: 0.9, y: 0.2, width: 0.3, height: 0.1 }] }
+  await expect(view.translations.translate(outsidePage, new AbortController().signal))
+    .rejects.toMatchObject({ details: { reason: 'selection' } })
+  const differentPage = { ...view.request, rects: [{ page: 2, x: 0.1, y: 0.2, width: 0.3, height: 0.1 }] }
+  await expect(view.translations.translate(differentPage, new AbortController().signal))
+    .rejects.toMatchObject({ details: { reason: 'selection' } })
+  expect(view.adapter.calls).toHaveLength(0)
+  expect(await view.translations.list(view.request.paperId, new AbortController().signal)).toEqual([])
+  await view.translate()
+  const path = join(view.paperDirectory, '..', '..', 'agent-lib', 'papers', 'paper', 'translations.json')
+  await writeFile(path, '{broken saved history')
+  await expect(view.translations.list(view.request.paperId, new AbortController().signal)).rejects.toMatchObject({ details: { reason: 'storage' } })
+  expect(await readFile(path, 'utf8')).toBe('{broken saved history')
 })

@@ -23,7 +23,7 @@ import { PaperMarkdownStatus } from './MarkdownStatus.tsx'
 import { ResearchPanelMenu } from './PanelMenu.tsx'
 import css from './Research.module.css'
 
-type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'listFiles' | 'readFile' | 'saveFile' | 'refresh' | 'highlight' | 'extractMarkdown' | 'translate' | 'saveTranslation'>
+type PanelSeats = Pick<ResearchWorkbenchProps, 't' | 'viewActions' | 'renderFactorySlot' | 'saveNote' | 'listFiles' | 'readFile' | 'saveFile' | 'refresh' | 'highlight' | 'extractMarkdown' | 'translate' | 'listTranslations' | 'saveTranslation'>
 interface PaperPanelsProps extends PanelSeats {
   paper: ResearchPaper
   revision: string
@@ -106,6 +106,8 @@ function SortablePanel({ panel, order, preview, ...props }: PaperPanelsProps & {
           : <><PaperMarkdownStatus paper={paper} t={t} extractMarkdown={props.extractMarkdown} />
             {props.renderFactorySlot('document.pdf', { path: paper.pdfPath, viewKey: paper.id,
               ...props.translationAvailable ? { translation: {
+                history: { key: JSON.stringify([paper.id, paper.pdfPath, paper.pdfSha256]),
+                  list: signal => props.listTranslations(paper.id, signal) },
                 translate: (selection, signal) => props.translate({ ...selection, paperId: paper.id }, signal),
                 save: result => props.saveTranslation(paper.id, result.key),
                 ask: props.askTranslation,

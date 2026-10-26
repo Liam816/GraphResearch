@@ -94,6 +94,7 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
       const sessionId = currentSession()
       return ctx.research.translate({ ...request, ...sessionId === undefined ? {} : { sessionId } }, signal)
     },
+    listTranslations: (id, signal) => ctx.research.listTranslations(id, signal),
     saveTranslation: (id, key) => ctx.research.saveTranslation(id, key),
     saveNote: request => ctx.research.saveNote(request),
     configureDirectory: request => ctx.research.configure(request),

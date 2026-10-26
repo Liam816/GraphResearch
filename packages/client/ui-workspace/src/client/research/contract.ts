@@ -4,7 +4,7 @@ import type { ResearchSnapshot, ResearchCreateTopicRequest, ResearchCreatePaperR
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ResearchPaper, ResearchUpdateConversationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { ResearchTranslation, ResearchTranslationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchTranslation, ResearchTranslationRequest, ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchViewStore } from './store.ts'
 import type { ResearchRenameTopicRequest, ResearchDeleteTopicRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchReorderPapersRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -34,6 +34,7 @@ export interface ResearchInjected {
   highlight: (request: ResearchHighlightRequest) => Promise<void>
   extractMarkdown: (paperId: ResearchPaperId) => Promise<void>
   translate: (request: ResearchTranslationRequest, signal: AbortSignal) => Promise<ResearchTranslation>
+  listTranslations: (paperId: ResearchPaperId, signal: AbortSignal) => Promise<readonly ResearchTranslationHistoryEntry[]>
   saveTranslation: (paperId: ResearchPaperId, key: string) => Promise<void>
   saveNote: (request: ResearchSaveNoteRequest) => Promise<void>
   configureDirectory: (request: ResearchDirectoryRequest) => Promise<void>

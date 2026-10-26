@@ -4,9 +4,10 @@ import { createPortal } from 'react-dom'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import { Button, MenuSurface, Tooltip, useAnchoredPosition } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ResearchHighlight, ResearchHighlightColor, ResearchHighlightId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchHighlight, ResearchHighlightColor, ResearchHighlightId, ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { collectPdfSelection, highlightAtPoint, type PdfAnnotations, type PdfSelection, type PdfTranslation } from './highlights.ts'
-import { TranslationCard } from './TranslationCard.tsx'
+import { TranslationCard, TranslationHistoryCard } from './TranslationCard.tsx'
+import { translationOccurrence, useTranslationHistory } from './translation-history.ts'
 import type {} from './locales.ts'
 import css from './HighlightControls.module.css'
 
@@ -17,14 +18,18 @@ type PendingChange = Parameters<PdfAnnotations['change']>[0]
 export function AnnotatedPages({ annotations, translation, t, children }: PropsLocale<'sidebarPdf'> & {
   readonly annotations: PdfAnnotations | undefined
   readonly translation?: PdfTranslation | undefined
-  readonly children: ReactNode
+  readonly children: ReactNode | ((entries: readonly ResearchTranslationHistoryEntry[]) => ReactNode)
 }): ReactNode {
   const root = useRef<HTMLDivElement>(null)
   const toolbar = useRef<HTMLDivElement>(null)
+  const historyTrigger = useRef<HTMLButtonElement>()
   const [selection, setSelection] = useState<PdfSelection>()
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<PendingChange>()
   const [pinned, setPinned] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState<{ key: string; anchor: PdfSelection['anchor'] }>()
+  const history = useTranslationHistory(translation)
+  const historyEntries = historyOpen === undefined ? [] : translationOccurrence(history.entries, historyOpen.key)
   const [editing, setEditing] = useState<{ highlight: ResearchHighlight; anchor: PdfSelection['anchor'] }>()
   const operation = useRef(false)
   const mounted = useRef(true)
@@ -33,23 +38,28 @@ export function AnnotatedPages({ annotations, translation, t, children }: PropsL
     return () => { mounted.current = false }
   }, [])
   const dismiss = (): void => {
-    if (!operation.current) { setSelection(undefined); setEditing(undefined); setFailure(undefined); setPinned(false) }
+    if (!operation.current) {
+      setSelection(undefined); setEditing(undefined); setHistoryOpen(undefined); setFailure(undefined); setPinned(false)
+      historyTrigger.current?.focus()
+    }
   }
   useEffect(() => {
-    if (selection === undefined && editing === undefined) return
+    if (selection === undefined && editing === undefined && historyOpen === undefined) return
     const outside = (event: PointerEvent): void => {
       if (!operation.current && !pinned && event.target instanceof Node && !toolbar.current?.contains(event.target)) {
-        setSelection(undefined); setEditing(undefined)
+        setSelection(undefined); setEditing(undefined); setHistoryOpen(undefined)
       }
     }
     const escape = (event: KeyboardEvent): void => {
       if (event.key === 'Escape' && !operation.current) {
-        setSelection(undefined); setEditing(undefined); setPinned(false); window.getSelection()?.removeAllRanges()
+        setSelection(undefined); setEditing(undefined); setHistoryOpen(undefined); setPinned(false)
+        window.getSelection()?.removeAllRanges()
+        if (historyOpen !== undefined) historyTrigger.current?.focus()
       }
     }
     const moved = (event: Event): void => {
       if (!operation.current && !pinned && !(event.target instanceof Node && toolbar.current?.contains(event.target))) {
-        setSelection(undefined); setEditing(undefined)
+        setSelection(undefined); setEditing(undefined); setHistoryOpen(undefined)
       }
     }
     document.addEventListener('pointerdown', outside, true)
@@ -62,7 +72,7 @@ export function AnnotatedPages({ annotations, translation, t, children }: PropsL
       window.removeEventListener('scroll', moved, true)
       window.removeEventListener('resize', moved)
     }
-  }, [selection, editing, pinned])
+  }, [selection, editing, historyOpen, pinned])
   const apply = async (change: PendingChange): Promise<void> => {
     if (annotations === undefined || !annotations.available || operation.current) return
     operation.current = true; setBusy(true); setFailure(undefined)
@@ -85,35 +95,77 @@ export function AnnotatedPages({ annotations, translation, t, children }: PropsL
     if ((annotations === undefined && translation === undefined) || operation.current || root.current === null) return
     const next = collectPdfSelection(root.current, window.getSelection())
     if (next === undefined && pinned) return
-    setSelection(next); setEditing(undefined); setPinned(false)
+    setSelection(next); setEditing(undefined); setHistoryOpen(undefined); setPinned(false)
   }
   return <div ref={root} className={css.pages} onClick={(event) => {
+    const historyButton = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-pdf-translation-history]') : null
+    const key = historyButton?.dataset['pdfTranslationHistory']
+    if (key !== undefined && historyButton !== null) {
+      const bounds = historyButton.getBoundingClientRect()
+      historyTrigger.current = historyButton
+      setSelection(undefined); setEditing(undefined); setPinned(false)
+      setHistoryOpen({ key, anchor: { x: bounds.left, y: bounds.bottom } })
+      return
+    }
     const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-pdf-highlight]') : null
     const highlight = annotations?.highlights.find(item => item.id === button?.dataset['pdfHighlight'])
     if (highlight !== undefined) void apply({ type: 'remove', id: highlight.id })
   }} onPointerUp={(event) => {
+    if (event.target instanceof Element && event.target.closest('[data-pdf-translation-history]') !== null) return
     if (event.target instanceof Node && !root.current?.contains(event.target)) return
     capture()
     if (annotations === undefined || root.current === null || operation.current || !window.getSelection()?.isCollapsed) return
     const hit = highlightAtPoint(root.current, annotations.highlights, event.clientX, event.clientY)
     if (hit !== undefined) setEditing({ highlight: hit, anchor: { x: event.clientX, y: event.clientY } })
   }} onKeyUp={(event) => {
+    if (event.target instanceof Element && event.target.closest('[data-pdf-translation-history]') !== null) return
     if (event.key !== 'Escape' && event.target instanceof Node && root.current?.contains(event.target)) capture()
   }}>
-    {children}
+    {typeof children === 'function' ? children(history.entries) : children}
+    {history.failed && <div className={css.failure} role="alert"><span>{t('translationHistoryFailed')}</span>
+      <Button size="sm" onClick={history.retry}>{t('retry')}</Button>
+    </div>}
     {failure !== undefined && <div className={css.failure} role="alert">
       <span>{t('highlightFailed')}</span>
       <Button size="sm" disabled={busy} onClick={() => { void apply(failure) }}>{t('retry')}</Button>
       <Button size="sm" variant="ghost" disabled={busy} onClick={dismiss}>{t('highlightDismiss')}</Button>
     </div>}
     {selection !== undefined && <SelectionToolbar key={JSON.stringify([selection.anchor, selection.start, selection.end, selection.text])}
-      selection={selection} busy={busy || failure?.type === 'add'} translation={translation} pinned={pinned} onPin={() => { setPinned(value => !value) }}
+      selection={selection} busy={busy || failure?.type === 'add'} translation={history.translation} pinned={pinned} onPin={() => { setPinned(value => !value) }}
       available={annotations?.available === true} toolbarRef={toolbar} t={t} onCancel={dismiss} onPick={(color) => {
         void apply({ type: 'add', highlight: { id: randomUUID() as ResearchHighlightId, color, text: selection.text, rects: selection.rects } })
       }} />}
     {editing !== undefined && selection === undefined && <HighlightMenu anchor={editing.anchor} toolbarRef={toolbar} t={t} busy={busy}
       available={annotations?.available === true} onCancel={dismiss} onRemove={() => { void apply({ type: 'remove', id: editing.highlight.id }) }} />}
+    {historyOpen !== undefined && historyEntries.length > 0 && translation !== undefined && <HistoryPopover
+      key={historyOpen.key} anchor={historyOpen.anchor} toolbarRef={toolbar} entries={historyEntries} translation={translation}
+      pinned={pinned} onPin={() => { setPinned(value => !value) }} onCancel={dismiss} t={t} />}
   </div>
+}
+
+function HistoryPopover({ anchor: point, toolbarRef, entries, translation, pinned, onPin, onCancel, t }: PropsLocale<'sidebarPdf'> & {
+  readonly anchor: PdfSelection['anchor']
+  readonly toolbarRef: RefObject<HTMLDivElement>
+  readonly entries: readonly ResearchTranslationHistoryEntry[]
+  readonly translation: PdfTranslation
+  readonly pinned: boolean
+  readonly onPin: () => void
+  readonly onCancel: () => void
+}): ReactNode {
+  const anchor = useRef<HTMLSpanElement>(null)
+  const position = useAnchoredPosition({ open: true, anchorRef: anchor, panelRef: toolbarRef, side: 'bottom', gap: 8, margin: 12 })
+  useEffect(() => { toolbarRef.current?.querySelector('button')?.focus() }, [toolbarRef])
+  return createPortal(<>
+    <span ref={anchor} className={css.anchor} aria-hidden="true" style={{ left: point.x, top: point.y }} />
+    <MenuSurface ref={toolbarRef} compact className={`${css.toolbar} ${css.withTranslation}`}
+      style={{ ...position, visibility: position === null ? 'hidden' : 'visible' }}>
+      <div className={css.selectionActions}>
+        <Button size="sm" variant="ghost" aria-pressed={pinned} onClick={onPin}>{t(pinned ? 'translationUnpin' : 'translationPin')}</Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>{t('translationHistoryClose')}</Button>
+      </div>
+      <TranslationHistoryCard entries={entries} translation={translation} t={t} />
+    </MenuSurface>
+  </>, document.body)
 }
 
 function SelectionToolbar({ selection, busy, available, toolbarRef, t, onPick, onCancel, translation, pinned, onPin }: PropsLocale<'sidebarPdf'> & {

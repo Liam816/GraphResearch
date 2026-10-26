@@ -1,5 +1,5 @@
 import { openResearchNote } from './research-files.helpers.ts'
-/** Shipped Web reading flow: explicit translation, original context, cache reuse and learning-note export. */
+/** Shipped Web reading flow: explicit translation, restored occurrence history and learning-note export. */
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -8,7 +8,7 @@ import { chromium } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { normalizeSessionSnapshots } from '@deepseek-ai/dsh-session-snapshot'
-import type { ResearchTranslation } from '@deepseek-ai/dsh-api-workspace-controller/types'
+import type { ResearchTranslation, ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/types'
 import { translationPdfFixture } from '../../../packages/client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
 import { assertFinalWorkspaceSnapshot, launchWebScaffold, webSnapshotMode } from './scaffold.ts'
 import { newEnglishPage, openSettings, saveFailureShot } from './support.ts'
@@ -64,9 +64,16 @@ it('translates an explicit selection with five original sentences and retains it
   await card.getByText('View context · PDF page 1', { exact: true }).click()
   expect(await card.getByText('First context sentence.', { exact: true }).isVisible()).toBe(true)
   expect(await card.getByText('Last context sentence.', { exact: true }).isVisible()).toBe(true)
-  const saved = JSON.parse(await readFile(join(root, 'agent-lib', 'papers', 'translation-paper', 'translations.json'), 'utf8')) as { entries: ResearchTranslation[] }
-  expect(saved).toEqual(JSON.parse(await readFile(join(DIRECTORY, 'runtime.expected', 'translations.json'), 'utf8')))
+  const saved = JSON.parse(await readFile(join(root, 'agent-lib', 'papers', 'translation-paper', 'translations.json'), 'utf8')) as { version: number; entries: ResearchTranslation[] }
+  const expectedStore = JSON.parse(await readFile(join(DIRECTORY, 'runtime.expected', 'translations.json'), 'utf8')) as { version: number; entries: ResearchTranslation[] }
+  expect({ version: saved.version, entries: saved.entries }).toEqual(expectedStore)
   expect(saved.entries).toHaveLength(1)
+  const located: readonly ResearchTranslationHistoryEntry[] = await scaffold.ctx.workspaceController.researchListTranslations(
+    catalog.papers[0]!.id, new AbortController().signal)
+  expect(located).toHaveLength(1)
+  expect(located[0]?.translation).toEqual(saved.entries[0])
+  expect(located[0]?.selection).toMatchObject({ start: { page: 1, item: 2, offset: 4 }, end: { page: 1, item: 2, offset: 10 } })
+  expect(located[0]?.selection?.rects?.length).toBeGreaterThan(0)
   expect(saved.entries[0]?.context.before).toEqual(['First context sentence.', 'Second context sentence.'])
   expect(saved.entries[0]?.context.after).toEqual(['Next context sentence.', 'Last context sentence.'])
   await expect(readFile(join(paperDirectory, 'notes', 'learning.md'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
@@ -85,8 +92,24 @@ it('translates an explicit selection with five original sentences and retains it
   await openResearchNote(workbench, 'learning')
   await expect.poll(() => notes.textContent()).toContain('机器人动作策略')
   await page.keyboard.press('Escape')
+  const historyButton = workbench.getByRole('button', { name: 'View translation history: policy', exact: true })
+  const history = page.getByRole('region', { name: 'Translation history', exact: true })
+  await historyButton.waitFor()
+  expect(await workbench.locator('[data-pdf-translation]').count()).toBeGreaterThan(0)
+  await historyButton.click()
+  await history.getByText('机器人动作策略', { exact: true }).waitFor()
+  expect(agent.session.snapshotEvents().filter(event => event.type === 'research/translation-request')).toHaveLength(1)
+  await page.screenshot({ path: '.artifacts/research-ui/translation-history-light.png' })
+  await page.keyboard.press('Escape')
+  await history.waitFor({ state: 'hidden' })
   await page.reload({ waitUntil: 'load' })
   await library.getByRole('button', { name: 'Translation paper', exact: true }).click()
+  await historyButton.waitFor()
+  await historyButton.click()
+  await history.getByText('机器人动作策略', { exact: true }).waitFor()
+  expect(agent.session.snapshotEvents().filter(event => event.type === 'research/translation-request')).toHaveLength(1)
+  await page.keyboard.press('Escape')
+  await history.waitFor({ state: 'hidden' })
   await select(); await page.getByRole('button', { name: 'Translate', exact: true }).click()
   await card.getByText('机器人动作策略', { exact: true }).waitFor()
   expect(agent.session.snapshotEvents().filter(event => event.type === 'research/translation-request')).toHaveLength(1)
@@ -103,6 +126,22 @@ it('translates an explicit selection with five original sentences and retains it
   expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(375)
   expect(await page.locator('body').evaluate(element => element.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: '.artifacts/research-ui/translation-narrow.png' })
+  await page.keyboard.press('Escape')
+  await workbench.getByRole('group', { name: 'Reading panel', exact: true })
+    .getByRole('button', { name: 'pdf viewer', exact: true }).click()
+  await historyButton.scrollIntoViewIfNeeded()
+  await historyButton.click()
+  await history.getByText('机器人动作策略', { exact: true }).waitFor()
+  const historyBounds = await history.boundingBox()
+  expect(historyBounds).not.toBeNull()
+  expect(historyBounds!.x).toBeGreaterThanOrEqual(0)
+  expect(historyBounds!.x + historyBounds!.width).toBeLessThanOrEqual(375)
+  expect(historyBounds!.y).toBeGreaterThanOrEqual(0)
+  expect(historyBounds!.y + historyBounds!.height).toBeLessThanOrEqual(812)
+  await page.screenshot({ path: '.artifacts/research-ui/translation-history-narrow-dark.png' })
+  await page.locator('body').dispatchEvent('pointerdown')
+  await history.waitFor({ state: 'hidden' })
+  expect(agent.session.snapshotEvents().filter(event => event.type === 'research/translation-request')).toHaveLength(1)
   const events = agent.session.snapshotEvents()
   expect(events.some(event => event.type === 'user/message' || event.type === 'assistant/message')).toBe(false)
   const raw = [JSON.stringify({ type: 'session', ...agent.session.header, delegationDepth: agent.session.header.delegationDepth ?? 0 }),

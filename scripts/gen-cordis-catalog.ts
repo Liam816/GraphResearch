@@ -793,6 +793,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   ResearchTranslationExplanation: 'workspace.md',
   ResearchPronunciation: 'workspace.md',
   ResearchTranslation: 'workspace.md',
+  ResearchTranslationHistoryEntry: 'workspace.md',
+  ResearchTranslationSelection: 'workspace.md',
   ResearchTranslationRequestRecord: 'workspace.md',
   ResearchPaperId: 'workspace.md',
   ResearchTopicId: 'workspace.md',

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ResearchTranslation } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchTranslation, ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PdfSelection, PdfTranslation } from './highlights.ts'
 import type {} from './locales.ts'
 import css from './HighlightControls.module.css'
@@ -30,7 +30,8 @@ export function TranslationCard({ selection, translation, t }: PropsLocale<'side
     const lifetime = new AbortController()
     setState({ kind: 'loading' })
     if (selection.start === undefined || selection.end === undefined) { setState({ kind: 'failed', reason: 'selection' }); return }
-    void callbacks.current.translate({ text: selection.text, start: selection.start, end: selection.end }, lifetime.signal)
+    void callbacks.current.translate({ text: selection.text, start: selection.start, end: selection.end, rects: selection.rects },
+      lifetime.signal)
       .then((value) => { if (!lifetime.signal.aborted) setState({ kind: 'ready', value }) }, (error: unknown) => {
         if (!lifetime.signal.aborted) setState({ kind: 'failed', reason: translationFailure(error) })
       })
@@ -44,6 +45,28 @@ export function TranslationCard({ selection, translation, t }: PropsLocale<'side
             : state.reason === 'source-changed' ? 'translationSourceChanged' : state.reason === 'limit' ? 'translationLimit' : 'translationFailed')}</p>
         <Button size="sm" onClick={() => { setAttempt(value => value + 1) }}>{t('retry')}</Button>
       </div> : <TranslationResult value={state.value} translation={translation} t={t} />}
+  </div>
+}
+
+/** @param props - saved explanations for one occurrence and paper actions. @returns history without invoking inference. */
+export function TranslationHistoryCard({ entries, translation, t }: PropsLocale<'sidebarPdf'> & {
+  readonly entries: readonly ResearchTranslationHistoryEntry[]
+  readonly translation: PdfTranslation
+}): ReactNode {
+  const [selected, setSelected] = useState(entries[0]?.translation.key)
+  const entry = entries.find(item => item.translation.key === selected) ?? entries[0]
+  if (entry === undefined) return null
+  return <div className={css.translation} role="region" aria-label={t('translationHistory')}>
+    <h3>{t('translationHistory')}</h3>
+    {entries.length > 1 && <div className={css.historyVersions} role="group" aria-label={t('translationHistoryVersions')}>
+      {entries.map((item, index) => <Button key={item.translation.key} size="sm"
+        variant={entry.translation.key === item.translation.key ? 'primary' : 'ghost'} aria-pressed={entry.translation.key === item.translation.key}
+        onClick={() => { setSelected(item.translation.key) }}>{t('translationHistoryVersion', { index: entries.length - index })}</Button>)}
+    </div>}
+    {entry.createdAt !== undefined && <p className={css.translationDetail}>
+      <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString()}</time>
+    </p>}
+    <TranslationResult key={entry.translation.key} value={entry.translation} translation={translation} t={t} />
   </div>
 }
 

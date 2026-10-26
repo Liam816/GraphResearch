@@ -73,6 +73,7 @@
 .translationContext summary { cursor: pointer; color: var(--dsw-alias-label-secondary); }
 .translationContext p { margin-top: 8px; }
 .translationActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.historyVersions { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 8px; }
 .translationError { color: var(--dsw-alias-label-primary); }
 .translationError > button { margin-top: 8px; }
 .translationLoading { display: flex; min-height: 96px; align-items: center; justify-content: center; color: var(--dsw-alias-label-secondary); }

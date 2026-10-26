@@ -54,7 +54,8 @@ it('sends no translation when selecting or highlighting and translates only afte
   fireEvent.click(screen.getByRole('button', { name: en.translate }))
   await screen.findByText('机器人动作策略')
   expect(view.translate).toHaveBeenCalledTimes(1)
-  expect(view.translate.mock.calls[0]?.[0]).toEqual({ text: 'policy', start: { page: 1, item: 0, offset: 4 }, end: { page: 1, item: 0, offset: 10 } })
+  expect(view.translate.mock.calls[0]?.[0]).toEqual({ text: 'policy', start: { page: 1, item: 0, offset: 4 }, end: { page: 1, item: 0, offset: 10 },
+    rects: [{ page: 1, x: 10 / 600, y: 20 / 800, width: 60 / 600, height: 12 / 800 }] })
   expect(view.change).not.toHaveBeenCalled()
   expect(window.getSelection()?.toString()).toBe('policy')
   fireEvent.click(screen.getByRole('button', { name: en.yellow }))

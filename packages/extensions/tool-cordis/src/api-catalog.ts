@@ -3853,6 +3853,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'a durably recorded explanation; failures retain the original and notebooks.',
       },
       {
+        signature: '@Remote(\'researchListTranslations\') researchListTranslations(paperId: ResearchPaperId, signal: AbortSignal): Promise<readonly ResearchTranslationHistoryEntry[]>',
+        description: 'Read saved explanations and reader locations for the paper\'s current PDF without inference.',
+        parameters: [{ name: 'paperId', description: 'owning paper.' }, { name: 'signal', description: 'caller lifetime.' }],
+        returns: 'saved explanations; ambiguous older locations remain absent.',
+      },
+      {
         signature: '@Remote(\'researchSaveTranslation\') researchSaveTranslation(paperId: ResearchPaperId, key: string): Promise<ResearchCatalog>',
         description: 'Append a confirmed translation and original-page link to learning notes exactly once.',
         parameters: [{ name: 'paperId', description: 'owning paper.' }, { name: 'key', description: 'saved translation occurrence key.' }],
@@ -6811,8 +6817,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ResearchTranslationExplanation {\n    readonly kind: \'word\' | \'phrase\' | \'sentence\';\n    readonly lemma: string;\n    readonly partOfSpeech: string;\n    readonly meanings: readonly string[];\n    readonly contextualMeaning: string;\n    readonly explanation: string;\n    readonly translation: string;\n}',
   },
   {
+    name: 'ResearchTranslationHistoryEntry',
+    declaration: 'export interface ResearchTranslationHistoryEntry {\n    readonly translation: ResearchTranslation;\n    readonly selection?: ResearchTranslationSelection;\n    readonly createdAt?: string;\n}',
+  },
+  {
     name: 'ResearchTranslationRequest',
-    declaration: 'export interface ResearchTranslationRequest {\n    readonly sessionId?: SessionId;\n    readonly paperId: ResearchPaperId;\n    readonly text: string;\n    readonly start: ResearchTextPosition;\n    readonly end: ResearchTextPosition;\n}',
+    declaration: 'export interface ResearchTranslationRequest {\n    readonly sessionId?: SessionId;\n    readonly paperId: ResearchPaperId;\n    readonly text: string;\n    readonly start: ResearchTextPosition;\n    readonly end: ResearchTextPosition;\n    readonly rects?: readonly ResearchHighlightRect[] | undefined;\n}',
+  },
+  {
+    name: 'ResearchTranslationSelection',
+    declaration: 'export interface ResearchTranslationSelection {\n    readonly start: ResearchTextPosition;\n    readonly end: ResearchTextPosition;\n    readonly rects?: readonly ResearchHighlightRect[] | undefined;\n}',
   },
   {
     name: 'ResearchUpdateConversationRequest',

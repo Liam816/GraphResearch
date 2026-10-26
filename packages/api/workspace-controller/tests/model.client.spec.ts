@@ -74,6 +74,7 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   readonly researchSaveFile = vi.fn<WorkspaceRemote['researchSaveFile']>()
   readonly researchTranslate = vi.fn<WorkspaceRemote['researchTranslate']>()
   readonly researchSaveTranslation = vi.fn<WorkspaceRemote['researchSaveTranslation']>()
+  readonly researchListTranslations = vi.fn<WorkspaceRemote['researchListTranslations']>()
   readonly researchHighlight = vi.fn<WorkspaceRemote['researchHighlight']>()
   readonly researchExtractMarkdown = vi.fn<WorkspaceRemote['researchExtractMarkdown']>()
   readonly researchConfigure = vi.fn<WorkspaceRemote['researchConfigure']>()

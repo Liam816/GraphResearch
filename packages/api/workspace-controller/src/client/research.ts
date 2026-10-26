@@ -7,7 +7,7 @@ import type {
 import type { ResearchCreateConversationRequest, ResearchUpdateConversationRequest } from '../research-types.ts'
 import type { ResearchReorderPapersRequest } from '../research-types.ts'
 import type { WorkspaceRemote } from './model.ts'
-import type { ResearchTranslation, ResearchTranslationRequest } from '../research-translation-types.ts'
+import type { ResearchTranslation, ResearchTranslationRequest, ResearchTranslationHistoryEntry } from '../research-translation-types.ts'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
   ResearchDeletePaperRequest, ResearchDeleteTopicRequest,
@@ -31,7 +31,7 @@ export class ClientResearchModel {
    * @param remote - generated Workspace namespace.
    */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchReorderPapers' | 'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeleteTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation'>) {}
+    'researchReorderPapers' | 'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeleteTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation' | 'researchListTranslations'>) {}
 
   /**
    * Save a Topic's reading order and publish only the confirmed response.
@@ -124,6 +124,18 @@ export class ClientResearchModel {
    */
   async translate(request: ResearchTranslationRequest, signal: AbortSignal): Promise<ResearchTranslation> {
     const result = await this.remote.researchTranslate(request, signal)
+    if (!result.ok) throw result.error
+    return result.value
+  }
+
+  /**
+   * Read saved explanations for the current original without changing catalog state.
+   * @param paperId - owning paper.
+   * @param signal - reader lifetime.
+   * @returns saved explanations and their available PDF locations.
+   */
+  async listTranslations(paperId: ResearchPaperId, signal: AbortSignal): Promise<readonly ResearchTranslationHistoryEntry[]> {
+    const result = await this.remote.researchListTranslations(paperId, signal)
     if (!result.ok) throw result.error
     return result.value
   }

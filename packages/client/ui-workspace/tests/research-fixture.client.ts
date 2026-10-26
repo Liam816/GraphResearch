@@ -15,6 +15,7 @@ export function installEmptyResearch(ctx: Context): void {
     researchCreateTopic: result, researchCreatePaper: result, researchSaveNote: result,
     researchConfigure: result, researchHighlight: result, researchExtractMarkdown: result, researchSaveTranslation: result,
     researchTranslate: () => Promise.reject(new Error('paper translations are not used by this fixture')),
+    researchListTranslations: () => Promise.resolve({ ok: true as const, value: [] }),
     researchImportPaper: () => Promise.reject(new Error('paper imports are not used by this fixture')),
     researchMentions: () => Promise.resolve({ ok: true as const, value: [] }) }))
   ctx.provide('remote.workspaceFiles', {})

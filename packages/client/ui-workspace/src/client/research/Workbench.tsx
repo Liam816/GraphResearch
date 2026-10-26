@@ -109,7 +109,7 @@ export function ResearchWorkbench(props: ResearchWorkbenchProps) {
       t={t} viewActions={actions} renderFactorySlot={props.renderFactorySlot} saveNote={props.saveNote}
       listFiles={props.listFiles} readFile={props.readFile} saveFile={props.saveFile} revision={`${catalog.revision}:${running}`}
       highlight={props.highlight} extractMarkdown={props.extractMarkdown}
-      translate={props.translate} saveTranslation={props.saveTranslation}
+      translate={props.translate} listTranslations={props.listTranslations} saveTranslation={props.saveTranslation}
       translationAvailable={catalog.capabilities?.pdfTranslations === true}
       askTranslation={(translation) => {
         if (sessionId === undefined) throw new Error('The paper composer is not ready')

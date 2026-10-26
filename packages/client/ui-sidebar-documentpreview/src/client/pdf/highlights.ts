@@ -1,9 +1,14 @@
 /** Page-relative PDF selection geometry shared by marker rendering and persistence callbacks. */
 import type { ResearchHighlight, ResearchHighlightRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import type { ResearchTextPosition, ResearchTranslation, ResearchTranslationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchTextPosition, ResearchTranslation, ResearchTranslationRequest, ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/client'
 
 /** Paper-owned translation and notebook commands; the generic reader supplies only selection positions. */
 export interface PdfTranslation {
+  readonly history?: {
+    /** Changes when the owning paper or its original PDF changes. */
+    readonly key: string
+    readonly list: (signal: AbortSignal) => Promise<readonly ResearchTranslationHistoryEntry[]>
+  }
   readonly translate: (selection: Omit<ResearchTranslationRequest, 'paperId'>, signal: AbortSignal) => Promise<ResearchTranslation>
   readonly save: (translation: ResearchTranslation) => Promise<void>
   readonly ask: (translation: ResearchTranslation) => Promise<void>
