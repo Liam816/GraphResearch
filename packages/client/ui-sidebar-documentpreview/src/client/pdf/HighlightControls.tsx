@@ -2,12 +2,13 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
-import { Button, MenuSurface, Tooltip, useAnchoredPosition } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, MenuSurface, StateDot, Tooltip, useAnchoredPosition } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ResearchHighlight, ResearchHighlightColor, ResearchHighlightId, ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { collectPdfSelection, highlightAtPoint, type PdfAnnotations, type PdfSelection, type PdfTranslation } from './highlights.ts'
 import { TranslationCard, TranslationHistoryCard } from './TranslationCard.tsx'
 import { translationOccurrence, useTranslationHistory } from './translation-history.ts'
+import { translationSelectionKey, useTranslationRequests, type TranslationRequestState } from './translation-requests.ts'
 import type {} from './locales.ts'
 import css from './HighlightControls.module.css'
 
@@ -29,6 +30,10 @@ export function AnnotatedPages({ annotations, translation, t, children }: PropsL
   const [pinned, setPinned] = useState(false)
   const [historyOpen, setHistoryOpen] = useState<{ key: string; anchor: PdfSelection['anchor'] }>()
   const history = useTranslationHistory(translation)
+  const requests = useTranslationRequests(history.translation)
+  const selectedRequest = selection === undefined ? undefined
+    : requests.requests.find(item => item.key === translationSelectionKey(selection))
+  const background = requests.requests.filter(item => item.kind !== 'ready' && item.key !== selectedRequest?.key)
   const historyEntries = historyOpen === undefined ? [] : translationOccurrence(history.entries, historyOpen.key)
   const [editing, setEditing] = useState<{ highlight: ResearchHighlight; anchor: PdfSelection['anchor'] }>()
   const operation = useRef(false)
@@ -111,17 +116,29 @@ export function AnnotatedPages({ annotations, translation, t, children }: PropsL
     const highlight = annotations?.highlights.find(item => item.id === button?.dataset['pdfHighlight'])
     if (highlight !== undefined) void apply({ type: 'remove', id: highlight.id })
   }} onPointerUp={(event) => {
-    if (event.target instanceof Element && event.target.closest('[data-pdf-translation-history]') !== null) return
+    if (event.target instanceof Element && event.target.closest('[data-pdf-translation-history], [data-pdf-translation-task]') !== null) return
     if (event.target instanceof Node && !root.current?.contains(event.target)) return
     capture()
     if (annotations === undefined || root.current === null || operation.current || !window.getSelection()?.isCollapsed) return
     const hit = highlightAtPoint(root.current, annotations.highlights, event.clientX, event.clientY)
     if (hit !== undefined) setEditing({ highlight: hit, anchor: { x: event.clientX, y: event.clientY } })
   }} onKeyUp={(event) => {
-    if (event.target instanceof Element && event.target.closest('[data-pdf-translation-history]') !== null) return
+    if (event.target instanceof Element && event.target.closest('[data-pdf-translation-history], [data-pdf-translation-task]') !== null) return
     if (event.key !== 'Escape' && event.target instanceof Node && root.current?.contains(event.target)) capture()
   }}>
     {typeof children === 'function' ? children(history.entries) : children}
+    {background.length > 0 && <div className={css.translationTasks} role="region" aria-label={t('translationTasks')}>
+      {background.map(request => <div key={request.key} role={request.kind === 'failed' ? 'alert' : 'status'}>
+        <Button size="sm" variant="ghost" data-pdf-translation-task="" className={css.translationTask} onClick={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect()
+          setSelection({ ...request.selection, anchor: { x: bounds.left, y: bounds.top } })
+          setEditing(undefined); setHistoryOpen(undefined); setPinned(false)
+        }}>
+          {request.kind === 'loading' && <StateDot state="ongoing" size={14} />}
+          <span>{t(request.kind === 'failed' ? 'translationBackgroundFailed' : 'translationBackgroundLoading', { text: request.selection.text })}</span>
+        </Button>
+      </div>)}
+    </div>}
     {history.failed && <div className={css.failure} role="alert"><span>{t('translationHistoryFailed')}</span>
       <Button size="sm" onClick={history.retry}>{t('retry')}</Button>
     </div>}
@@ -132,6 +149,10 @@ export function AnnotatedPages({ annotations, translation, t, children }: PropsL
     </div>}
     {selection !== undefined && <SelectionToolbar key={JSON.stringify([selection.anchor, selection.start, selection.end, selection.text])}
       selection={selection} busy={busy || failure?.type === 'add'} translation={history.translation} pinned={pinned} onPin={() => { setPinned(value => !value) }}
+      request={selectedRequest} onTranslate={() => { requests.start(selection) }} onStopTranslation={() => {
+        if (selectedRequest !== undefined) requests.cancel(selectedRequest.key)
+        dismiss()
+      }}
       available={annotations?.available === true} toolbarRef={toolbar} t={t} onCancel={dismiss} onPick={(color) => {
         void apply({ type: 'add', highlight: { id: randomUUID() as ResearchHighlightId, color, text: selection.text, rects: selection.rects } })
       }} />}
@@ -168,19 +189,23 @@ function HistoryPopover({ anchor: point, toolbarRef, entries, translation, pinne
   </>, document.body)
 }
 
-function SelectionToolbar({ selection, busy, available, toolbarRef, t, onPick, onCancel, translation, pinned, onPin }: PropsLocale<'sidebarPdf'> & {
-  readonly selection: PdfSelection
-  readonly busy: boolean
-  readonly available: boolean
-  readonly toolbarRef: RefObject<HTMLDivElement>
-  readonly onPick: (color: ResearchHighlightColor) => void
-  readonly onCancel: () => void
-  readonly translation: PdfTranslation | undefined
-  readonly pinned: boolean
-  readonly onPin: () => void
-}): ReactNode {
+function SelectionToolbar({ selection, busy, available, toolbarRef, t, onPick, onCancel, translation, pinned, onPin,
+  request, onTranslate, onStopTranslation }: PropsLocale<'sidebarPdf'> & {
+    readonly selection: PdfSelection
+    readonly busy: boolean
+    readonly available: boolean
+    readonly toolbarRef: RefObject<HTMLDivElement>
+    readonly onPick: (color: ResearchHighlightColor) => void
+    readonly onCancel: () => void
+    readonly translation: PdfTranslation | undefined
+    readonly pinned: boolean
+    readonly onPin: () => void
+    readonly request: TranslationRequestState | undefined
+    readonly onTranslate: () => void
+    readonly onStopTranslation: () => void
+  }): ReactNode {
   const anchor = useRef<HTMLSpanElement>(null)
-  const [translated, setTranslated] = useState(false)
+  const translated = request !== undefined
   const position = useAnchoredPosition({ open: true, anchorRef: anchor, panelRef: toolbarRef, side: translated ? 'bottom' : 'top', gap: 8, margin: 12 })
   return createPortal(<>
     <span ref={anchor} className={css.anchor} aria-hidden="true" style={{ left: selection.anchor.x, top: selection.anchor.y }} />
@@ -192,13 +217,20 @@ function SelectionToolbar({ selection, busy, available, toolbarRef, t, onPick, o
           <button type="button" className={css.swatch} data-highlight-color={color} aria-label={t(color)}
             disabled={busy || !available} onClick={() => { onPick(color) }} />
         </Tooltip>)}
-        {translation !== undefined && <Button size="sm" variant={translated ? 'primary' : 'ghost'} disabled={busy || selection.start === undefined || selection.end === undefined}
-          onClick={() => { setTranslated(true) }}>{t('translate')}</Button>}
-        {translated && <Button size="sm" variant="ghost" aria-pressed={pinned} onClick={onPin}>{t(pinned ? 'translationUnpin' : 'translationPin')}</Button>}
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onCancel}>{t('highlightDismiss')}</Button>
+        {translation !== undefined && <Button size="sm" variant={translated ? 'primary' : 'ghost'}
+          disabled={busy || request?.kind === 'loading' || selection.start === undefined || selection.end === undefined}
+          onClick={onTranslate}>{t('translate')}</Button>}
+        {request?.kind === 'loading' && <Button size="sm" variant="ghost" onClick={onStopTranslation}>{t('translationCancel')}</Button>}
+        {translated && <Button size="sm" variant="ghost" aria-pressed={pinned} onClick={onPin}>
+          {t(pinned ? 'translationUnpin' : 'translationPin')}
+        </Button>}
+        <Button size="sm" variant="ghost" disabled={busy} onClick={onCancel}>
+          {t(translated ? 'translationHistoryClose' : 'highlightDismiss')}
+        </Button>
       </div>
       <span className={css.hint} role={available ? undefined : 'alert'}>{t(available ? 'highlightDeleteHint' : 'highlightRestartRequired')}</span>
-      {translated && translation !== undefined && <TranslationCard selection={selection} translation={translation} t={t} />}
+      {request !== undefined && translation !== undefined && <TranslationCard
+        state={request} translation={translation} retry={onTranslate} t={t} />}
     </MenuSurface>
   </>, document.body)
 }

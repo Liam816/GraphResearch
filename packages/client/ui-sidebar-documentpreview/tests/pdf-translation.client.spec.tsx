@@ -28,16 +28,17 @@ afterEach(() => {
   else Object.defineProperty(Range.prototype, 'getClientRects', originalRects)
 })
 
-function fixture() {
+function fixture(history?: PdfTranslation['history']) {
   const translate = vi.fn<PdfTranslation['translate']>(async () => result)
   const save = vi.fn<PdfTranslation['save']>(async () => {})
   const ask = vi.fn<PdfTranslation['ask']>(async () => {})
   const change = vi.fn<PdfAnnotations['change']>(async () => {})
   const view = render(<AnnotatedPages annotations={{ highlights: [], available: true, change }}
-    translation={{ translate, save, ask }} t={makeTranslate(en)}>
-    <div data-pdf-page="1"><div data-document-zoom-surface><div data-pdf-text>
+    translation={{ translate, save, ask, ...history === undefined ? {} : { history } }} t={makeTranslate(en)}>
+    {entries => <><div data-pdf-page="1"><div data-document-zoom-surface><div data-pdf-text>
       <span data-pdf-text-item="0">The policy predicts actions.</span>
-    </div></div></div>
+    </div></div></div>{entries.map(entry => <button key={entry.translation.key} type="button"
+      data-pdf-translation-history={entry.translation.key}>Saved translation: {entry.translation.context.selected}</button>)}</>}
   </AnnotatedPages>)
   const text = view.container.querySelector('[data-pdf-text-item]')!.firstChild!
   const select = (start = 4, end = 10): void => {
@@ -98,7 +99,7 @@ it('retains a failed translation for retry and saves notes or inserts Agent cont
   expect(view.ask).toHaveBeenCalledWith(result)
 })
 
-it('cancels an old selection and ignores its late response after translating another word', async () => {
+it('keeps an earlier request running without replacing the card for a more recent selection', async () => {
   const view = fixture()
   let settle!: (value: ResearchTranslation) => void
   view.translate.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve }))
@@ -106,13 +107,15 @@ it('cancels an old selection and ignores its late response after translating ano
   await waitFor(() => { expect(view.translate).toHaveBeenCalledTimes(1) })
   const oldSignal = view.translate.mock.calls[0]![1]
   view.select(11, 19)
-  expect(oldSignal.aborted).toBe(true)
+  expect(oldSignal.aborted).toBe(false)
   expect(screen.queryByRole('region', { name: en.translationTitle })).toBeNull()
   view.translate.mockResolvedValueOnce({ ...result, result: { ...result.result, contextualMeaning: '最新选词解释' } })
   fireEvent.click(screen.getByRole('button', { name: en.translate }))
   await screen.findByText('最新选词解释')
   settle(result)
   await waitFor(() => { expect(screen.queryByText('机器人动作策略')).toBeNull() })
+  expect(screen.getByText('最新选词解释')).toBeDefined()
+  expect(oldSignal.aborted).toBe(false)
 })
 
 it('keeps a pinned card across outside clicks and dismisses it with Escape', async () => {
@@ -126,7 +129,67 @@ it('keeps a pinned card across outside clicks and dismisses it with Escape', asy
   expect(screen.getByRole('button', { name: en.translationUnpin })).toBeDefined()
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(screen.queryByRole('region', { name: en.translationTitle })).toBeNull()
-  expect(view.translate.mock.calls[0]![1].aborted).toBe(true)
+  expect(view.translate.mock.calls[0]![1].aborted).toBe(false)
+})
+
+it.each(['scroll', 'outside', 'escape', 'close'] as const)('finishes and saves a translation after %s hides its card', async (gesture) => {
+  const saved = { translation: result, selection: { start: { page: 1, item: 0, offset: 4 }, end: { page: 1, item: 0, offset: 10 } } }
+  const list = vi.fn<NonNullable<PdfTranslation['history']>['list']>().mockResolvedValueOnce([]).mockResolvedValue([saved])
+  const view = fixture({ key: 'paper:sha', list })
+  let settle!: (value: ResearchTranslation) => void
+  view.translate.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve }))
+  view.select(); fireEvent.click(screen.getByRole('button', { name: en.translate }))
+  await waitFor(() => { expect(view.translate).toHaveBeenCalledTimes(1) })
+  const signal = view.translate.mock.calls[0]![1]
+  if (gesture === 'scroll') fireEvent.scroll(view.container.querySelector('[data-pdf-page]')!)
+  else if (gesture === 'outside') fireEvent.pointerDown(document.body)
+  else if (gesture === 'escape') fireEvent.keyDown(document, { key: 'Escape' })
+  else fireEvent.click(screen.getByRole('button', { name: en.translationHistoryClose }))
+  expect(screen.queryByRole('region', { name: en.translationTitle })).toBeNull()
+  expect(signal.aborted).toBe(false)
+  expect(screen.getByRole('button', { name: 'Translating “policy”' })).toBeDefined()
+  settle(result)
+  fireEvent.click(await screen.findByRole('button', { name: 'Saved translation: policy' }))
+  await screen.findByRole('region', { name: en.translationHistory })
+  expect(screen.getByText('机器人动作策略')).toBeDefined()
+  expect(view.translate).toHaveBeenCalledTimes(1)
+  expect(signal.aborted).toBe(false)
+})
+
+it('reopens pending progress and retries a failed hidden translation without losing the passage', async () => {
+  const view = fixture()
+  let reject!: (error: unknown) => void
+  view.translate.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+  view.select(); fireEvent.click(screen.getByRole('button', { name: en.translate }))
+  fireEvent.pointerDown(document.body)
+  fireEvent.click(screen.getByRole('button', { name: 'Translating “policy”' }))
+  expect(screen.getByRole('region', { name: en.translationTitle }).getAttribute('aria-busy')).toBe('true')
+  expect(screen.getByRole('button', { name: en.translate }).hasAttribute('disabled')).toBe(true)
+  expect(view.translate).toHaveBeenCalledTimes(1)
+  fireEvent.scroll(view.container.querySelector('[data-pdf-page]')!)
+  reject({ code: 'research/translation-failed', details: { reason: 'timeout' } })
+  fireEvent.click(await screen.findByRole('button', { name: 'Translation failed: policy' }))
+  await screen.findByText(en.translationTimeout)
+  fireEvent.click(screen.getByRole('button', { name: en.retry }))
+  await screen.findByText(result.result.contextualMeaning)
+  expect(view.translate).toHaveBeenCalledTimes(2)
+})
+
+it('cancels a pending request only through the explicit translation cancel action', async () => {
+  const view = fixture()
+  let settle!: (value: ResearchTranslation) => void
+  view.translate.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve }))
+  view.select(); fireEvent.click(screen.getByRole('button', { name: en.translate }))
+  const signal = view.translate.mock.calls[0]![1]
+  fireEvent.click(screen.getByRole('button', { name: en.translationCancel }))
+  expect(signal.aborted).toBe(true)
+  expect(screen.queryByRole('region', { name: en.translationTasks })).toBeNull()
+  expect(screen.queryByRole('region', { name: en.translationTitle })).toBeNull()
+  view.select(); fireEvent.click(screen.getByRole('button', { name: en.translate }))
+  await screen.findByText(result.result.contextualMeaning)
+  expect(view.translate).toHaveBeenCalledTimes(2)
+  settle({ ...result, result: { ...result.result, contextualMeaning: '取消后的旧结果' } })
+  await waitFor(() => { expect(screen.queryByText('取消后的旧结果')).toBeNull() })
 })
 
 it('reports device speech and Agent insertion failures while retaining the translation', async () => {

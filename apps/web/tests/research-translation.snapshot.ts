@@ -1,5 +1,5 @@
 import { openResearchNote } from './research-files.helpers.ts'
-/** Shipped Web reading flow: explicit translation, restored occurrence history and learning-note export. */
+/** Shipped Web reading flow: translations survive popup dismissal and retain occurrence history. */
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -39,7 +39,7 @@ it('translates an explicit selection with five original sentences and retains it
   onTestFinished(() => browser.close())
   const page = await newEnglishPage(browser)
   onTestFailed(() => saveFailureShot(page, 'research-translation'))
-  await page.setViewportSize({ width: 1600, height: 1000 })
+  await page.setViewportSize({ width: 1600, height: 600 })
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   const library = page.getByRole('region', { name: 'Research library', exact: true })
   await library.getByRole('button', { name: 'Translation paper', exact: true }).click()
@@ -58,8 +58,60 @@ it('translates an explicit selection with five original sentences and retains it
   await select()
   const agent = scaffold.ctx.agents.get(paperSession.sessionId)!
   expect(agent.session.snapshotEvents().some(event => event.type === 'research/translation-request')).toBe(false)
-  await page.getByRole('button', { name: 'Translate', exact: true }).click()
+  const release = Promise.withResolvers<undefined>()
+  const reached = Promise.withResolvers<AbortSignal>()
+  let paused = false
+  const dispose = scaffold.ctx.on('llm/stream', async function* (options, next) {
+    if (!paused && options.sessionId === paperSession.sessionId) {
+      paused = true
+      const signal = options.signal
+      if (signal === undefined) throw new Error('Paper translation must provide request cancellation')
+      reached.resolve(signal)
+      const abort = (): void => { release.resolve(undefined) }
+      signal.addEventListener('abort', abort, { once: true })
+      try { await release.promise }
+      finally { signal.removeEventListener('abort', abort) }
+    }
+    yield* next()
+  }, { prepend: true })
+  onTestFinished(() => { release.resolve(undefined); dispose() })
   const card = page.getByRole('region', { name: 'Selection translation', exact: true })
+  const background = workbench.getByRole('button', { name: 'Translating “policy”', exact: true })
+  try {
+    await page.getByRole('button', { name: 'Translate', exact: true }).click()
+    const signal = await reached.promise
+    await card.waitFor()
+    const scrollport = workbench.getByRole('region', { name: 'pdf viewer', exact: true }).locator('[data-document-zoom-scrollport]')
+    await expect.poll(() => scrollport.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
+    const scrollBounds = await scrollport.boundingBox()
+    expect(scrollBounds).not.toBeNull()
+    await page.mouse.move(scrollBounds!.x + scrollBounds!.width - 8, scrollBounds!.y + scrollBounds!.height - 24)
+    await page.mouse.wheel(0, 96)
+    await expect.poll(() => scrollport.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+    await card.waitFor({ state: 'hidden' })
+    expect(signal.aborted).toBe(false)
+    await background.waitFor()
+    await background.click()
+    await card.waitFor()
+    await select()
+    await card.waitFor()
+    expect(await page.getByRole('button', { name: 'Translate', exact: true }).isEnabled()).toBe(false)
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'research/translation-request')).toHaveLength(1)
+    await workbench.locator('> header').click({ position: { x: 4, y: 4 } })
+    await card.waitFor({ state: 'hidden' })
+    expect(signal.aborted).toBe(false)
+    await background.waitFor()
+    await mkdir('.artifacts/research-ui', { recursive: true })
+    await page.screenshot({ path: '.artifacts/research-ui/translation-background-pending.png' })
+  } finally {
+    release.resolve(undefined)
+  }
+  const savedMarker = workbench.getByRole('button', { name: 'View translation history: policy', exact: true })
+  await savedMarker.waitFor()
+  expect(agent.session.snapshotEvents().filter(event => event.type === 'research/translation-request')).toHaveLength(1)
+  dispose()
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await select(); await page.getByRole('button', { name: 'Translate', exact: true }).click()
   await card.getByText('机器人动作策略', { exact: true }).waitFor()
   await card.getByText('View context · PDF page 1', { exact: true }).click()
   expect(await card.getByText('First context sentence.', { exact: true }).isVisible()).toBe(true)

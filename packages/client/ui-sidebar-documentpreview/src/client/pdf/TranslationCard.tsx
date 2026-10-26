@@ -1,49 +1,30 @@
-/** Explicit, cancellable vocabulary explanation with original context and paper-owned actions. */
+/** Vocabulary progress and explanations presented independently of request ownership. */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ResearchTranslation, ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import type { PdfSelection, PdfTranslation } from './highlights.ts'
+import type { PdfTranslation } from './highlights.ts'
+import type { TranslationRequestState } from './translation-requests.ts'
 import type {} from './locales.ts'
 import css from './HighlightControls.module.css'
 
-function translationFailure(error: unknown): string | undefined {
-  if (typeof error !== 'object' || error === null || !('code' in error) || error.code !== 'research/translation-failed'
-    || !('details' in error) || typeof error.details !== 'object' || error.details === null || !('reason' in error.details)) return
-  return typeof error.details.reason === 'string' ? error.details.reason : undefined
-}
-
 /**
- * Request a single explicitly chosen passage and discard responses after selection changes or dismissal.
- * @param props - immutable selection, paper callbacks and PDF locale.
+ * Present one reader-owned request without cancelling it when the card closes.
+ * @param props - retained progress, paper callbacks, explicit retry and PDF locale.
  * @returns a selectable result card with retained errors and explicit retries.
  */
-export function TranslationCard({ selection, translation, t }: PropsLocale<'sidebarPdf'> & {
-  readonly selection: PdfSelection
+export function TranslationCard({ state, translation, retry, t }: PropsLocale<'sidebarPdf'> & {
+  readonly state: TranslationRequestState
   readonly translation: PdfTranslation
+  readonly retry: () => void
 }): ReactNode {
-  const [state, setState] = useState<{ kind: 'loading' } | { kind: 'failed'; reason: string | undefined } | { kind: 'ready'; value: ResearchTranslation }>({ kind: 'loading' })
-  const [attempt, setAttempt] = useState(0)
-  const callbacks = useRef(translation)
-  callbacks.current = translation
-  useEffect(() => {
-    const lifetime = new AbortController()
-    setState({ kind: 'loading' })
-    if (selection.start === undefined || selection.end === undefined) { setState({ kind: 'failed', reason: 'selection' }); return }
-    void callbacks.current.translate({ text: selection.text, start: selection.start, end: selection.end, rects: selection.rects },
-      lifetime.signal)
-      .then((value) => { if (!lifetime.signal.aborted) setState({ kind: 'ready', value }) }, (error: unknown) => {
-        if (!lifetime.signal.aborted) setState({ kind: 'failed', reason: translationFailure(error) })
-      })
-    return () => { lifetime.abort() }
-  }, [selection, attempt])
   return <div className={css.translation} role="region" aria-label={t('translationTitle')} aria-busy={state.kind === 'loading'}>
     {state.kind === 'loading' ? <div className={css.translationLoading} role="status" aria-label={t('translationLoading')}><StateDot state="ongoing" size={20} /></div>
       : state.kind === 'failed' ? <div className={css.translationError} role="alert">
         <p>{t(state.reason === 'unavailable' ? 'translationUnavailable' : state.reason === 'selection' ? 'translationSelectionFailed'
           : state.reason === 'no-text' ? 'translationNoText' : state.reason === 'timeout' ? 'translationTimeout'
             : state.reason === 'source-changed' ? 'translationSourceChanged' : state.reason === 'limit' ? 'translationLimit' : 'translationFailed')}</p>
-        <Button size="sm" onClick={() => { setAttempt(value => value + 1) }}>{t('retry')}</Button>
+        <Button size="sm" onClick={retry}>{t('retry')}</Button>
       </div> : <TranslationResult value={state.value} translation={translation} t={t} />}
   </div>
 }
