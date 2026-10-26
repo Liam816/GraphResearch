@@ -16,7 +16,7 @@ import { digest, missing, ResearchFiles, researchCatalogSchema, researchHighligh
 import type { ResearchFilePolicy } from './research-files.ts'
 import { listPaperContents, readPaperContent, savePaperContent } from './research-contents.ts'
 import { orderedTopicPapers } from './research-order.ts'
-import type { ResearchReorderPapersRequest } from './research-types.ts'
+import type { ResearchReorderPapersRequest, ResearchReorderTopicsRequest } from './research-types.ts'
 import type {
   ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
 } from './research-types.ts'
@@ -318,6 +318,34 @@ export class ResearchCatalogHost {
         })
       }
       return { ...catalog, topics: catalog.topics.map(item => item.id === topic.id ? { ...item, title } : item) }
+    })
+  }
+
+  /**
+   * Commit the complete directory order under the same lock as Topic creation and deletion.
+   * @param request - desired Topic permutation and the last observed directory order.
+   * @returns confirmed catalog; stale membership and incomplete permutations write nothing.
+   */
+  reorderTopics(request: ResearchReorderTopicsRequest): Promise<ResearchCatalog> {
+    return this.mutate((catalog) => {
+      const current = catalog.topics.map(topic => topic.id)
+      const same = (ids: readonly ResearchTopicId[]) => ids.length === current.length && ids.every((id, index) => id === current[index])
+      if (same(request.topicIds)) return catalog
+      if (!same(request.expectedTopicIds)) {
+        throw new RemoteError('research/topic-order-conflict', 'The Topic order or directory contents changed; read the current order before retrying', {
+          topicIds: current,
+        })
+      }
+      const topics = new Map(catalog.topics.map(topic => [topic.id, topic]))
+      const ordered = request.topicIds.flatMap((id) => {
+        const topic = topics.get(id)
+        return topic === undefined ? [] : [topic]
+      })
+      if (request.topicIds.length !== topics.size || new Set(request.topicIds).size !== topics.size
+        || ordered.length !== topics.size) {
+        throw new RemoteError('research/invalid', 'Include every Topic exactly once', { field: 'topicIds' })
+      }
+      return { ...catalog, topics: ordered }
     })
   }
 

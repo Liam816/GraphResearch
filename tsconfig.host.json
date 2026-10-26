@@ -23,6 +23,7 @@
     "apps/web/tests/code-card-layout.e2e.ts",
     "apps/web/tests/code-language.snapshot.ts",
     "apps/web/tests/research-agent.snapshot.ts",
+    "apps/web/tests/research-main.snapshot.ts",
     "apps/web/tests/research-translation.snapshot.ts",
     "apps/web/tests/edit-question.snapshot.ts",
     "apps/web/tests/research-ui.snapshot.ts",

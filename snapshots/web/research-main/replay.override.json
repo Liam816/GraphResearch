@@ -1,0 +1,47 @@
+{
+  "patches": [
+    {
+      "at": 7,
+      "entry": {
+        "kind": "chunks",
+        "chunks": [
+          {
+            "type": "block-start",
+            "index": 0,
+            "blockType": "tool-call"
+          },
+          {
+            "type": "tool-call-delta",
+            "index": 0,
+            "id": "main-call-8",
+            "name": "ui_update",
+            "argumentsDelta": "{\"module\":\"research.directory\",\"target\":{},\"change\":{\"topicIds\":[\"{{fromRequest:topicIds[^[]+[[][^a-z]+existing-topic[^a-z0-9]+([a-f0-9-]+)}}\",\"existing-topic\"],\"expectedTopicIds\":[\"existing-topic\",\"{{fromRequest:topicIds[^[]+[[][^a-z]+existing-topic[^a-z0-9]+([a-f0-9-]+)}}\"]}}"
+          },
+          {
+            "type": "block-end",
+            "index": 0,
+            "block": {
+              "type": "tool-call",
+              "id": "main-call-8",
+              "name": "ui_update",
+              "arguments": "{\"module\":\"research.directory\",\"target\":{},\"change\":{\"topicIds\":[\"{{fromRequest:topicIds[^[]+[[][^a-z]+existing-topic[^a-z0-9]+([a-f0-9-]+)}}\",\"existing-topic\"],\"expectedTopicIds\":[\"existing-topic\",\"{{fromRequest:topicIds[^[]+[[][^a-z]+existing-topic[^a-z0-9]+([a-f0-9-]+)}}\"]}}"
+            }
+          },
+          {
+            "type": "usage",
+            "usage": {
+              "inputTokens": 256,
+              "outputTokens": 32
+            }
+          },
+          {
+            "type": "finish",
+            "reason": {
+              "kind": "tool-calls"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

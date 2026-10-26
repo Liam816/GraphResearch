@@ -78,6 +78,7 @@
     "tests/research-highlights.e2e.ts",
     "tests/research-reading.e2e.ts",
     "tests/research-agent.snapshot.ts",
+    "tests/research-main.snapshot.ts",
     "tests/research-translation.snapshot.ts",
     "tests/edit-question.snapshot.ts",
     "tests/research-ui.snapshot.ts",

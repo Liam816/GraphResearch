@@ -172,6 +172,8 @@ The Workspace controller also manages a research library whose Topic and paper i
 
 `ResearchRenameTopicRequest` carries a `topicId`, replacement `title`, and `expectedTitle` for concurrent-edit detection. It changes Topic metadata through the [controller](../../packages/api/workspace-controller/README.md#research-catalog).
 
+`ResearchReorderTopicsRequest` carries complete desired `topicIds` and observed `expectedTopicIds`. The catalog's `topics` array is the persisted directory order; concurrent moves and membership changes require rereading. The [directory module](../../packages/api/workspace-controller/README.md#research-catalog) exposes this update to all Agents through an empty target.
+
 `ResearchDeletePaperRequest` carries the selected `paperId` and the absolute `directory` explicitly confirmed by the user. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) defines deletion checks, recovery, and retained Session history.
 
 `ResearchFileRequest` identifies a `paperId` and paper-relative `path` (empty for its root). `ResearchDirectoryListing` returns that path and direct entries with `name`, `path`, `kind`, and optional `bytes`. `ResearchFileContent` distinguishes complete versioned UTF-8 `text`, bounded `image` previews, and `unsupported` binary or oversized files. `ResearchSaveFileRequest` adds Markdown `text` and its `expectedVersion` SHA-256; file previews and drafts do not change Session history.
@@ -460,6 +462,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns committed catalog broadcast to connected readers.
  */
 @Remote('researchReorderPapers') researchReorderPapers(request: ResearchReorderPapersRequest): Promise<ResearchCatalog>
+
+/**
+ * Replace the complete Topic directory order after checking the last observed catalog order.
+ * @param request - every Topic in the desired and previously observed order.
+ * @returns committed catalog broadcast to all connected readers.
+ */
+@Remote('researchReorderTopics') researchReorderTopics(request: ResearchReorderTopicsRequest): Promise<ResearchCatalog>
 
 /**
  * Remove a Topic and its exclusive papers, preserving shared papers and archived histories.

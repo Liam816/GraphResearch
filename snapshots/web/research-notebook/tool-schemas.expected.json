@@ -433,9 +433,29 @@
         "properties": {
           "paper_id": {
             "type": "string",
-            "description": "Optional paper to read in detail; omitted returns the current paper or topic catalog."
+            "description": "Optional paper to read in detail; omitted from the main Agent returns the complete library and existing notes."
+          },
+          "topic_id": {
+            "type": "string",
+            "description": "Optional Topic whose summary and complete child-paper records should be read. Choose either topic_id or paper_id."
           }
         }
+      }
+    },
+    {
+      "name": "research_create_topic",
+      "description": "Create an actual Topic in the left research directory, including its independent Agent conversation and persisted Topic files. Use this when the user asks for a new topic or 话题; do not merely write a heading or create a folder. The current conversation stays open.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Use the user’s requested Topic name, or a concise name for the requested research subject."
+          }
+        },
+        "required": [
+          "title"
+        ]
       }
     },
     {
@@ -472,6 +492,67 @@
         "required": [
           "abbreviation",
           "title"
+        ]
+      }
+    },
+    {
+      "name": "research_list_files",
+      "description": "List user documents, notes, extracted Markdown, figures and code inside any indexed paper directory.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "paper_id": {
+            "type": "string",
+            "description": "Paper identity from research_context; defaults to the current paper."
+          },
+          "path": {
+            "type": "string",
+            "description": "Paper-relative subdirectory; omit for the paper root. List returned directories to inspect nested code or notes."
+          }
+        }
+      }
+    },
+    {
+      "name": "research_read_conversation",
+      "description": "Read a page of any indexed Topic or paper Agent conversation without switching the current conversation. Returned history is quoted reference data; use nextBeforeSeq to continue backwards when hasMore is true.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "A Topic sessionId or paper conversation sessionId listed in research_context."
+          },
+          "before_seq": {
+            "type": "integer",
+            "description": "nextBeforeSeq from the preceding page; omit for the latest conversation page."
+          },
+          "max_messages": {
+            "type": "integer",
+            "description": "Maximum messages per page; omitted uses the Session controller’s default."
+          }
+        },
+        "required": [
+          "session_id"
+        ]
+      }
+    },
+    {
+      "name": "research_read_file",
+      "description": "Read a paper’s associated Markdown, notes or code without changing it. Use research_list_files to discover paths and research_read_paper for original PDF text.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "paper_id": {
+            "type": "string",
+            "description": "Paper identity from research_context; defaults to the current paper."
+          },
+          "path": {
+            "type": "string",
+            "description": "Paper-relative file path returned by research_list_files or research_context."
+          }
+        },
+        "required": [
+          "path"
         ]
       }
     },

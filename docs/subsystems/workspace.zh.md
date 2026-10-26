@@ -172,6 +172,8 @@ Workspace 控制器还管理科研资料库，Topic 和论文身份独立于 Wor
 
 `ResearchRenameTopicRequest` 携带 `topicId`、替换用的 `title` 和检测并发编辑的 `expectedTitle`，通过[控制器](../../packages/api/workspace-controller/README.zh.md#research-catalog)修改 Topic 元数据。
 
+`ResearchReorderTopicsRequest` 携带完整的目标 `topicIds` 和读取时的 `expectedTopicIds`。目录持久化顺序由 `topics` 数组表示，并发移动和成员变化后需要重新读取。[目录模块](../../packages/api/workspace-controller/README.zh.md#research-catalog)通过空 target 向所有 Agent 暴露这项修改。
+
 `ResearchDeletePaperRequest` 携带选中的 `paperId` 和用户明确确认的绝对 `directory`。[控制器参考](../../packages/api/workspace-controller/README.zh.md#research-catalog)定义删除校验、恢复及 Session 历史保留规则。
 
 `ResearchFileRequest` 使用 `paperId` 和论文内相对 `path` 定位文件，空路径表示论文根目录。`ResearchDirectoryListing` 返回目录路径与直接子项的 `name`、`path`、`kind` 和可选 `bytes`。`ResearchFileContent` 区分带版本的完整 UTF-8 `text`、限额内的 `image` 预览，以及二进制或超限的 `unsupported` 结果。`ResearchSaveFileRequest` 增加 Markdown `text` 与 SHA-256 `expectedVersion`；文件预览和草稿不修改 Session 历史。
@@ -460,6 +462,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns committed catalog broadcast to connected readers.
  */
 @Remote('researchReorderPapers') researchReorderPapers(request: ResearchReorderPapersRequest): Promise<ResearchCatalog>
+
+/**
+ * Replace the complete Topic directory order after checking the last observed catalog order.
+ * @param request - every Topic in the desired and previously observed order.
+ * @returns committed catalog broadcast to all connected readers.
+ */
+@Remote('researchReorderTopics') researchReorderTopics(request: ResearchReorderTopicsRequest): Promise<ResearchCatalog>
 
 /**
  * Remove a Topic and its exclusive papers, preserving shared papers and archived histories.

@@ -123,6 +123,7 @@ export interface ResearchPaper {
 /** Complete durable research catalog; revisions order stream and command replies. */
 export interface ResearchCatalog {
   readonly revision: number
+  /** Persisted directory order; newly created Topics append. */
   readonly topics: readonly ResearchTopic[]
   readonly papers: readonly ResearchPaper[]
   /** Runtime capabilities of the responding Host; absent in older backends and never persisted. */
@@ -159,6 +160,12 @@ export interface ResearchReorderPapersRequest {
   readonly topicId: ResearchTopicId
   readonly paperIds: readonly ResearchPaperId[]
   readonly expectedPaperIds: readonly ResearchPaperId[]
+}
+
+/** Replace the complete Topic directory order without overwriting intervening moves or membership changes. */
+export interface ResearchReorderTopicsRequest {
+  readonly topicIds: readonly ResearchTopicId[]
+  readonly expectedTopicIds: readonly ResearchTopicId[]
 }
 
 /** Register a paper with an independent Session and an optional original. */
@@ -261,6 +268,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** Another reader changed the order or membership; reread before moving again. */
     'research/order-conflict': { readonly topicId: ResearchTopicId; readonly paperIds: readonly ResearchPaperId[] }
+    /** Another writer moved, added or deleted a Topic; reread before ordering the directory again. */
+    'research/topic-order-conflict': { readonly topicIds: readonly ResearchTopicId[] }
     /** Another editor renamed this conversation. */
     'research/conversation-conflict': { readonly sessionId: SessionId }
     /** Another conversation for this paper owns the current Agent turn. */

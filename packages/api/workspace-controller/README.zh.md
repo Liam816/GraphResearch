@@ -63,9 +63,11 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 `researchReorderPapers` 为每个 Topic 保存完整的 `paperOrder`。`expectedPaperIds` 必须匹配当前解析后的顺序；不完整排列、重复 ID 和其他 Topic 的论文会被拒绝。已应用的目标顺序可幂等重试。旧 Topic 保持创建顺序，新成员追加，已移除成员忽略。共享论文在不同 Topic 中独立排序。资料库锁、可恢复日志与现有流将同一确认状态发布给拖拽控件及 Agent；文件、成员关系与 Session 保持不变。写入结果未确认时，先刷新再重试。
 
-`workspaceController.uiModules` 注册可由 Agent 管理的界面模块。提供方声明稳定名称、说明、target/change JSON Schema 及匹配的校验器，并实现异步 read/update。通过 `ctx.effect(() => ctx.workspaceController.uiModules.register(module))` 贡献；重复名称在注册时失败，卸载同时移除发现与执行入口。提供方负责作用域授权、冲突检查、持久化及提交后的通知。读取返回权威 JSON，修改返回确认状态。后续画布模块复用同一注册和工具协议，不暴露 DOM 选择器或任意脚本。目录模块委托给 `researchReorderPapers`。
+`researchReorderTopics` 保存完整的 `topics` 数组顺序，目录直接按此数组渲染。`topicIds` 必须包含每个现有 Topic 且仅出现一次，`expectedTopicIds` 必须与读取时的顺序一致。并发移动或成员变化会被拒绝，已应用的顺序可幂等重试，新 Topic 追加到末尾。已有论文阅读顺序、内容和会话保持不变。
 
-所有 Agent，包括普通、Topic、论文和委派会话，均获得 `ui_capabilities`、`ui_read` 与 `ui_update`。发现返回已注册的参数格式；以空 target 读取 `research.directory` 可列出 Topic 标识与阅读顺序，指定 `topicId` 可缩小范围。修改必须指定 `topicId`、完整 `paperIds` 及读取时的 `expectedPaperIds`。未注册模块和不合法参数在执行提供方之前失败；顺序冲突需重新读取并合并。调用和结果沿用 Session 的持久化工具事件，即使 Agent 面板关闭，变更也会同步到已连接客户端。
+`workspaceController.uiModules` 注册可由 Agent 管理的界面模块。提供方声明稳定名称、说明、target/change JSON Schema 及匹配的校验器，并实现异步 read/update。通过 `ctx.effect(() => ctx.workspaceController.uiModules.register(module))` 贡献；重复名称在注册时失败，卸载同时移除发现与执行入口。提供方负责作用域授权、冲突检查、持久化及提交后的通知。读取返回权威 JSON，修改返回确认状态。后续画布模块复用同一注册和工具协议，不暴露 DOM 选择器或任意脚本。目录模块委托给 `researchReorderPapers` 与 `researchReorderTopics`。
+
+所有 Agent，包括普通、Topic、论文和委派会话，均获得 `ui_capabilities`、`ui_read` 与 `ui_update`。发现返回已注册的参数格式。以空 target 读取 `research.directory` 返回 `topicIds` 和 Topic 阅读顺序；以相同 target 调用 `ui_update` 时，传入完整 `topicIds` 和读取时的 `expectedTopicIds`。指定 `topicId` 时，则读取或修改完整 `paperIds`，并提交读取时的 `expectedPaperIds`。未注册模块和不合法参数在执行提供方之前失败；顺序冲突需重新读取并合并。调用和结果沿用 Session 的持久化工具事件，即使 Agent 面板关闭，变更也会同步到已连接客户端。
 
 `researchRenameTopic` 接收 Topic 标识、新名称及编辑框的 `expectedTitle`。它去除首尾空白并校验名称，拒绝不存在的 Topic；其他写入者已改名时返回 `research/topic-conflict`。重复已成功应用的改名不会再次增加修订号。现有资料库事务更新 `agent-lib/library.json` 和私有 Topic 元数据；Topic 标识、笔记、Session、目录和论文关联保持稳定。写入失败时可能保留可恢复日志，重试前应先刷新资料库。
 
@@ -99,15 +101,17 @@ Documents 查询占用注册表变更队列，因此其他 Workspace 变更（�
 
 #### 模型看到的内容
 
-界面管理为每个 Agent 提供发现、读取和修改三个工具 schema；模块说明和参数格式仅在调用发现工具时进入历史。科研实体的 Agent 获得作用域内的 `research_context`、`research_import_paper`、`research_attach_pdf`、`research_read_paper`、`research_write_note`、`research_update_progress` 和 `research_write_topic_note` 工具。必要的运行上下文包含资料库、论文目录、PDF 原文、Markdown 转换状态、笔记版本和续读位置。这些信息通过已有提示词上下文准入记录；工具调用和结果使用标准 Session 工具事件。笔记正文通过 `research_context` 显式读取，同时返回已保存高亮的文字、颜色和页面相对矩形。高亮操作本身不启动模型回合。修改学习笔记要求用户明确提出。
+所有 Agent 都获得科研工具及三个界面发现、读取和修改工具。普通主 Agent 的必要上下文索引每个 Topic 和论文、当前 Topic 顺序、文档路径、笔记版本及会话标识；Topic 和论文 Agent 保留各自实体的默认目标。`research_context` 可读取全目录已有笔记，或指定 `topic_id`／`paper_id`。`research_list_files` 和 `research_read_file` 读取关联文档与代码，`research_read_paper` 读取 PDF 原文。`research_read_conversation` 仅接受目录中 Topic 或论文的会话 ID，通过现有 Session Controller 向前分页，不启动其他 Agent。文档和其他会话均作为参考数据，不作为指令。
+
+`research_create_topic` 将用户提出的 topic 或话题建立为持久化 Topic，包含独立会话与受管理目录。创建通过现有目录流发布，不跳离当前聊天；Agent 仅在工具成功后确认创建。主 Agent 调研时选择或创建 Topic，再向 `research_import_paper` 传入明确的 `topic_id`；论文导入、PDF 关联、笔记写入及续读工具继续可用。Agent 核实来源，区分只读摘要与阅读全文的结论，未经明确要求不修改学习笔记，并报告搜索或下载失败。现有运行上下文准入记录目录概览，标准 Session 工具事件保存每次读取和修改。
 
 #### Token 影响
 
-三个界面工具 schema 由所有 Agent 共享；科研工具仅在科研 Agent 请求中额外增加 schema。必要上下文包含路径、身份标识、版本和续读位置；读取笔记或 PDF 时，通过工具结果加入所请求的正文。PDF 页数和字符数限制约束每次提取的内容量。
+所有 Agent 请求包含科研与界面工具 schema。主 Agent 上下文包含完整资料库索引，实体上下文包含路径、身份标识、版本、续读位置及子论文结果。完整笔记、文件、PDF 页面和其他会话通过显式且有界的工具读取加入模型上下文，不自动重复注入全部文档。
 
 #### KV Cache 影响
 
-普通 Workspace 变更不会改变请求。科研笔记版本、目录变化和续读位置在请求准入时替换已记录的运行上下文；科研专用工具 schema 仅属于科研实体的 Agent 作用域。注册或卸载模块不会改变界面工具的 schema；下一次发现返回当前注册内容。
+科研笔记版本、目录变化、Topic 顺序和续读位置在请求准入时替换已记录的运行上下文。各 Agent 作用域共享稳定的工具 schema，界面模块注册变化在下一次发现时体现。
 
 ### 论文划词翻译
 

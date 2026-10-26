@@ -23,7 +23,7 @@ import * as ResearchAgent from './research-agent.ts'
 import * as UiAgent from './ui-agent.ts'
 import { UiModuleRegistry } from './ui-modules.ts'
 import { researchDirectoryModule } from './research-ui.ts'
-import type { ResearchReorderPapersRequest } from './research-types.ts'
+import type { ResearchReorderPapersRequest, ResearchReorderTopicsRequest } from './research-types.ts'
 import { formatSessionReferenceMention } from '@deepseek-ai/dsh-session-reference'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchSaveNoteRequest, ResearchPaperId,
@@ -166,6 +166,7 @@ export class WorkspaceController extends TypertRemoteService {
   private readonly research: ResearchCatalogHost
   private readonly translations: PaperTranslations
   private readonly researchAgents = new WeakSet<Agent>()
+  private readonly researchEntityAgents = new WeakSet<Agent>()
   /** Explicit interface operations shared by every Agent; contributions register through ctx.effect. */
   readonly uiModules: UiModuleRegistry = new UiModuleRegistry()
   private readonly uiAgents = new WeakSet<Agent>()
@@ -206,16 +207,21 @@ export class WorkspaceController extends TypertRemoteService {
     }, { read: () => this.research.read(), saveNote: request => this.research.saveNote(request) })
     ctx.effect(() => this.uiModules.register(researchDirectoryModule({
       list: () => this.researchList(), reorder: request => this.researchReorderPapers(request),
+      reorderTopics: request => this.researchReorderTopics(request),
     })))
     ctx.on('agent/created', async ({ agent }) => {
       await this.bindUiAgent(agent)
       const catalog = this.research.current()
-      if (catalog.topics.some(item => item.sessionId === agent.id) || paperForSession(catalog, agent.id) !== undefined) {
-        await this.bindResearchAgent(agent)
-      }
+      await this.bindResearchAgent(agent,
+        catalog.topics.some(item => item.sessionId === agent.id) || paperForSession(catalog, agent.id) !== undefined)
     })
     ctx.inject(['agents'], async () => {
-      for (const agent of ctx.agents.list()) await this.bindUiAgent(agent)
+      for (const agent of ctx.agents.list()) {
+        await this.bindUiAgent(agent)
+        const catalog = this.research.current()
+        await this.bindResearchAgent(agent,
+          catalog.topics.some(item => item.sessionId === agent.id) || paperForSession(catalog, agent.id) !== undefined)
+      }
     })
     // This package is the Loader entry for both Remote owners it hosts: the
     // directory-picking seam is abstract and never an entry itself. The child
@@ -381,6 +387,14 @@ export class WorkspaceController extends TypertRemoteService {
    */
   @Remote('researchReorderPapers')
   researchReorderPapers(request: ResearchReorderPapersRequest): Promise<ResearchCatalog> { return this.research.reorderPapers(request) }
+
+  /**
+   * Replace the complete Topic directory order after checking the last observed catalog order.
+   * @param request - every Topic in the desired and previously observed order.
+   * @returns committed catalog broadcast to all connected readers.
+   */
+  @Remote('researchReorderTopics')
+  researchReorderTopics(request: ResearchReorderTopicsRequest): Promise<ResearchCatalog> { return this.research.reorderTopics(request) }
 
   /**
    * Remove a Topic and its exclusive papers, preserving shared papers and archived histories.
@@ -606,7 +620,7 @@ export class WorkspaceController extends TypertRemoteService {
       ...catalog.papers.flatMap(paper => paperConversations(paper).map(item => item.sessionId))]
     for (const id of sessions) {
       const agent = agents.get(id)
-      if (agent !== undefined) await this.bindResearchAgent(agent)
+      if (agent !== undefined) await this.bindResearchAgent(agent, true)
     }
   }
 
@@ -619,11 +633,15 @@ export class WorkspaceController extends TypertRemoteService {
     } catch (error: unknown) { this.uiAgents.delete(agent); throw error }
   }
 
-  private async bindResearchAgent(agent: Agent): Promise<void> {
+  private async bindResearchAgent(agent: Agent, entity = false): Promise<void> {
+    if (entity && !this.researchEntityAgents.has(agent)) {
+      this.researchEntityAgents.add(agent)
+      try { await this.research.captureSession(agent.session) }
+      catch (error: unknown) { this.researchEntityAgents.delete(agent); throw error }
+    }
     if (this.researchAgents.has(agent)) return
     this.researchAgents.add(agent)
     try {
-      await this.research.captureSession(agent.session)
       const fiber = await agent.ctx.plugin(ResearchAgent)
       this.ctx.effect(() => () => fiber.dispose(), 'workspace-controller: research Agent tools')
     } catch (error: unknown) { this.researchAgents.delete(agent); throw error }

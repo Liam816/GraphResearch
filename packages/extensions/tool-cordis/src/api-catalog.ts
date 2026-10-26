@@ -3787,6 +3787,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'committed catalog broadcast to connected readers.',
       },
       {
+        signature: '@Remote(\'researchReorderTopics\') researchReorderTopics(request: ResearchReorderTopicsRequest): Promise<ResearchCatalog>',
+        description: 'Replace the complete Topic directory order after checking the last observed catalog order.',
+        parameters: [{ name: 'request', description: 'every Topic in the desired and previously observed order.' }],
+        returns: 'committed catalog broadcast to all connected readers.',
+      },
+      {
         signature: '@Remote(\'researchDeleteTopic\') researchDeleteTopic(request: ResearchDeleteTopicRequest): Promise<ResearchCatalog>',
         description: 'Remove a Topic and its exclusive papers, preserving shared papers and archived histories.',
         parameters: [{ name: 'request', description: 'Topic and every exclusive paper directory confirmed by the user.' }],
@@ -6783,6 +6789,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ResearchReorderPapersRequest',
     declaration: 'export interface ResearchReorderPapersRequest {\n    readonly topicId: ResearchTopicId;\n    readonly paperIds: readonly ResearchPaperId[];\n    readonly expectedPaperIds: readonly ResearchPaperId[];\n}',
+  },
+  {
+    name: 'ResearchReorderTopicsRequest',
+    declaration: 'export interface ResearchReorderTopicsRequest {\n    readonly topicIds: readonly ResearchTopicId[];\n    readonly expectedTopicIds: readonly ResearchTopicId[];\n}',
   },
   {
     name: 'ResearchSaveFileRequest',

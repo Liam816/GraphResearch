@@ -1,0 +1,12 @@
+version: 1
+scenario: research-main
+profile: web
+composition: web-research
+recording: authored
+header:
+  class: web-research-main
+  pin: true
+replay:
+  override: true
+workspace:
+  final: true

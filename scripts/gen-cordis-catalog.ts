@@ -804,6 +804,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   ResearchUpdateConversationRequest: 'workspace.md',
   ResearchRenameTopicRequest: 'workspace.md',
   ResearchReorderPapersRequest: 'workspace.md',
+  ResearchReorderTopicsRequest: 'workspace.md',
   ResearchCreatePaperRequest: 'workspace.md',
   ResearchDeletePaperRequest: 'workspace.md',
   ResearchDeleteTopicRequest: 'workspace.md',
