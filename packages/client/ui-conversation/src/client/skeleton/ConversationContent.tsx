@@ -87,12 +87,13 @@ export function ConversationContent(props: ConversationContentProps) {
 
   // A loading registry can still use the Session's cwd; a settled registry
   // without that Workspace requires another directory selection.
-  const workspaceAvailable = pendingWorkspace !== undefined || sessionWorkspace !== undefined
+  const workspaceManaged = props.workspaceMode === 'managed'
+  const workspaceAvailable = workspaceManaged || pendingWorkspace !== undefined || sessionWorkspace !== undefined
     || (workspaces.phase !== 'ready' && cwd !== undefined && cwd !== '')
 
   const heroWorkspaceRow = (
     <div ref={pickerAnchor} className={css.heroWorkspaceRow}>
-      {renderSlot('conversation.hero.workspace', {
+      {!workspaceManaged && renderSlot('conversation.hero.workspace', {
         open: pickerOpen,
         anchorRef: pickerAnchor,
         selectedId: pendingWorkspaceId ?? sessionWorkspace?.workspaceId,
@@ -121,9 +122,8 @@ export function ConversationContent(props: ConversationContentProps) {
     ...(inert
       ? {
         disabled: true,
-        placeholder: t('placeholder.workspace'),
-        workspacePickerOpen: pickerOpen,
-        onRequestWorkspace: () => { setPickerOpen(true) },
+        placeholder: t(workspaceManaged ? 'placeholder.preparing' : 'placeholder.workspace'),
+        ...workspaceManaged ? {} : { workspacePickerOpen: pickerOpen, onRequestWorkspace: () => { setPickerOpen(true) } },
       }
       : blocked
         // `blocked`, not `disabled`: the bar refuses input either way, but a

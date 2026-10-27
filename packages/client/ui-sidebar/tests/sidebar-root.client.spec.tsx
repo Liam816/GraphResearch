@@ -41,6 +41,7 @@ function mountShell({ collapsed = false, width = 300, shortcuts = [] }: {
   shortcuts?: readonly ShortcutCatalogEntry[]
 } = {}) {
   const startSession = vi.fn()
+  const openGlobalAgent = vi.fn()
   const toggleSidebar = vi.fn()
   let regionOwner: SidebarSectionOwnerProps | undefined
   let settingsOwner: SidebarSettingsOwnerProps | undefined
@@ -54,7 +55,7 @@ function mountShell({ collapsed = false, width = 300, shortcuts = [] }: {
       useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
       usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])} useShortcuts={selector => selector(shortcuts)}
       useResource={useResource} useWorkspaces={neverHook}
-      startSession={startSession} toggleSidebar={toggleSidebar} t={t}
+      startSession={startSession} openGlobalAgent={openGlobalAgent} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
         key: string,
         owner: SidebarFooterActionOwnerProps | SidebarSectionOwnerProps | SidebarSettingsOwnerProps,
@@ -78,6 +79,7 @@ function mountShell({ collapsed = false, width = 300, shortcuts = [] }: {
   const view = render(root())
   return {
     startSession,
+    openGlobalAgent,
     toggleSidebar,
     regionOwner: () => {
       if (regionOwner === undefined) throw new Error('region owner not rendered')
@@ -112,7 +114,7 @@ describe('SidebarRoot shell', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
     expect(Array.from(expanded.querySelectorAll('kbd'), key => key.textContent)).toEqual(['Ctrl', 'N'])
     cleanup()
-    render(<HeaderLeadingControls toggleSidebar={vi.fn()} startSession={vi.fn()} selectPanel={vi.fn()} t={t}
+    render(<HeaderLeadingControls toggleSidebar={vi.fn()} startSession={vi.fn()} openGlobalAgent={vi.fn()} selectPanel={vi.fn()} t={t}
       usePanelInfo={neverHook} useSessions={neverHook} useSessionStatus={neverHook}
       useSessionRetainInfo={neverHook} useResource={useResource} useWorkspaces={neverHook}
       usePanels={select => select([])} useShortcuts={select => select([shortcut])} />)
@@ -121,15 +123,17 @@ describe('SidebarRoot shell', () => {
     fireEvent.focus(button)
     expect(Array.from(screen.getByRole('tooltip').querySelectorAll('kbd'), key => key.textContent)).toEqual(['Ctrl', 'N'])
   })
-  it('routes New Session (capsule + wordmark) and the column toggle', () => {
+  it('returns through the brand without creating another conversation and keeps the column toggle separate', () => {
     const b = mountShell()
     expect(screen.getByTestId('custom-brand-mark')).toBeTruthy()
     expect(screen.getByTestId('custom-brand-name')).toBeTruthy()
-    // Expanded, both the wordmark and the capsule start a session.
     const starters = screen.getAllByRole('button', { name: 'New session' })
-    expect(starters).toHaveLength(2)
+    expect(starters).toHaveLength(1)
     for (const button of starters) fireEvent.click(button)
-    expect(b.startSession).toHaveBeenCalledTimes(2)
+    expect(b.startSession).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Open global Agent' }))
+    expect(b.openGlobalAgent).toHaveBeenCalledOnce()
+    expect(b.startSession).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
     expect(b.toggleSidebar).toHaveBeenCalledOnce()
   })
@@ -143,7 +147,7 @@ describe('SidebarRoot shell', () => {
       useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
       usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])} useShortcuts={selector => selector([])}
       useResource={useResource} useWorkspaces={neverHook}
-      startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
+      startSession={vi.fn()} openGlobalAgent={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
     />)
@@ -186,6 +190,16 @@ describe('SidebarRoot shell', () => {
     expect(screen.getByRole('button', { name: 'Open sidebar' })).toBeTruthy()
   })
 
+  it('hides global navigation while keeping expansion available in the collapsed rail', () => {
+    const b = mountShell({ collapsed: true, width: 56 })
+    expect(screen.queryByRole('button', { name: 'Open global Agent' })).toBeNull()
+    expect(b.openGlobalAgent).not.toHaveBeenCalled()
+    expect(b.startSession).not.toHaveBeenCalled()
+    expect(b.toggleSidebar).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Open sidebar' }))
+    expect(b.toggleSidebar).toHaveBeenCalledOnce()
+  })
+
   it('shows only the badge bubble while the rail badge is hovered inside the toggle', () => {
     vi.useFakeTimers()
     render(<SidebarRoot
@@ -193,7 +207,7 @@ describe('SidebarRoot shell', () => {
       useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
       usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])} useShortcuts={selector => selector([])}
       useResource={useResource} useWorkspaces={neverHook}
-      startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
+      startSession={vi.fn()} openGlobalAgent={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((key: string) => key === 'sidebar.toggle.badge'
         ? <Tooltip label="Update — V1.2.3"><span data-testid="badge" /></Tooltip>
         : null) as SidebarRootComponentProps['renderSlot']}
@@ -219,9 +233,9 @@ it('keeps the macOS sidebar toggle in its top strip', () => {
   const shell = mountShell()
   fireEvent.click(screen.getByRole('button', { name: en['toggle.collapse'] }))
   expect(shell.toggleSidebar).toHaveBeenCalledOnce()
-  // The brand stays part of the logo row's window-drag surface: no button
-  // role (the global no-drag rule would subtract it); only the dedicated
-  // New Session capsule starts a session.
+  fireEvent.click(screen.getByRole('button', { name: 'Open global Agent' }))
+  expect(shell.openGlobalAgent).toHaveBeenCalledOnce()
+  expect(shell.startSession).not.toHaveBeenCalled()
   expect(screen.getAllByRole('button', { name: 'New session' })).toHaveLength(1)
   expect(screen.getByTestId('custom-brand-mark')).toBeTruthy()
 })
@@ -229,13 +243,16 @@ it('keeps the macOS sidebar toggle in its top strip', () => {
 it('wires the shell.leading controls to the shared sidebar actions', () => {
   const toggleSidebar = vi.fn()
   const startSession = vi.fn()
+  const openGlobalAgent = vi.fn()
   // This occupant only consumes its two actions and locale, not Session hooks.
-  const props = { toggleSidebar, startSession, t, useShortcuts: select => select([{ id: 'sidebar.left.toggle' as ShortcutCommandId, label: 'Toggle sidebar', aliases: [], binding: null, modified: false, conflicts: [], issue: null, keys: ['⌘', 'B'], aria: 'Meta+B' }]) } as HeaderLeadingControlsProps
+  const props = { toggleSidebar, startSession, openGlobalAgent, t, useShortcuts: select => select([{ id: 'sidebar.left.toggle' as ShortcutCommandId, label: 'Toggle sidebar', aliases: [], binding: null, modified: false, conflicts: [], issue: null, keys: ['⌘', 'B'], aria: 'Meta+B' }]) } as HeaderLeadingControlsProps
   render(<HeaderLeadingControls {...props} />)
   fireEvent.click(screen.getByRole('button', { name: en['toggle.open'] }))
   fireEvent.click(screen.getByRole('button', { name: en['session.new.label'] }))
   expect(toggleSidebar).toHaveBeenCalledOnce()
   expect(startSession).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('button', { name: en['research.open'] })).toBeNull()
+  expect(openGlobalAgent).not.toHaveBeenCalled()
 })
 
 describe('Windows caption tooltips', () => {

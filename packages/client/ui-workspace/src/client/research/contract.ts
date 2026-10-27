@@ -2,7 +2,7 @@
 import type { HostObservable, PropsHooks, PropsLocale, PropsRenderFactories, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ResearchSnapshot, ResearchCreateTopicRequest, ResearchCreatePaperRequest, ResearchDeletePaperRequest, ResearchSaveNoteRequest, ResearchPaperId, ResearchDirectoryRequest, ResearchHighlightRequest, ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { ResearchPaper, ResearchUpdateConversationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ResearchPaper, ResearchUpdateConversationRequest, ResearchUpdateLibraryConversationRequest, ResearchDeleteLibraryConversationRequest } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ResearchTranslation, ResearchTranslationRequest, ResearchTranslationHistoryEntry } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { ResearchViewStore } from './store.ts'
@@ -18,6 +18,11 @@ export interface ResearchInjected {
   createConversation: (paperId: ResearchPaperId) => Promise<void>
   updateConversation: (request: ResearchUpdateConversationRequest) => Promise<void>
   openConversation: (paperId: ResearchPaperId, sessionId: SessionId) => void
+  createLibraryConversation: () => Promise<void>
+  updateLibraryConversation: (request: ResearchUpdateLibraryConversationRequest) => Promise<void>
+  deleteLibraryConversation: (request: ResearchDeleteLibraryConversationRequest) => Promise<void>
+  openLibraryConversation: (sessionId: SessionId) => void
+  openLibrary: () => Promise<void>
   insertText: (sessionId: SessionId, text: string) => boolean
   insertReferences: (sessionId: SessionId, paperIds: readonly ResearchPaperId[]) => Promise<boolean>
   refresh: () => Promise<void>

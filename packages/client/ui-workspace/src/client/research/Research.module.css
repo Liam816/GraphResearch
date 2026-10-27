@@ -190,3 +190,21 @@ html:not([data-input-modality='pointer']) .paperRow:has(:focus-visible:not([data
 .conversationNotice { flex: none; margin: 0; padding: 8px 12px; font-size: 12px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
 @container (max-width: 1000px) { .newConversation > span:last-child:not(:first-child) { display: none; } }
 @media (pointer: coarse) { .conversationPicker, .conversationMore, .conversationOption, .conversationArchiveFilter { min-height: 44px; } .conversationMore { width: 44px; } }
+
+.libraryConversationControls { min-width: 0; }
+.libraryConversationControls .conversationToolbar { min-width: 0; padding: 0; gap: 10px; border-bottom: 0; }
+.libraryConversationControls .conversationPicker { flex: 0 1 auto; max-width: min(480px, 55%); font-size: 14px; padding-inline: 6px; }
+.libraryConversationControls .conversationPicker > svg { flex: none; }
+.conversationPopup[data-library-conversations] { box-sizing: border-box; width: min(420px, calc(100vw - 24px)); }
+.conversationPopup[data-library-conversations] .conversationRow .conversationMore { opacity: 0; pointer-events: none; }
+.conversationPopup[data-library-conversations] .conversationRow:hover .conversationMore,
+.conversationPopup[data-library-conversations] .conversationMore[aria-expanded=true],
+html:not([data-input-modality='pointer']) .conversationPopup[data-library-conversations] .conversationRow:has(:focus-visible:not([data-dsh-automatic-focus])) .conversationMore { opacity: 1; pointer-events: auto; }
+.conversationPicker:focus-visible, .conversationOption:focus-visible, .conversationMore:focus-visible, .conversationArchiveFilter:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; }
+@container (max-width: 480px) {
+  .libraryConversationControls .conversationToolbar { gap: 4px; }
+  .libraryConversationControls .conversationPicker { flex: 1; max-width: none; padding-inline: 2px; font-size: 13px; }
+}
+@media (hover: none), (pointer: coarse) {
+  .conversationPopup[data-library-conversations] .conversationRow .conversationMore { opacity: 1; pointer-events: auto; }
+}

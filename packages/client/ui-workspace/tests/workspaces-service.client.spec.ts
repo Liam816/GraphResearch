@@ -271,6 +271,9 @@ class FakeDirectoryPicker {
 }
 
 interface BenchOptions {
+  readonly startGlobalSession?: () => boolean
+  readonly restoreGlobalSession?: (sessionId: SessionId | undefined, signal: AbortSignal) => Promise<boolean>
+  readonly openResearchLibrary?: () => Promise<void>
   readonly conversation?: boolean
   readonly configureWorkspaces?: (workspaces: FakeWorkspaces) => void
   readonly workspaces?: WorkspaceSnapshot
@@ -309,6 +312,9 @@ function bench(options: BenchOptions = {}) {
     sessions,
     view.actions,
     notify,
+    options.startGlobalSession,
+    options.restoreGlobalSession,
+    options.openResearchLibrary,
   )
   return { ctx, directoryPicker, sessions, uiWorkspace, workspaces, layout, selectPanel, view, notify, requestDraftInitialization }
 }
@@ -320,6 +326,68 @@ function lastOpening(open: MockInstance<UiWorkspaceService['openWorkspace']>): P
 }
 
 describe('UiWorkspaceService', () => {
+  it('returns to existing research through its owner without allocating an ordinary Session', async () => {
+    const openResearchLibrary = vi.fn(async () => {})
+    const b = bench({ openResearchLibrary })
+    await b.uiWorkspace.openResearchLibrary()
+    expect(openResearchLibrary).toHaveBeenCalledOnce()
+    expect(b.sessions.create).not.toHaveBeenCalled()
+    const failure = new Error('Research unavailable')
+    openResearchLibrary.mockRejectedValueOnce(failure)
+    await expect(b.uiWorkspace.openResearchLibrary()).rejects.toBe(failure)
+  })
+
+  it('keeps an archive-backed deletion confirmation mounted until its last hold is released', () => {
+    const b = bench()
+    b.uiWorkspace.openSession(sid('current'))
+    const first = b.uiWorkspace.holdArchivedSelection(sid('current'))
+    const second = b.uiWorkspace.holdArchivedSelection(sid('current'))
+    b.selectPanel.mockClear()
+    b.workspaces.list.set(workspaceState([], [sid('current')]))
+    expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
+    first(); first()
+    expect(b.sessions.retained[0]!.release).not.toHaveBeenCalled()
+    second()
+    expect(b.sessions.retained[0]!.release).toHaveBeenCalledOnce()
+    expect(b.selectPanel).not.toHaveBeenCalled()
+  })
+
+  it('lets research initialize an empty startup without asking for or creating an ordinary Workspace', async () => {
+    const restoreGlobalSession = vi.fn(async () => true)
+    const b = bench({ restoreGlobalSession, workspaces: workspaceState(), sessions: sessionState() })
+    await setImmediate()
+    expect(restoreGlobalSession).toHaveBeenCalledExactlyOnceWith(undefined, expect.any(AbortSignal))
+    expect(b.workspaces.initializeDefault).not.toHaveBeenCalled()
+    expect(b.sessions.create).not.toHaveBeenCalled()
+    expect(b.sessions.retain).not.toHaveBeenCalled()
+  })
+
+  it('passes a persisted selection to research before applying ordinary Workspace restoration', async () => {
+    persistSelection({ sessionId: sid('cold-main') })
+    const restoreGlobalSession = vi.fn(async () => true)
+    const b = bench({ restoreGlobalSession, workspaces: workspaceState(), sessions: sessionState([summary('cold-main')]) })
+    await setImmediate()
+    expect(restoreGlobalSession).toHaveBeenCalledExactlyOnceWith(sid('cold-main'), expect.any(AbortSignal))
+    expect(b.sessions.retain).not.toHaveBeenCalled()
+    expect(b.workspaces.initializeDefault).not.toHaveBeenCalled()
+  })
+
+  it.each(['session', 'panel', 'disposal'] as const)('does not resume ordinary startup after pending research restoration loses %s ownership', async (kind) => {
+    const pending = Promise.withResolvers<boolean>()
+    const restoreGlobalSession = vi.fn((_id: SessionId | undefined, _signal: AbortSignal) => pending.promise)
+    const b = bench({ restoreGlobalSession, workspaces: workspaceState(), sessions: sessionState() })
+    expect(restoreGlobalSession).toHaveBeenCalledOnce()
+    if (kind === 'session') b.uiWorkspace.openSession(sid('manual'))
+    else if (kind === 'panel') b.layout.selectPanel('other-panel' as MainPanelId)
+    else await b.ctx.fiber.dispose()
+    expect(restoreGlobalSession.mock.calls[0]![1].aborted).toBe(true)
+    pending.resolve(false)
+    await setImmediate()
+    expect(b.workspaces.initializeDefault).not.toHaveBeenCalled()
+    expect(b.sessions.create).not.toHaveBeenCalled()
+    expect(b.sessions.retain.mock.calls.map(args => args[0])).toEqual(kind === 'session' ? [sid('manual')] : [])
+  })
+
   it('checkpoints the current Session before acquiring the next history window or clearing an archived selection', () => {
     const b = bench()
     b.uiWorkspace.openSession(sid('first'))
@@ -794,6 +862,25 @@ describe('UiWorkspaceService', () => {
     await vi.waitFor(() => {
       expect(missingMember.sessions.create).toHaveBeenCalledWith({ workspaceId: wid('newer') })
     })
+  })
+
+  it('routes unscoped blank creation to the composed global conversation owner', () => {
+    const startGlobalSession = vi.fn(() => true)
+    const b = bench({ startGlobalSession })
+    b.uiWorkspace.startSession()
+    expect(startGlobalSession).toHaveBeenCalledOnce()
+    expect(b.sessions.create).not.toHaveBeenCalled()
+    expect(b.selectPanel).not.toHaveBeenCalled()
+  })
+
+  it('keeps explicit Workspace creation and prepared drafts with their original owner', async () => {
+    const startGlobalSession = vi.fn(() => true)
+    const b = bench({ startGlobalSession, workspaces: workspaceState([workspace('a')]), sessions: sessionState() })
+    b.uiWorkspace.startSession(wid('a'))
+    await vi.waitFor(() => { expect(b.sessions.create).toHaveBeenCalledWith({ workspaceId: wid('a') }) })
+    b.uiWorkspace.startSession(wid('a'), { prompt: 'Prepared content' })
+    await vi.waitFor(() => { expect(b.requestDraftInitialization).toHaveBeenCalled() })
+    expect(startGlobalSession).not.toHaveBeenCalled()
   })
 
   it('opens nothing when a New Session request has no Workspace to open', () => {

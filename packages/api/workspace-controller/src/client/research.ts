@@ -4,7 +4,10 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {
   ResearchFileRequest, ResearchDirectoryListing, ResearchFileContent, ResearchSaveFileRequest, ResearchRenameTopicRequest,
 } from '../research-types.ts'
-import type { ResearchCreateConversationRequest, ResearchUpdateConversationRequest } from '../research-types.ts'
+import type {
+  ResearchCreateConversationRequest, ResearchUpdateConversationRequest,
+  ResearchCreateLibraryConversationRequest, ResearchUpdateLibraryConversationRequest, ResearchDeleteLibraryConversationRequest,
+} from '../research-types.ts'
 import type { ResearchReorderPapersRequest } from '../research-types.ts'
 import type { WorkspaceRemote } from './model.ts'
 import type { ResearchTranslation, ResearchTranslationRequest, ResearchTranslationHistoryEntry } from '../research-translation-types.ts'
@@ -31,7 +34,37 @@ export class ClientResearchModel {
    * @param remote - generated Workspace namespace.
    */
   constructor(private readonly remote: Pick<WorkspaceRemote,
-    'researchReorderPapers' | 'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeleteTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation' | 'researchListTranslations'>) {}
+    'researchCreateLibraryConversation' | 'researchUpdateLibraryConversation' | 'researchDeleteLibraryConversation' | 'researchReorderPapers' | 'researchCreateConversation' | 'researchUpdateConversation' | 'researchRenameTopic' | 'researchDeleteTopic' | 'researchDeletePaper' | 'researchListFiles' | 'researchReadFile' | 'researchSaveFile' | 'researchList' | 'researchCreateTopic' | 'researchCreatePaper' | 'researchSaveNote' | 'researchMentions' | 'researchConfigure' | 'researchImportPaper' | 'researchHighlight' | 'researchExtractMarkdown' | 'researchTranslate' | 'researchSaveTranslation' | 'researchListTranslations'>) {}
+
+  /**
+   * Register an ordinary main Session, keeping its existing transcript.
+   * @param request - fresh or explicitly adopted global Session.
+   */
+  async createLibraryConversation(request: ResearchCreateLibraryConversationRequest): Promise<void> {
+    const result = await this.remote.researchCreateLibraryConversation(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
+
+  /**
+   * Save global conversation metadata and publish only the confirmed response.
+   * @param request - main conversation name, pin or archive changes.
+   */
+  async updateLibraryConversation(request: ResearchUpdateLibraryConversationRequest): Promise<void> {
+    const result = await this.remote.researchUpdateLibraryConversation(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
+
+  /**
+   * Remove a global history entry after Host confirmation, retaining the last catalog on failure.
+   * @param request - global Session selected for deletion and optional expected library root.
+   */
+  async deleteLibraryConversation(request: ResearchDeleteLibraryConversationRequest): Promise<void> {
+    const result = await this.remote.researchDeleteLibraryConversation(request)
+    if (!result.ok) throw result.error
+    this.accept(result.value)
+  }
 
   /**
    * Save a Topic's reading order and publish only the confirmed response.

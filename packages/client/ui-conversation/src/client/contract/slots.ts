@@ -460,6 +460,8 @@ export interface ConversationContentInputProps {
   variant: 'main' | 'embedded'
   phase: 'settling' | 'hero' | 'active'
   hero: boolean
+  /** Managed callers prepare the Session's working directory and never request user Workspace selection. */
+  workspaceMode?: 'select' | 'managed'
 }
 
 /** Values passed from shared content to its occurrence-selected width controls. */

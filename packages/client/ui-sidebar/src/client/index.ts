@@ -34,6 +34,7 @@ const NS = 'sidebar'
 
 interface WorkspaceNavigation {
   startSession(workspaceId?: Parameters<SidebarRootInjected['startSession']>[0]): void
+  openResearchLibrary(): Promise<void>
 }
 
 /** Services required by the sidebar plugin. */
@@ -43,7 +44,7 @@ export const inject = ['slots', 'layout', 'uiWorkspace', 'locale', 'shortcuts']
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
-  const workspaceNavigation = ctx.get('uiWorkspace') as unknown as WorkspaceNavigation
+  const workspaceNavigation = ctx.get('uiWorkspace') as WorkspaceNavigation
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-sidebar: dictionaries')
   const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
   const syncPanels = (): void => {
@@ -66,6 +67,12 @@ export function apply(ctx: ClientContext): void {
     // The shell's New Session button rides the Workspace UI's shared action
     // (current Session Workspace, then recent Workspace).
     startSession: (workspaceId) => { workspaceNavigation.startSession(workspaceId) },
+    openGlobalAgent: () => {
+      void workspaceNavigation.openResearchLibrary().catch((error: unknown) => {
+        // The research navigation owner reports the failed operation through its root-owned toast.
+        console.error('Research library navigation failed:', error)
+      })
+    },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
     selectPanel: (id) => {
       if (id === 'plugins' || id === 'schedules') ctx.get('productAnalytics')?.track('sidebar_menu_click', { menu_name: id === 'plugins' ? 'plugin' : 'cron' })

@@ -13,6 +13,21 @@ import type { ResearchSeats } from '../src/client/research/contract.ts'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 beforeEach(() => { localStorage.clear() })
+
+it('adds library conversation preferences to older saved reading layouts without discarding paper drafts', () => {
+  const id = 'legacy-paper' as ResearchPaperId
+  const legacy = { expanded: { topic: true }, papers: { [id]: { ...defaultPaperView(),
+    drafts: { learning: { text: 'Unsaved reading note', revision: 2 } } } } }
+  localStorage.setItem('dsh.research.view.v1', JSON.stringify(legacy))
+  const store = createResearchViewStore().create()
+  store.actions.libraryConversation('/library-a', 'conversation-a' as SessionId)
+  store.actions.libraryConversation('/library-b', 'conversation-b' as SessionId)
+  const restored = createResearchViewStore().create().getSnapshot()
+  expect(restored.librarySessions).toEqual({ '/library-a': 'conversation-a', '/library-b': 'conversation-b' })
+  expect(restored.papers[id]?.drafts).toEqual(legacy.papers[id]?.drafts)
+  expect(restored.expanded).toEqual({ topic: true })
+})
+
 const paper = (id: string): ResearchPaper => ({
   id: id as ResearchPaperId, title: id, topicIds: [], sessionId: id as SessionId, pdfPath: `${id}.pdf`, repositoryUrl: '',
   ai: { text: '', revision: 0 }, learning: { text: '', revision: 0 },

@@ -15,13 +15,13 @@ export type HeaderLeadingControlsProps =
   & PropsLocale<'sidebar'>
 
 /**
- * Sidebar-open and New Session controls in the frame's window-chrome seat.
- * On macOS desktop a collapsed sidebar hides entirely (no rail), taking both
- * controls off screen; this occupant puts them back beside the traffic
- * lights. The frame mounts the seat only in that state and owns its
+ * Sidebar-open control in the frame's window-chrome seat.
+ * On macOS desktop a collapsed sidebar hides entirely (no rail); this
+ * occupant keeps expansion available beside the traffic lights while the
+ * global Agent logo stays hidden. The frame mounts the seat only in that state and owns its
  * placement, so the occupant renders unconditionally.
  * @param props - Injected sidebar actions plus the sidebar locale seat.
- * @returns the two window-chrome controls.
+ * @returns the sidebar opener and the composition-hidden New Session control.
  */
 export function HeaderLeadingControls({ toggleSidebar, startSession, useShortcuts, t }: HeaderLeadingControlsProps) {
   const shortcut = useShortcuts(rows => rows.find(row => row.id === 'sidebar.left.toggle'))

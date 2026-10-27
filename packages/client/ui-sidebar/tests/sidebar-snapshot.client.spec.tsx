@@ -42,7 +42,7 @@ async function bench(options: { locale?: 'en' } = {}) {
   const runtime = await SlotTestRuntime.create()
   runtime.ctx.provide('shortcuts', { catalog: createSnapshotStore([]) } as never)
   runtime.ctx.provide('layout', { toggleSidebar: vi.fn() })
-  runtime.ctx.provide('uiWorkspace', { startSession: vi.fn() } as never)
+  runtime.ctx.provide('uiWorkspace', { startSession: vi.fn(), openResearchLibrary: vi.fn(async () => {}) } as never)
   const locale = new LocaleRuntime(runtime.ctx)
   locale.register('common', { zh: commonZh, en: commonEn })
   if (options.locale === 'en') locale.setLocale('en')
@@ -57,8 +57,8 @@ describe('sidebar shell snapshots', () => {
   it('renders the expanded column in the default locale (zh, no setLocale)', async () => {
     const { runtime } = await bench()
     const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300 })
-    // Wordmark + capsule both start a session in the expanded state.
-    expect(slot.view.getAllByRole('button', { name: '新建会话' })).toHaveLength(2)
+    // The brand restores a global conversation; the hidden capsule retains its separate action.
+    expect(slot.view.getAllByRole('button', { name: '新建会话' })).toHaveLength(1)
     expect(slot.container).toMatchSnapshot()
     await runtime.dispose()
   })
@@ -66,8 +66,8 @@ describe('sidebar shell snapshots', () => {
   it('renders the expanded column (wordmark, capsule, empty holes)', async () => {
     const { runtime } = await bench({ locale: 'en' })
     const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300 })
-    // Wordmark + capsule both start a session in the expanded state.
-    expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(2)
+    // The brand restores a global conversation; the hidden capsule retains its separate action.
+    expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(1)
     expect(slot.container).toMatchSnapshot()
     await runtime.dispose()
   })
@@ -80,7 +80,7 @@ describe('sidebar shell snapshots', () => {
     // The wide content (wordmark shortcut) unmounts at the 150ms settle;
     // only the rail's capsule remains a New-session button.
     await waitFor(() => {
-      expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(1)
+      expect(slot.view.queryByText('Research library')).toBeNull()
     })
     expect(slot.container).toMatchSnapshot()
     // Same tree position: the owner flip re-rendered the shell in place.
@@ -91,10 +91,10 @@ describe('sidebar shell snapshots', () => {
   it('a locale switch refreshes mounted copy without re-registration', async () => {
     const { runtime, locale } = await bench()
     const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300 })
-    expect(slot.view.getAllByRole('button', { name: '新建会话' })).toHaveLength(2)
+    expect(slot.view.getAllByRole('button', { name: '新建会话' })).toHaveLength(1)
     // Same fiber, same registration: setLocale alone re-renders the outlet.
     act(() => { locale.setLocale('en') })
-    expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(2)
+    expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(1)
     expect(slot.view.queryByRole('button', { name: '新建会话' })).toBeNull()
     await runtime.dispose()
   })

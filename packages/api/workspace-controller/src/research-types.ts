@@ -64,7 +64,7 @@ export interface ResearchTopic {
   readonly notes?: ResearchNote | undefined
 }
 
-/** Independent conversation metadata; paper resources remain shared. */
+/** Independent conversation metadata; library or paper resources remain shared. */
 export interface ResearchConversation {
   readonly sessionId: SessionId
   /** Empty until the first question supplies a default name. */
@@ -83,6 +83,24 @@ export interface ResearchCreateConversationRequest {
 
 /** Change conversation metadata without replacing its transcript or paper files. */
 export interface ResearchUpdateConversationRequest extends ResearchCreateConversationRequest {
+  readonly title?: string
+  readonly expectedTitle?: string
+  readonly pinned?: boolean
+  readonly archived?: boolean
+}
+
+/** Register a fresh or existing top-level main Session once, retaining its transcript. */
+export interface ResearchCreateLibraryConversationRequest {
+  readonly sessionId: SessionId
+  /** Last confirmed library root; a library switch refuses registration before any write. */
+  readonly expectedDirectory?: string
+}
+
+/** Remove a global conversation from the library while retaining its archived native history. */
+export interface ResearchDeleteLibraryConversationRequest extends ResearchCreateLibraryConversationRequest {}
+
+/** Change a global conversation's metadata without changing its transcript or library files. */
+export interface ResearchUpdateLibraryConversationRequest extends ResearchCreateLibraryConversationRequest {
   readonly title?: string
   readonly expectedTitle?: string
   readonly pinned?: boolean
@@ -126,8 +144,16 @@ export interface ResearchCatalog {
   /** Persisted directory order; newly created Topics append. */
   readonly topics: readonly ResearchTopic[]
   readonly papers: readonly ResearchPaper[]
+  /** Explicitly registered global conversations, separate from Topic, paper and delegated Sessions. */
+  readonly libraryConversations?: readonly ResearchConversation[] | undefined
   /** Runtime capabilities of the responding Host; absent in older backends and never persisted. */
-  readonly capabilities?: { readonly pdfHighlights: true; readonly pdfTranslations?: true; readonly paperConversations?: true } | undefined
+  readonly capabilities?: {
+    readonly pdfHighlights: true
+    readonly pdfTranslations?: true
+    readonly paperConversations?: true
+    readonly libraryConversations?: true
+    readonly libraryConversationDeletion?: true
+  } | undefined
   /** Absolute managed library root. */
   readonly directory?: string | undefined
 }
@@ -272,8 +298,12 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'research/topic-order-conflict': { readonly topicIds: readonly ResearchTopicId[] }
     /** Another editor renamed this conversation. */
     'research/conversation-conflict': { readonly sessionId: SessionId }
+    /** The library changed while a global conversation was being prepared. */
+    'research/library-changed': { readonly expectedDirectory: string; readonly directory: string }
     /** Another conversation for this paper owns the current Agent turn. */
     'research/conversation-busy': { readonly sessionId: SessionId }
+    /** Native archival committed; refresh the catalog before deciding whether removal needs retry. */
+    'research/conversation-delete-incomplete': { readonly sessionId: SessionId; readonly nativeArchived: true }
     /** Restore the conversation before submitting another prompt. */
     'research/conversation-archived': { readonly sessionId: SessionId }
     /** Another writer renamed the Topic; retain the draft and request a new edit from the current name. */

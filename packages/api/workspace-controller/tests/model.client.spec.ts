@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  ClientWorkspaceModel, type WorkspaceRemote,
+  ClientResearchModel, ClientWorkspaceModel, type WorkspaceRemote,
 } from '../src/client/index.ts'
 import type {
   WorkspaceArchiveSessionRequest,
@@ -88,6 +88,9 @@ class FakeWorkspaceRemote implements WorkspaceRemote {
   readonly researchCreateTopic = vi.fn<WorkspaceRemote['researchCreateTopic']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchCreateConversation = vi.fn<WorkspaceRemote['researchCreateConversation']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchUpdateConversation = vi.fn<WorkspaceRemote['researchUpdateConversation']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
+  readonly researchCreateLibraryConversation = vi.fn<WorkspaceRemote['researchCreateLibraryConversation']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
+  readonly researchUpdateLibraryConversation = vi.fn<WorkspaceRemote['researchUpdateLibraryConversation']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
+  readonly researchDeleteLibraryConversation = vi.fn<WorkspaceRemote['researchDeleteLibraryConversation']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchRenameTopic = vi.fn<WorkspaceRemote['researchRenameTopic']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchReorderPapers = vi.fn<WorkspaceRemote['researchReorderPapers']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
   readonly researchReorderTopics = vi.fn<WorkspaceRemote['researchReorderTopics']>(async () => remoteOk({ revision: 0, topics: [], papers: [] }))
@@ -595,5 +598,54 @@ describe('ClientWorkspaceModel', () => {
     expect(model.getSnapshot().items).toEqual([])
     model.removeView(wid('gone'))
     expect(model.getSnapshot().items).toEqual([])
+  })
+})
+
+describe('ClientResearchModel global conversations', () => {
+  it('publishes confirmed registration and keeps a newer stream snapshot over a delayed metadata reply', async () => {
+    const remote = new FakeWorkspaceRemote(), model = new ClientResearchModel(remote)
+    const conversation = { sessionId: sid('global'), title: '', pinned: false, archived: false, createdAt: 1 }
+    remote.researchCreateLibraryConversation.mockResolvedValueOnce(remoteOk({
+      revision: 1, topics: [], papers: [], libraryConversations: [conversation],
+    }))
+    await model.createLibraryConversation({ sessionId: conversation.sessionId, expectedDirectory: '/library' })
+    expect(remote.researchCreateLibraryConversation).toHaveBeenCalledWith({ sessionId: 'global', expectedDirectory: '/library' })
+    expect(model.state.getSnapshot().catalog.libraryConversations).toEqual([conversation])
+    const pending = deferred<Awaited<ReturnType<WorkspaceRemote['researchUpdateLibraryConversation']>>>()
+    remote.researchUpdateLibraryConversation.mockReturnValueOnce(pending.promise)
+    const updating = model.updateLibraryConversation({ sessionId: conversation.sessionId, pinned: true })
+    const latest = { revision: 3, topics: [], papers: [], libraryConversations: [{ ...conversation, title: 'First question', pinned: true }] }
+    model.accept(latest)
+    pending.resolve(remoteOk({ revision: 2, topics: [], papers: [], libraryConversations: [{ ...conversation, pinned: true }] }))
+    await updating
+    expect(model.state.getSnapshot().catalog).toEqual(latest)
+  })
+
+  it('preserves confirmed global metadata when registration or an update fails', async () => {
+    const remote = new FakeWorkspaceRemote(), model = new ClientResearchModel(remote)
+    const catalog = { revision: 1, topics: [], papers: [], libraryConversations: [] }
+    model.accept(catalog)
+    const failure = new RemoteError('research/conversation-busy', 'Stop this conversation', { sessionId: sid('global') })
+    remote.researchCreateLibraryConversation.mockResolvedValueOnce(workspaceError(failure))
+    remote.researchUpdateLibraryConversation.mockResolvedValueOnce(workspaceError(failure))
+    await expect(model.createLibraryConversation({ sessionId: sid('global') })).rejects.toEqual(failure)
+    await expect(model.updateLibraryConversation({ sessionId: sid('global'), archived: true })).rejects.toEqual(failure)
+    expect(model.state.getSnapshot()).toEqual({ phase: 'ready', catalog })
+  })
+
+  it('removes a global conversation only from a confirmed delete response and retains metadata on failure', async () => {
+    const remote = new FakeWorkspaceRemote(), model = new ClientResearchModel(remote)
+    const entry = { sessionId: sid('global'), title: 'Survey', pinned: false, archived: false, createdAt: 1 }
+    const before = { revision: 1, topics: [], papers: [], libraryConversations: [entry] }
+    model.accept(before)
+    const failure = new RemoteError('research/conversation-busy', 'Stop this conversation', { sessionId: entry.sessionId })
+    remote.researchDeleteLibraryConversation.mockResolvedValueOnce(workspaceError(failure))
+    await expect(model.deleteLibraryConversation({ sessionId: entry.sessionId })).rejects.toEqual(failure)
+    expect(model.state.getSnapshot().catalog).toEqual(before)
+    const after = { ...before, revision: 2, libraryConversations: [] }
+    remote.researchDeleteLibraryConversation.mockResolvedValueOnce(remoteOk(after))
+    await model.deleteLibraryConversation({ sessionId: entry.sessionId, expectedDirectory: '/library' })
+    expect(remote.researchDeleteLibraryConversation).toHaveBeenLastCalledWith({ sessionId: entry.sessionId, expectedDirectory: '/library' })
+    expect(model.state.getSnapshot().catalog).toEqual(after)
   })
 })

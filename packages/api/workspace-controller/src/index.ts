@@ -8,7 +8,10 @@ import { DirectoryPickerController } from './directory-picker.ts'
 import { WorkspaceFeed, workspaceView } from './feed.ts'
 import { defaultWorkspaceDirectory, validateDocumentsDirectory } from './default-directory.ts'
 import { paperConversations, paperForSession } from './research-conversations.ts'
-import type { ResearchCreateConversationRequest, ResearchUpdateConversationRequest } from './research-types.ts'
+import type {
+  ResearchCreateConversationRequest, ResearchUpdateConversationRequest,
+  ResearchCreateLibraryConversationRequest, ResearchUpdateLibraryConversationRequest, ResearchDeleteLibraryConversationRequest,
+} from './research-types.ts'
 import { ResearchCatalogHost } from './research.ts'
 import { PaperTranslations } from './research-translation.ts'
 import type {
@@ -213,14 +216,16 @@ export class WorkspaceController extends TypertRemoteService {
       await this.bindUiAgent(agent)
       const catalog = this.research.current()
       await this.bindResearchAgent(agent,
-        catalog.topics.some(item => item.sessionId === agent.id) || paperForSession(catalog, agent.id) !== undefined)
+        catalog.libraryConversations?.some(item => item.sessionId === agent.id) === true
+          || catalog.topics.some(item => item.sessionId === agent.id) || paperForSession(catalog, agent.id) !== undefined)
     })
     ctx.inject(['agents'], async () => {
       for (const agent of ctx.agents.list()) {
         await this.bindUiAgent(agent)
         const catalog = this.research.current()
         await this.bindResearchAgent(agent,
-          catalog.topics.some(item => item.sessionId === agent.id) || paperForSession(catalog, agent.id) !== undefined)
+          catalog.libraryConversations?.some(item => item.sessionId === agent.id) === true
+            || catalog.topics.some(item => item.sessionId === agent.id) || paperForSession(catalog, agent.id) !== undefined)
       }
     })
     // This package is the Loader entry for both Remote owners it hosts: the
@@ -439,6 +444,38 @@ export class WorkspaceController extends TypertRemoteService {
   }
 
   /**
+   * Resume and register an ordinary main Session with the selected library, retaining its existing history.
+   * @param request - fresh or existing independent main Session; registration is idempotent.
+   * @returns the library with its global conversation metadata.
+   */
+  @Remote('researchCreateLibraryConversation')
+  async researchCreateLibraryConversation(request: ResearchCreateLibraryConversationRequest): Promise<ResearchCatalog> {
+    const catalog = await this.research.createLibraryConversation(request)
+    await this.bindResearchAgents(catalog)
+    return catalog
+  }
+
+  /**
+   * Rename, pin, archive or restore one registered global conversation.
+   * @param request - main conversation metadata changes.
+   * @returns the committed library; active work and stale names refuse changes without writes.
+   */
+  @Remote('researchUpdateLibraryConversation')
+  researchUpdateLibraryConversation(request: ResearchUpdateLibraryConversationRequest): Promise<ResearchCatalog> {
+    return this.research.updateLibraryConversation(request)
+  }
+
+  /**
+   * Remove one global conversation from the library and archive its native history.
+   * @param request - global conversation and optional last confirmed library directory.
+   * @returns remaining metadata; paper content is retained and active work refuses deletion.
+   */
+  @Remote('researchDeleteLibraryConversation')
+  researchDeleteLibraryConversation(request: ResearchDeleteLibraryConversationRequest): Promise<ResearchCatalog> {
+    return this.research.deleteLibraryConversation(request)
+  }
+
+  /**
    * Permanently remove one paper's directory and catalog entry, retaining its archived native Session.
    * @param request - paper identity and the absolute directory confirmed by the user.
    * @returns the remaining library after deletion completes.
@@ -617,6 +654,7 @@ export class WorkspaceController extends TypertRemoteService {
     const agents = this.ctx.get('agents')
     if (agents === undefined) return
     const sessions = [...catalog.topics.map(item => item.sessionId),
+      ...catalog.libraryConversations?.map(item => item.sessionId) ?? [],
       ...catalog.papers.flatMap(paper => paperConversations(paper).map(item => item.sessionId))]
     for (const id of sessions) {
       const agent = agents.get(id)

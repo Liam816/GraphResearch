@@ -27,7 +27,10 @@ import { extractPaperMarkdown } from './research-markdown.ts'
 import type { ResearchMarkdownPolicy } from './research-markdown.ts'
 import { restoreResearchSessions } from './research-session-backup.ts'
 import { paperConversations, paperForSession, conversationBackup } from './research-conversations.ts'
-import type { ResearchCreateConversationRequest, ResearchUpdateConversationRequest } from './research-types.ts'
+import type {
+  ResearchConversation, ResearchCreateConversationRequest, ResearchUpdateConversationRequest,
+  ResearchCreateLibraryConversationRequest, ResearchUpdateLibraryConversationRequest, ResearchDeleteLibraryConversationRequest,
+} from './research-types.ts'
 import type {
   ResearchCatalog, ResearchCreatePaperRequest, ResearchCreateTopicRequest, ResearchDirectoryRequest,
   ResearchDeletePaperRequest, ResearchDeleteTopicRequest,
@@ -73,6 +76,10 @@ export class ResearchCatalogHost {
     void this.ready.catch((error: unknown) => { this.report(error) })
     ctx.on('session/event', (session) => { this.queueArchive(session) })
     ctx.on('agent/pre-step', async ({ agent }, next) => {
+      if (this.snapshot.libraryConversations?.some(item => item.sessionId === agent.id && item.archived)) {
+        throw new RemoteError('research/conversation-archived',
+          'Restore this conversation before sending another prompt', { sessionId: agent.id })
+      }
       const paper = paperForSession(this.snapshot, agent.id)
       if (paper !== undefined) {
         const conversation = paperConversations(paper).find(item => item.sessionId === agent.id)
@@ -402,6 +409,118 @@ export class ResearchCatalogHost {
   }
 
   /**
+   * Resume and register a top-level main Session, preserving any existing history.
+   * @param request - ordinary Session explicitly selected by the user; same-id retries do not duplicate metadata.
+   * @returns the committed library; invalid ownership is refused before activation, and legacy bindings are created internally.
+   */
+  createLibraryConversation(request: ResearchCreateLibraryConversationRequest): Promise<ResearchCatalog> {
+    return this.mutate(async (catalog) => {
+      this.requireLibraryDirectory(request.expectedDirectory)
+      if (catalog.libraryConversations?.some(item => item.sessionId === request.sessionId)) return catalog
+      this.requireIndependentSession(catalog, request.sessionId)
+      if (this.ctx.workspaceRegistry.archivedSessionIds.includes(request.sessionId)) {
+        throw new RemoteError('research/conversation-archived', 'Open another conversation instead of registering an archived history', {
+          sessionId: request.sessionId,
+        })
+      }
+      let session = this.ctx.sessions.get(request.sessionId)
+      const header = session?.header ?? (await this.ctx.sessionPersistence.stat(request.sessionId))?.header
+      if (header === undefined || header.isSeeded || header.parentSession !== undefined
+        || header.origin === 'subagent' || header.cwd === undefined) {
+        throw new RemoteError('research/invalid', 'Choose an open independent main Session for the library', { field: 'sessionId' })
+      }
+      if (session === undefined) {
+        const resolved = await this.ctx.sessionController.resolveAgent(request.sessionId)
+        if ('error' in resolved) throw resolved.error
+        session = resolved.agent.session
+      }
+      if (session.header.isSeeded || session.header.parentSession !== undefined
+        || session.header.origin === 'subagent' || session.header.cwd === undefined) {
+        throw new RemoteError('research/invalid', 'Choose an independent main Session for the library', { field: 'sessionId' })
+      }
+      if (!this.ctx.workspaceRegistry.list().some(workspace => workspace.sessionIds.includes(request.sessionId))) {
+        const workspace = await this.ctx.workspaceRegistry.create(session.header.cwd)
+        await workspace.attachSession(session.id)
+      }
+      return { ...catalog, libraryConversations: [...catalog.libraryConversations ?? [], {
+        sessionId: request.sessionId, title: firstQuestionTitle(session), pinned: false, archived: false,
+        createdAt: session.header.createdAt,
+      }] }
+    })
+  }
+
+  /**
+   * Rename, pin, archive or restore an explicitly registered main conversation.
+   * @param request - global conversation and metadata changes.
+   * @returns confirmed metadata; busy archives and stale renames write nothing.
+   */
+  updateLibraryConversation(request: ResearchUpdateLibraryConversationRequest): Promise<ResearchCatalog> {
+    return this.mutate(async (catalog) => {
+      this.requireLibraryDirectory(request.expectedDirectory)
+      const conversation = catalog.libraryConversations?.find(item => item.sessionId === request.sessionId)
+      if (conversation === undefined) throw new RemoteError('research/not-found', 'Global conversation not found', { id: request.sessionId })
+      const next = await this.conversationMetadata(conversation, request)
+      return next === conversation ? catalog : { ...catalog,
+        libraryConversations: catalog.libraryConversations?.map(item => item.sessionId === request.sessionId ? next : item) }
+    })
+  }
+
+  /**
+   * Remove a global conversation and archive its native history without touching paper files.
+   * @param request - registered global Session and last confirmed library directory.
+   * @returns confirmed metadata; a completed same-id retry resolves while its native archive remains.
+   * @throws `research/conversation-delete-incomplete` when the native archive committed but catalog completion needs refresh.
+   */
+  deleteLibraryConversation(request: ResearchDeleteLibraryConversationRequest): Promise<ResearchCatalog> {
+    return this.serialized(() => this.files.withLock(async () => {
+      const catalog = await this.files.read()
+      this.accept(catalog)
+      this.requireLibraryDirectory(request.expectedDirectory)
+      if (catalog.topics.some(item => item.sessionId === request.sessionId) || paperForSession(catalog, request.sessionId) !== undefined) {
+        throw new RemoteError('research/invalid', 'Only a registered global conversation can be removed', { field: 'sessionId' })
+      }
+      const conversation = catalog.libraryConversations?.find(item => item.sessionId === request.sessionId)
+      if (conversation === undefined) {
+        const header = this.ctx.sessions.get(request.sessionId)?.header
+          ?? (await this.ctx.sessionPersistence.stat(request.sessionId))?.header
+        if (header?.origin === 'subagent' || header?.parentSession !== undefined || header?.isSeeded === true) {
+          throw new RemoteError('research/invalid', 'Only a registered global conversation can be removed', { field: 'sessionId' })
+        }
+        if (this.ctx.workspaceRegistry.archivedSessionIds.includes(request.sessionId)) return this.accept(catalog)
+        throw new RemoteError('research/not-found', 'Global conversation not found', { id: request.sessionId })
+      }
+      const activity = await this.ctx.waterfall('workspace/session-activity', { sessionId: request.sessionId }, () => Promise.resolve([]))
+      if (activity.length > 0 || this.ctx.get('agents')?.get(request.sessionId)?.status === 'running') {
+        throw new RemoteError('research/conversation-busy', 'Stop this conversation before deleting it', { sessionId: request.sessionId })
+      }
+      try { await this.ctx.workspaceRegistry.archiveSession(request.sessionId) } catch (error: unknown) {
+        if (error instanceof WorkspaceActiveSessionError) throw new RemoteError('research/conversation-busy',
+          'Stop this conversation before deleting it', { sessionId: request.sessionId }, { cause: error })
+        throw error
+      }
+      const next = { ...catalog, revision: catalog.revision + 1,
+        libraryConversations: catalog.libraryConversations?.filter(item => item.sessionId !== request.sessionId) }
+      try {
+        await this.files.write(next, catalog)
+        return this.accept(await this.files.read())
+      } catch (error: unknown) {
+        throw new RemoteError('research/conversation-delete-incomplete',
+          'The native history is archived; refresh the library to confirm removal before retrying', {
+            sessionId: request.sessionId, nativeArchived: true,
+          }, { cause: error })
+      }
+    }))
+  }
+
+  private requireLibraryDirectory(expectedDirectory: string | undefined): void {
+    if (expectedDirectory !== undefined && resolve(expectedDirectory) !== this.files.directory) {
+      throw new RemoteError('research/library-changed', 'The library changed; open the intended library before retrying', {
+        expectedDirectory, directory: this.files.directory,
+      })
+    }
+  }
+
+  /**
    * Persist conversation metadata while protecting active work and concurrent renames.
    * @param request - paper conversation and metadata changes.
    * @returns confirmed metadata; busy archives and stale renames write nothing.
@@ -413,26 +532,30 @@ export class ResearchCatalogHost {
       if (paper === undefined || conversation === undefined) {
         throw new RemoteError('research/not-found', 'Conversation not found', { id: request.sessionId })
       }
-      const title = request.title === undefined ? conversation.title : requiredText(request.title, 'title')
-      if (request.title !== undefined && conversation.title !== title && request.expectedTitle !== conversation.title) {
-        throw new RemoteError('research/conversation-conflict', 'Reopen the conversation name editor before saving', { sessionId: request.sessionId })
-      }
-      if (request.archived === true && !conversation.archived) {
-        const activity = await this.ctx.waterfall('workspace/session-activity', { sessionId: request.sessionId }, () => Promise.resolve([]))
-        if (activity.length > 0 || this.ctx.get('agents')?.get(request.sessionId)?.status === 'running') {
-          throw new RemoteError('research/conversation-busy', 'Stop this conversation before archiving it', {
-            sessionId: request.sessionId,
-          })
-        }
-      }
-      const next = { ...conversation, title, pinned: request.pinned ?? conversation.pinned,
-        archived: request.archived ?? conversation.archived }
-      if (title === conversation.title && next.pinned === conversation.pinned && next.archived === conversation.archived) {
-        return catalog
-      }
+      const next = await this.conversationMetadata(conversation, request)
+      if (next === conversation) return catalog
       return { ...catalog, papers: catalog.papers.map(item => item.id === paper.id ? { ...item,
         conversations: paperConversations(item).map(entry => entry.sessionId === request.sessionId ? next : entry) } : item) }
     })
+  }
+
+  private async conversationMetadata(
+    conversation: ResearchConversation, request: ResearchUpdateLibraryConversationRequest,
+  ): Promise<ResearchConversation> {
+    const title = request.title === undefined ? conversation.title : requiredText(request.title, 'title')
+    if (request.title !== undefined && conversation.title !== title && request.expectedTitle !== conversation.title) {
+      throw new RemoteError('research/conversation-conflict', 'Reopen the conversation name editor before saving', { sessionId: request.sessionId })
+    }
+    if (request.archived === true && !conversation.archived) {
+      const activity = await this.ctx.waterfall('workspace/session-activity', { sessionId: request.sessionId }, () => Promise.resolve([]))
+      if (activity.length > 0 || this.ctx.get('agents')?.get(request.sessionId)?.status === 'running') {
+        throw new RemoteError('research/conversation-busy', 'Stop this conversation before archiving it', { sessionId: request.sessionId })
+      }
+    }
+    const next = { ...conversation, title,
+      pinned: request.pinned ?? conversation.pinned, archived: request.archived ?? conversation.archived }
+    return title === conversation.title && next.pinned === conversation.pinned && next.archived === conversation.archived
+      ? conversation : next
   }
 
   /**
@@ -883,7 +1006,8 @@ export class ResearchCatalogHost {
 
   private accept(catalog: ResearchCatalog): ResearchCatalog {
     const confirmed: ResearchCatalog = { ...catalog,
-      capabilities: { pdfHighlights: true, pdfTranslations: true, paperConversations: true } }
+      capabilities: { pdfHighlights: true, pdfTranslations: true, paperConversations: true,
+        libraryConversations: true, libraryConversationDeletion: true } }
     if (catalog.revision !== this.snapshot.revision || catalog.directory !== this.snapshot.directory) {
       this.snapshot = confirmed
       for (const follower of this.followers) follower.push({ type: 'changed', catalog: confirmed })
@@ -897,7 +1021,8 @@ export class ResearchCatalogHost {
   }
 
   private ownsSession(id: string): boolean {
-    return this.snapshot.topics.some(item => item.sessionId === id)
+    return this.snapshot.libraryConversations?.some(item => item.sessionId === id) === true
+      || this.snapshot.topics.some(item => item.sessionId === id)
       || this.snapshot.papers.some(item => paperConversations(item).some(entry => entry.sessionId === id))
   }
 
@@ -924,22 +1049,22 @@ export class ResearchCatalogHost {
   private async archiveCopy(session: Session, catalog: ResearchCatalog): Promise<number | undefined> {
     const paper = paperForSession(catalog, session.id)
     const topic = catalog.topics.find(item => item.sessionId === session.id)
-    const conversation = paper?.conversations?.find(item => item.sessionId === session.id)
-    if (paper !== undefined && conversation?.title === '') {
-      const message = session.deriveMessages().find(item => item.role === 'user' && item.source.kind === 'user')
-      if (message?.role === 'user') {
-        const title = message.content.filter(part => part.type === 'text').map(part => part.text).join(' ').replace(/\s+/g, ' ').trim().slice(0, 100)
-        if (title !== '') {
-          const next = { ...catalog, revision: catalog.revision + 1, papers: catalog.papers.map(item => item.id === paper.id ? { ...item,
-            conversations: paperConversations(item).map(entry => entry.sessionId === session.id ? { ...entry, title } : entry) } : item) }
-          await this.files.write(next, catalog)
-          this.accept(next)
-        }
-      }
+    const library = catalog.libraryConversations?.find(item => item.sessionId === session.id)
+    const conversation = library ?? paper?.conversations?.find(item => item.sessionId === session.id)
+    const title = conversation?.title === '' ? firstQuestionTitle(session) : ''
+    if (title !== '') {
+      const next: ResearchCatalog = { ...catalog, revision: catalog.revision + 1,
+        ...library !== undefined ? { libraryConversations: catalog.libraryConversations?.map(entry =>
+          entry.sessionId === session.id ? { ...entry, title } : entry) }
+          : { papers: catalog.papers.map(item => item.id === paper?.id ? { ...item,
+            conversations: paperConversations(item).map(entry => entry.sessionId === session.id ? { ...entry, title } : entry) } : item) } }
+      await this.files.write(next, catalog)
+      this.accept(next)
     }
-    if (paper === undefined && topic === undefined) return
+    if (paper === undefined && topic === undefined && library === undefined) return
     const path = paper !== undefined ? await this.files.runtimePaperPath(paper, ...conversationBackup(paper, session.id))
-      : topic !== undefined ? await this.files.runtimePath('topics', topic.id, 'session.json') : undefined
+      : topic !== undefined ? await this.files.runtimePath('topics', topic.id, 'session.json')
+        : library !== undefined ? await this.files.runtimePath('sessions', session.id, 'session.json') : undefined
     if (path === undefined) return
     for (;;) {
       const end = session.seq
@@ -960,11 +1085,17 @@ export class ResearchCatalogHost {
   }
 
   private requireIndependentSession(catalog: ResearchCatalog, id: ResearchCreatePaperRequest['sessionId']): void {
-    if (catalog.topics.some(item => item.sessionId === id)
+    if (catalog.libraryConversations?.some(item => item.sessionId === id) === true || catalog.topics.some(item => item.sessionId === id)
       || catalog.papers.some(item => paperConversations(item).some(entry => entry.sessionId === id))) {
       throw new RemoteError('research/invalid', 'Each entity requires an independent Session', { field: 'sessionId' })
     }
   }
+}
+
+function firstQuestionTitle(session: Session): string {
+  const message = session.deriveMessages().find(item => item.role === 'user' && item.source.kind === 'user')
+  return message?.role === 'user'
+    ? message.content.filter(part => part.type === 'text').map(part => part.text).join(' ').replace(/\s+/g, ' ').trim().slice(0, 100) : ''
 }
 
 class ResearchFollower {

@@ -139,6 +139,8 @@ function mount(
     composerBlock?: { reason: string }
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** Research surfaces prepare their working directory without a user Workspace picker. */
+    workspaceMode?: ConversationContentInputProps['workspaceMode']
   } = {},
 ) {
   const sessionId = 'sessionId' in options ? options.sessionId : SID
@@ -351,7 +353,8 @@ function mount(
     )) as ConversationContentProps['useFactorySlot']
     return (
       <FactoryViewsTestContext.Provider value={common}>
-        <ConversationContent {...({ ...common, ...runtimeProps, ...input, useFactorySlot })} />
+        <ConversationContent {...({ ...common, ...runtimeProps, ...input,
+          ...options.workspaceMode === undefined ? {} : { workspaceMode: options.workspaceMode }, useFactorySlot })} />
       </FactoryViewsTestContext.Provider>
     )
   }) as ConversationSlotProps['renderFactorySlot']
@@ -459,6 +462,31 @@ describe('ConversationRoot resident composer', () => {
     expect(box.getAttribute('data-placeholder')).not.toBe('select a model first')
     const modelSeat = b.seatOwners.filter(call => call.key === 'conversation.input.model').at(-1)?.owner
     expect(modelSeat).toEqual({ locked: true })
+  })
+
+  it('keeps a managed blank research composer editable without a Workspace catalog entry', () => {
+    const b = mount(sessionSnapshotOf({ blank: true }), [], undefined, { summaryBlank: true, workspaceMode: 'managed' })
+    const box = b.view.getByRole('textbox')
+    expect(box.getAttribute('contenteditable')).toBe('true')
+    expect(box.getAttribute('aria-haspopup')).toBeNull()
+    expect(box.getAttribute('data-placeholder')).not.toBe(zh['placeholder.workspace'])
+    expect(b.slotCalls).not.toContain('conversation.hero.workspace')
+    expect(b.slotCalls).toContain('conversation.hero.agentPreset')
+    act(() => { b.wiring.setDraft('Research question') })
+    expect(b.store.store.getSnapshot().draft).toEqual({ text: 'Research question', references: [] })
+    expect(b.retargetWorkspace).not.toHaveBeenCalled()
+  })
+
+  it('shows preparation rather than a directory-picker action before a managed Session is available', () => {
+    const b = mount(sessionSnapshotOf(), [], undefined, { sessionId: undefined, workspaceMode: 'managed' })
+    const box = b.view.getByRole('textbox')
+    expect(box.getAttribute('contenteditable')).not.toBe('true')
+    expect(box.getAttribute('data-placeholder')).toBe(zh['placeholder.preparing'])
+    expect(box.getAttribute('aria-haspopup')).toBeNull()
+    expect(b.slotCalls).not.toContain('conversation.hero.workspace')
+    fireEvent.click(box)
+    expect(b.pickerOwner()).toBeUndefined()
+    expect(b.retargetWorkspace).not.toHaveBeenCalled()
   })
 
   it('keeps composer text in the machine, mirrors to the Conversation store, and submits through the sink', () => {

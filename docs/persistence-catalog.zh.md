@@ -757,7 +757,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'research/translation-request': ResearchTranslationRequestRecord
 ```
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:80`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:96`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 <a id="researchtranslation-result--log-only"></a>
 
@@ -771,7 +771,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'research/translation-result': { readonly requestSeq: import('@deepseek-ai/dsh-session/types').SessionSeq; readonly translation: ResearchTranslation }
 ```
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:85`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:101`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 ### `sandbox/*`
 
@@ -4476,7 +4476,7 @@ SHA-256: `0a17eb17f76b614ae7a66620bbe0c77bed6e0b02328b14aad57dd8e1716cd938`
 
 SHA-256: `79998beddac54f1530d47cd87029f3fbbb95d9bf56659c0bc3d5e81bfef19254`
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:47`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:49`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -4494,7 +4494,7 @@ SHA-256: `79998beddac54f1530d47cd87029f3fbbb95d9bf56659c0bc3d5e81bfef19254`
 
 SHA-256: `27836fd07fda3ddd5c832b86f552027af335d814d4c197d4038da59e0ac41b44`
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:54`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:56`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -4515,7 +4515,7 @@ SHA-256: `27836fd07fda3ddd5c832b86f552027af335d814d4c197d4038da59e0ac41b44`
 
 SHA-256: `a41d6b2bd7f966af88bde79e01a8120e3d5cf837c553b1020979cad7d5fa5ed2`
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:23`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:25`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -4538,7 +4538,7 @@ SHA-256: `a41d6b2bd7f966af88bde79e01a8120e3d5cf837c553b1020979cad7d5fa5ed2`
 
 SHA-256: `dde5a81f784c23e2111dcb2db2d3c6cab971118690c17455976f2b299f789c0d`
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:36`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:38`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -4560,7 +4560,7 @@ SHA-256: `dde5a81f784c23e2111dcb2db2d3c6cab971118690c17455976f2b299f789c0d`
 
 SHA-256: `da877af1420e83bf73d3003d625b93ad3f18972704f9f4664ff4cf1246a33cc1`
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:64`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:80`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -6101,7 +6101,7 @@ SHA-256: `3e4e7683b0192c9f0e6a75c59076108f017892cdb302a98032c2632fd79c356f`
 
 SHA-256: `2b64b82387d5c151eb7c75e8b5eeb17d32a2828cca7a09b286656e04369fa0a8`
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:67`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:83`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|
@@ -7850,7 +7850,7 @@ SHA-256: `e481c46af3813e0010558e93f578b2986acd658404cec2d1679e3ac2a6c48654`
 
 SHA-256: `2ebc18d4f9fda63e87ee5528008c981a5ee4d40e643a20be4a3ab842358c7a9f`
 
-来源：[`packages/api/workspace-controller/src/research-translation-types.ts:85`](../packages/api/workspace-controller/src/research-translation-types.ts)
+来源：[`packages/api/workspace-controller/src/research-translation-types.ts:101`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | 属性 | 存在性 | 类型 |
 |---|---|---|

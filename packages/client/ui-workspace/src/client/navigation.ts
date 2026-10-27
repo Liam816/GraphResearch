@@ -33,6 +33,17 @@ export type StartSessionOptions = DraftInitializationOptions
 /** Workspace archive and directory operations consumed by Client UI domains. */
 export interface UiWorkspace {
   /**
+   * Open the last active global research conversation, creating one only when none exists.
+   * @returns completion; the research owner reports navigation failures.
+   */
+  openResearchLibrary(): Promise<void>
+  /**
+   * Retain the current view while an archive-backed removal is pending.
+   * @param sessionId - removal target whose archive increment must not clear its confirmation.
+   * @returns idempotent release; the last release clears a still-selected archived Session.
+   */
+  holdArchivedSelection(sessionId: SessionId): () => void
+  /**
    * Select a Session and show its Conversation as one UI navigation action.
    * @param target - known Session identity or durable direct-parent subagent address to display.
    */
@@ -68,7 +79,8 @@ export interface UiWorkspace {
   /**
    * Create a fresh Session, or reuse a blank when preparing an explicit draft. A creation the Host
    * refuses is shown through the Workspace notice and leaves the selection as it was.
-   * @param workspaceId - explicit target; absent inherits the current or most recent Workspace.
+   * @param workspaceId - explicit target; unscoped blank creation uses the composed research entry when available,
+   * otherwise it inherits the current or most recent Workspace.
    * @param options - initial content; existing text or attachments are preserved unless clearPreviousDraft is true.
    */
   startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void
@@ -150,6 +162,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     {}, { persist: { name: 'dsh.sessions.current' } },
   )
   private mainReference: SessionReference | undefined
+  private readonly archiveHolds = new Map<SessionId, number>()
 
   /**
    * @param ctx - Client root Context.
@@ -158,6 +171,9 @@ class UiWorkspaceService extends Service implements UiWorkspace {
    * @param sessions - pure Session Controller.
    * @param view - the browser's viewing-store write set (one instance shared with its registration).
    * @param notify - show one notice through the Workspace notice channel.
+   * @param startGlobalSession - optional owner of unscoped blank creation; true consumes the action.
+   * @param restoreGlobalSession - optional startup owner; true replaces ordinary Workspace restoration.
+   * @param openResearchLibraryCommand - optional owner of the sidebar brand's global research navigation.
    */
   constructor(
     ctx: Context,
@@ -166,6 +182,9 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     private readonly sessions: ISessions,
     private readonly view: Pick<WorkspaceViewStoreActions, 'pinSessionOrder'>,
     private readonly notify: (toast: RowToast) => void,
+    private readonly startGlobalSession?: () => boolean,
+    private readonly restoreGlobalSession?: (sessionId: SessionId | undefined, signal: AbortSignal) => Promise<boolean>,
+    private readonly openResearchLibraryCommand?: () => Promise<void>,
   ) {
     super(ctx, 'uiWorkspace')
     ctx.effect(() => {
@@ -182,6 +201,23 @@ class UiWorkspaceService extends Service implements UiWorkspace {
 
   connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId> {
     return this.connectBlank(workspaceId, true)
+  }
+
+  openResearchLibrary(): Promise<void> {
+    if (this.openResearchLibraryCommand === undefined) return Promise.reject(new Error('Research navigation is unavailable'))
+    return this.openResearchLibraryCommand()
+  }
+
+  holdArchivedSelection(sessionId: SessionId): () => void {
+    this.archiveHolds.set(sessionId, (this.archiveHolds.get(sessionId) ?? 0) + 1)
+    let held = true
+    return () => {
+      if (!held) return
+      held = false
+      const remaining = (this.archiveHolds.get(sessionId) ?? 1) - 1
+      if (remaining > 0) this.archiveHolds.set(sessionId, remaining)
+      else { this.archiveHolds.delete(sessionId); this.clearArchivedCurrent(true) }
+    }
   }
 
   private async connectBlank(workspaceId: WorkspaceId, reuse: boolean): Promise<SessionId> {
@@ -260,6 +296,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   }
 
   startSession(workspaceId?: WorkspaceId, options?: StartSessionOptions): void {
+    if (workspaceId === undefined && options === undefined && this.startGlobalSession?.() === true) return
     const draftOptions = options === undefined ? undefined : { ...options }
     const initializeDraft = draftOptions !== undefined
       && (draftOptions.prompt !== undefined || draftOptions.clearPreviousDraft === true)
@@ -386,6 +423,10 @@ class UiWorkspaceService extends Service implements UiWorkspace {
       this.replaceMain(saved.subagentAddress, this.lifetime.signal, 'preserve')
       return
     }
+    if (this.restoreGlobalSession !== undefined) {
+      const signal = AbortSignal.any([this.ctx.layout.beginNavigation(), this.lifetime.signal])
+      if (await this.restoreGlobalSession(saved.sessionId, signal) || signal.aborted) return
+    }
     const summary = saved.sessionId === undefined ? undefined : sessions.byId[saved.sessionId]
     const workspace = summary === undefined ? undefined
       : workspaces.items.find(item => item.sessionIds.includes(summary.id))
@@ -421,21 +462,22 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   }
 
   /** @returns true when an archived current selection was cleared. */
-  private clearArchivedCurrent(): boolean {
+  private clearArchivedCurrent(preservePanel = false): boolean {
     const current = this.mainReference?.sessionId
     if (current === undefined
+      || this.archiveHolds.has(current)
       || !this.workspaces.list.getSnapshot().archivedSessionIds.includes(current)) return false
-    this.clearMain()
+    this.clearMain(preservePanel)
     return true
   }
 
-  private clearMain(): void {
+  private clearMain(preservePanel = false): void {
     const previous = this.mainReference
     if (previous !== undefined) this.ctx.emit('ui-workspace/before-session-change', previous.sessionId)
     this.mainReference = undefined
     this.selection.set({})
     previous?.release()
-    this.ctx.layout.selectPanel(null)
+    if (!preservePanel) this.ctx.layout.selectPanel(null)
   }
 
   private replaceMain(

@@ -6,12 +6,12 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, SessionId } from '@deepseek-ai/dsh-session'
 import { formatSystemPromptSnapshot, formatToolSchemasSnapshot, normalizedSystemPrompts,
   normalizedToolSchemas, normalizeSessionSnapshots } from '@deepseek-ai/dsh-session-snapshot'
 import { assertFinalWorkspaceSnapshot, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold,
   normalizeWebSessionVolatiles, webSnapshotMode } from './scaffold.ts'
-import { newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
+import { newEnglishPage, REPO_ROOT, saveFailureShot, WEB_FIXTURE_TIME } from './support.ts'
 
 const DIRECTORY = fileURLToPath(new URL('../../../snapshots/web/research-main', import.meta.url))
 const FIXTURE = join(DIRECTORY, 'session.v4.jsonl')
@@ -32,7 +32,14 @@ it('lets the main Agent read every research entity, create a Topic and persist i
   const workspace = await scaffold.ctx.workspaceRegistry.create(root)
   const topicSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id, sessionId: SessionId('main-existing-topic') })
   const paperSession = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id, sessionId: SessionId('main-existing-paper') })
-  const main = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id, sessionId: SessionId('main-library-session') })
+  const mainId = SessionId('main-library-session')
+  // Research tools expose conversation creation time, so seed that durable field without changing the process clock.
+  {
+    await using writer = await scaffold.ctx.sessionPersistence.create({ version: SESSION_FORMAT_VERSION,
+      id: mainId, createdAt: WEB_FIXTURE_TIME, isSeeded: false, cwd: root, delegationDepth: 0 })
+    await writer.flush()
+  }
+  const main = await scaffold.ctx.sessionController.create({ workspaceId: workspace.id, sessionId: mainId })
   const paperDirectory = join(root, 'papers', 'Existing')
   await mkdir(join(paperDirectory, 'notes'), { recursive: true }); await mkdir(join(paperDirectory, 'src'), { recursive: true })
   await mkdir(join(root, 'topics', 'existing-topic'), { recursive: true })
@@ -48,6 +55,7 @@ it('lets the main Agent read every research entity, create a Topic and persist i
       sessionId: paperSession.sessionId, pdfPath: '', repositoryUrl: '', ai: { revision: 1, sha256: digest(AI_NOTE) }, learning: empty }],
   }))
   await scaffold.ctx.workspaceController.researchList()
+  await scaffold.ctx.workspaceController.researchCreateLibraryConversation({ sessionId: main.sessionId })
   const agent = scaffold.ctx.agents.get(main.sessionId)!
   expect(scaffold.ctx.tools.schemas(agent).map(tool => tool.name)).toEqual(expect.arrayContaining([
     'research_context', 'research_create_topic', 'research_list_files', 'research_read_file', 'research_read_paper', 'research_read_conversation',
@@ -62,6 +70,7 @@ it('lets the main Agent read every research entity, create a Topic and persist i
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
   const library = page.getByRole('region', { name: 'Research library', exact: true })
   await library.getByRole('button', { name: 'Existing topic', exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Open global Agent', exact: true }).click()
   const locationBefore = page.url()
   const prompts = fixtureUserPrompts(await readFile(FIXTURE, 'utf8'))
   expect(prompts).toHaveLength(1)
@@ -97,6 +106,21 @@ it('lets the main Agent read every research entity, create a Topic and persist i
   expect(page.url()).toBe(locationBefore)
   await page.reload({ waitUntil: 'load' })
   await expect.poll(() => topicTitles.allTextContents()).toEqual(['Robot VLA', 'Existing topic'])
+  await page.getByRole('button', { name: 'Open global Agent', exact: true }).click()
+  const header = page.locator('[data-research-library-header]')
+  const globalConversation = (await scaffold.ctx.workspaceController.researchList()).libraryConversations
+    ?.find(item => item.sessionId === main.sessionId)
+  expect(globalConversation).toBeDefined()
+  const finalAnswer = events.findLast(event => event.type === 'assistant/message')
+  if (finalAnswer === undefined) throw new Error('The recorded main Agent must complete its answer')
+  const answer = finalAnswer.data.message.content.filter(block => block.type === 'text').map(block => block.text).join('')
+  await page.locator('[data-research-workbench]').getByText(answer, { exact: true }).waitFor()
+  await header.getByRole('button', { name: 'New conversation', exact: true }).click()
+  await expect.poll(() => page.locator('[data-research-workbench]').getByText(answer, { exact: true }).count()).toBe(0)
+  await header.getByRole('button', { name: 'Switch conversation', exact: true }).click()
+  const history = page.getByRole('dialog', { name: 'Global conversations', exact: true })
+  await history.locator('[data-conversation-option]').filter({ hasText: globalConversation!.title }).click()
+  await page.locator('[data-research-workbench]').getByText(answer, { exact: true }).waitFor()
   await assertFinalWorkspaceSnapshot(DIRECTORY, join(root, 'papers'))
   const identities: readonly (readonly [string, string])[] = [
     [workspace.id, '{{id:1}}'], [created.id, '{{id:2}}'], [created.sessionId, '{{session:2}}'],

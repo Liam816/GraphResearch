@@ -121,6 +121,8 @@ export type SidebarRootInjected = {
    * recent Workspace, or clear into the New Session pure view when none exist.
    */
   startSession: (workspaceId?: WorkspaceId) => void
+  /** Restore the research library's last global conversation without creating another one. */
+  openGlobalAgent: () => void
   /** Toggle the sidebar column through the layout service. */
   toggleSidebar: () => void
   /** Select the global panel addressed by a sidebar row. */

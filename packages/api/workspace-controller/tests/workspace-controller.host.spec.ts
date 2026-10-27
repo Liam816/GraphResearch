@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { Session, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionId, SessionLogOffset, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import Storage from '@deepseek-ai/dsh-storage'
@@ -571,6 +571,308 @@ describe('Research catalog', () => {
     expect(ctx.sessions.get(SessionId('paper-b'))!.snapshotEvents().filter(event => event.type === 'user/message')).toEqual([])
     expect(JSON.parse(readFileSync(join(root, 'data', 'agent-lib', 'library.json'), 'utf8'))).toMatchObject({ version: 4 })
     expect((await controller.researchCreateConversation({ paperId: paper.id, sessionId: SessionId('paper-b') })).revision).toBe(created.revision)
+  })
+
+  async function globalFixture() {
+    const fixture = await researchFixture({ nativeSessions: true })
+    for (const id of ['topic-agent', 'paper-a', 'paper-b']) {
+      await using writer = await fixture.ctx.sessionPersistence.create(fixture.ctx.sessions.get(SessionId(id))!.header)
+      await writer.flush()
+    }
+    return fixture
+  }
+
+  it('registers global conversations once without assigning them to a Topic or paper', async () => {
+    const { controller, topic, ctx, root } = await globalFixture()
+    const before = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    await expect(controller.researchCreateLibraryConversation({ sessionId: SessionId('paper-b'), expectedDirectory: join(root, 'another-library') }))
+      .rejects.toMatchObject({ code: 'research/library-changed', details: { directory: join(root, 'data') } })
+    const created = await controller.researchCreateLibraryConversation({ sessionId: SessionId('paper-b') })
+    expect(created.capabilities?.libraryConversations).toBe(true)
+    expect(created.libraryConversations).toEqual([{ sessionId: 'paper-b', title: '', pinned: false, archived: false,
+      createdAt: ctx.sessions.get(SessionId('paper-b'))!.header.createdAt }])
+    expect(created.topics).toEqual(before.topics)
+    expect(created.papers).toEqual(before.papers)
+    expect((await controller.researchCreateLibraryConversation({ sessionId: SessionId('paper-b') })).revision).toBe(created.revision)
+    expect((await controller.researchList()).libraryConversations).toEqual(created.libraryConversations)
+    expect(JSON.parse(readFileSync(join(root, 'data', 'agent-lib', 'library.json'), 'utf8'))).toMatchObject({
+      version: 5, libraryConversations: [{ sessionId: 'paper-b' }],
+    })
+    await expect(controller.researchCreateConversation({ paperId: created.papers[0]!.id, sessionId: SessionId('paper-b') }))
+      .rejects.toMatchObject({ code: 'research/invalid' })
+  })
+
+  it('adopts an ordinary main history and refuses entity, delegated, seeded or unknown Sessions', async () => {
+    const { controller, topic, ctx, workspace, root } = await globalFixture()
+    const paper = (await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })).papers[0]!
+    const existing = ctx.sessions.get(SessionId('paper-b'))!
+    existing.append('user/message', createUserMessage({ content: [{ type: 'text', text: '  Compare VLA\n approaches  ' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+    const events = existing.snapshotEvents()
+    expect((await controller.researchCreateLibraryConversation({ sessionId: existing.id })).libraryConversations?.[0]?.title).toBe('Compare VLA approaches')
+    expect(existing.snapshotEvents()).toEqual(events)
+    const child = ctx.sessions.create(SessionId('delegated-main'), { meta: { cwd: root, parentSession: existing.id, origin: 'subagent' } })
+    const seeded = ctx.sessions.create(SessionId('seeded-main'), { meta: { cwd: root, parentSession: existing.id, isSeeded: true },
+      seed: events, inheritedEventCount: SessionLogOffset(events.length) })
+    for (const id of [child.id, seeded.id]) await ctx.workspaceRegistry.get(workspace.workspaceId)!.attachSession(id)
+    for (const id of [topic.sessionId, paper.sessionId, child.id, seeded.id, SessionId('missing')]) {
+      await expect(controller.researchCreateLibraryConversation({ sessionId: id })).rejects.toMatchObject({ code: 'research/invalid' })
+    }
+    await expect(controller.researchCreateTopic({ title: 'Cannot share', workspaceId: workspace.workspaceId, sessionId: existing.id }))
+      .rejects.toMatchObject({ code: 'research/invalid' })
+  })
+
+  it('resumes a persisted main conversation before registering its cold history', async () => {
+    const { controller, ctx, root } = await harness({ nativeSessions: true })
+    const id = SessionId('cold-main')
+    const source = Session.create(id, [], { version: SESSION_FORMAT_VERSION, id, createdAt: 1,
+      isSeeded: false, cwd: root, delegationDepth: 0 })
+    source.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'Continue the VLA survey' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+    {
+      await using writer = await ctx.sessionPersistence.create(source.header)
+      await writer.append(source.snapshotEvents())
+      await writer.flush()
+    }
+    const workspace = await ctx.workspaceRegistry.create(root)
+    await workspace.attachSession(id)
+    const resolveAgent = vi.fn(async () => {
+      await using reader = await ctx.sessionPersistence.open(id, 'read')
+      const { events } = await reader.read()
+      const session = Session.fromRestore(id, events, reader.header, reader.inheritedEventCount, 'detached')
+      ctx.effect(() => ctx.sessions.enter(session))
+      return { agent: { session } }
+    })
+    ctx.provide('sessionController', { resolveAgent } as never)
+    expect(ctx.sessions.get(id)).toBeUndefined()
+    const catalog = await controller.researchCreateLibraryConversation({ sessionId: id, expectedDirectory: join(root, 'data') })
+    expect(resolveAgent).toHaveBeenCalledExactlyOnceWith(id)
+    expect(catalog.libraryConversations).toMatchObject([{ sessionId: id, title: 'Continue the VLA survey' }])
+    expect(ctx.sessions.get(id)!.snapshotEvents().slice(0, source.snapshotEvents().length)).toEqual(source.snapshotEvents())
+    expect(ctx.sessions.get(id)!.deriveMessages()).toEqual(source.deriveMessages())
+    expect(ctx.sessions.get(id)!.header).toEqual(source.header)
+  })
+
+  it('creates an internal binding for an ordinary legacy main conversation without a workspace', async () => {
+    const { controller, ctx, root } = await harness({ nativeSessions: true })
+    const session = ctx.sessions.create(SessionId('unbound-main'), { meta: { cwd: root } })
+    expect(ctx.workspaceRegistry.list()).toHaveLength(0)
+    const catalog = await controller.researchCreateLibraryConversation({ sessionId: session.id })
+    expect(catalog.libraryConversations?.[0]?.sessionId).toBe(session.id)
+    expect(ctx.workspaceRegistry.list().find(workspace => workspace.path === root)?.sessionIds).toContain(session.id)
+    expect(session.header.cwd).toBe(root)
+    expect(session.snapshotEvents()).toEqual([])
+  })
+
+  it('refuses cold delegated ownership before activation and preserves Session resolution failures', async () => {
+    const { controller, ctx, root } = await harness({ nativeSessions: true })
+    const id = SessionId('unavailable-main')
+    const failure = new RemoteError('session/writer-held', 'The native writer is owned elsewhere', { sessionId: id })
+    const resolveAgent = vi.fn(async () => ({ error: failure }))
+    ctx.provide('sessionController', { resolveAgent } as never)
+    const delegated = SessionId('cold-delegated')
+    {
+      await using writer = await ctx.sessionPersistence.create({ version: SESSION_FORMAT_VERSION, id: delegated,
+        createdAt: 1, isSeeded: false, cwd: root, parentSession: id, origin: 'subagent' })
+      await writer.flush()
+    }
+    await expect(controller.researchCreateLibraryConversation({ sessionId: delegated }))
+      .rejects.toMatchObject({ code: 'research/invalid' })
+    expect(resolveAgent).not.toHaveBeenCalled()
+    {
+      await using writer = await ctx.sessionPersistence.create({ version: SESSION_FORMAT_VERSION, id,
+        createdAt: 1, isSeeded: false, cwd: root })
+      await writer.flush()
+    }
+    const before = await controller.researchList()
+    await expect(controller.researchCreateLibraryConversation({ sessionId: id })).rejects.toBe(failure)
+    expect(resolveAgent).toHaveBeenCalledExactlyOnceWith(id)
+    expect((await controller.researchList()).revision).toBe(before.revision)
+    expect(ctx.workspaceRegistry.list()).toHaveLength(0)
+  })
+
+  it('names the first global question and broadcasts it without replacing its transcript', async () => {
+    const { controller, ctx } = await globalFixture()
+    await controller.researchCreateLibraryConversation({ sessionId: SessionId('paper-b') })
+    const stop = new AbortController()
+    const stream = controller.researchFollow(stop.signal)[Symbol.asyncIterator]()
+    expect((await stream.next()).value).toMatchObject({ type: 'baseline', catalog: { libraryConversations: [{ title: '' }] } })
+    const session = ctx.sessions.get(SessionId('paper-b'))!
+    session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'Survey robot VLA' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+    expect((await stream.next()).value).toMatchObject({ type: 'changed', catalog: { libraryConversations: [{ title: 'Survey robot VLA' }] } })
+    session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'Second question' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+    expect((await controller.researchList()).libraryConversations?.[0]?.title).toBe('Survey robot VLA')
+    expect(session.deriveMessages().filter(message => message.role === 'user')).toHaveLength(2)
+    stop.abort()
+    await stream.return?.()
+  })
+
+  it('persists global names, pins and archives while refusing stale names and active work', async () => {
+    const { controller, ctx, root } = await globalFixture()
+    const id = SessionId('paper-b')
+    await controller.researchCreateLibraryConversation({ sessionId: id })
+    await expect(controller.researchUpdateLibraryConversation({ sessionId: id, expectedDirectory: join(root, 'another-library'), pinned: true }))
+      .rejects.toMatchObject({ code: 'research/library-changed' })
+    const named = await controller.researchUpdateLibraryConversation({ sessionId: id, title: '  Robot survey  ', expectedTitle: '', pinned: true })
+    expect(named.libraryConversations?.[0]).toMatchObject({ title: 'Robot survey', pinned: true })
+    await expect(controller.researchUpdateLibraryConversation({ sessionId: id, title: 'Stale', expectedTitle: '' }))
+      .rejects.toMatchObject({ code: 'research/conversation-conflict' })
+    const stop = ctx.on('workspace/session-activity', async (_request, next) => [...await next(), { kind: 'probe' as const }])
+    await expect(controller.researchUpdateLibraryConversation({ sessionId: id, archived: true }))
+      .rejects.toMatchObject({ code: 'research/conversation-busy' })
+    stop()
+    const archived = await controller.researchUpdateLibraryConversation({ sessionId: id, archived: true })
+    expect(archived.libraryConversations?.[0]?.archived).toBe(true)
+    const restored = await controller.researchUpdateLibraryConversation({ sessionId: id, archived: false })
+    expect(restored.libraryConversations?.[0]).toMatchObject({ title: 'Robot survey', pinned: true, archived: false })
+    expect((await controller.researchUpdateLibraryConversation({ sessionId: id, pinned: true })).revision).toBe(restored.revision)
+    await expect(controller.researchUpdateLibraryConversation({ sessionId: SessionId('missing'), pinned: true }))
+      .rejects.toMatchObject({ code: 'research/not-found' })
+  })
+
+  it('deletes a global conversation durably while preserving paper files and its archived native history', async () => {
+    const { controller, ctx, root, topic } = await globalFixture()
+    const before = await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })
+    const registered = await controller.researchCreateLibraryConversation({ sessionId: SessionId('paper-b') })
+    const native = ctx.sessions.get(SessionId('paper-b'))!
+    const events = native.snapshotEvents()
+    const file = join(before.papers[0]!.directory!, 'reading.md')
+    writeFileSync(file, '# Preserved reading note\n')
+    const removed = await controller.researchDeleteLibraryConversation({ sessionId: native.id, expectedDirectory: join(root, 'data') })
+    expect(removed.capabilities?.libraryConversationDeletion).toBe(true)
+    expect(removed.libraryConversations).toEqual([])
+    expect(removed.topics).toEqual(registered.topics)
+    expect(removed.papers).toEqual(registered.papers)
+    expect(readFileSync(file, 'utf8')).toBe('# Preserved reading note\n')
+    expect(ctx.workspaceRegistry.archivedSessionIds).toContain(native.id)
+    expect(native.snapshotEvents()).toEqual(events)
+    expect(JSON.parse(readFileSync(join(root, 'data', 'agent-lib', 'library.json'), 'utf8'))).toMatchObject({ version: 5, libraryConversations: [] })
+    expect((await controller.researchDeleteLibraryConversation({ sessionId: native.id })).revision).toBe(removed.revision)
+    await expect(controller.researchCreateLibraryConversation({ sessionId: native.id })).rejects.toMatchObject({ code: 'research/conversation-archived' })
+  })
+
+  it('refuses global conversation deletion for busy work, changed libraries, and foreign identities without archival', async () => {
+    const { controller, ctx, root, topic, workspace } = await globalFixture()
+    const paper = (await controller.researchCreatePaper({ topicId: topic.id, title: 'A', repositoryUrl: '', sessionId: SessionId('paper-a') })).papers[0]!
+    const id = SessionId('paper-b')
+    const before = await controller.researchCreateLibraryConversation({ sessionId: id })
+    await expect(controller.researchDeleteLibraryConversation({ sessionId: id, expectedDirectory: join(root, 'elsewhere') }))
+      .rejects.toMatchObject({ code: 'research/library-changed' })
+    const stop = ctx.on('workspace/session-activity', async (_request, next) => [...await next(), { kind: 'probe' as const }])
+    await expect(controller.researchDeleteLibraryConversation({ sessionId: id })).rejects.toMatchObject({ code: 'research/conversation-busy' })
+    stop()
+    const child = ctx.sessions.create(SessionId('child-global'), { meta: { cwd: root, parentSession: id, origin: 'subagent' } })
+    await ctx.workspaceRegistry.get(workspace.workspaceId)!.attachSession(child.id)
+    for (const sessionId of [topic.sessionId, paper.sessionId, child.id]) {
+      await expect(controller.researchDeleteLibraryConversation({ sessionId })).rejects.toMatchObject({ code: 'research/invalid' })
+    }
+    await expect(controller.researchDeleteLibraryConversation({ sessionId: SessionId('unknown-global') }))
+      .rejects.toMatchObject({ code: 'research/not-found' })
+    expect((await controller.researchList()).revision).toBe(before.revision)
+    expect(ctx.workspaceRegistry.archivedSessionIds).toEqual([])
+  })
+
+  it('refuses global conversation deletion when work starts before the registry commits its archive', async () => {
+    const { controller, ctx } = await globalFixture()
+    const id = SessionId('paper-b')
+    const before = await controller.researchCreateLibraryConversation({ sessionId: id })
+    let checks = 0
+    ctx.on('workspace/session-activity', async (_request, next) => [
+      ...await next(), ...++checks >= 2 ? [{ kind: 'probe' as const }] : [],
+    ])
+    await expect(controller.researchDeleteLibraryConversation({ sessionId: id }))
+      .rejects.toMatchObject({ code: 'research/conversation-busy' })
+    expect(checks).toBe(2)
+    expect(ctx.workspaceRegistry.archivedSessionIds).not.toContain(id)
+    expect((await controller.researchList()).revision).toBe(before.revision)
+  })
+
+  it('deletes a persisted cold global conversation without activating its Agent', async () => {
+    const { controller, ctx, root } = await harness({ nativeSessions: true })
+    const before = await controller.researchList()
+    const id = SessionId('cold-global-delete')
+    {
+      await using writer = await ctx.sessionPersistence.create({ version: SESSION_FORMAT_VERSION, id,
+        createdAt: 1, isSeeded: false, cwd: root })
+      await writer.flush()
+    }
+    const files = await ResearchFiles.open(join(root, 'data'), { maxNoteBytes: 4096, lockTimeoutMs: 1000 })
+    await files.withLock(() => files.write({ ...before, revision: before.revision + 1,
+      libraryConversations: [{ sessionId: id, title: 'Cold research', createdAt: 1, pinned: false, archived: false }] }, before))
+    expect(ctx.sessions.get(id)).toBeUndefined()
+    const removed = await controller.researchDeleteLibraryConversation({ sessionId: id })
+    expect(removed.libraryConversations).toEqual([])
+    expect(ctx.workspaceRegistry.archivedSessionIds).toContain(id)
+    expect(ctx.sessions.get(id)).toBeUndefined()
+    expect(await ctx.sessionPersistence.stat(id)).toBeDefined()
+  })
+
+  it('reports native archival separately when global conversation removal needs a catalog retry', async () => {
+    const { controller, ctx, root } = await globalFixture()
+    const id = SessionId('paper-b')
+    const before = await controller.researchCreateLibraryConversation({ sessionId: id })
+    const path = join(root, 'data', 'agent-lib', 'library.json')
+    const saved = readFileSync(path, 'utf8')
+    const failure = vi.spyOn(ResearchFiles.prototype, 'write').mockRejectedValueOnce(new Error('catalog write failed'))
+    await expect(controller.researchDeleteLibraryConversation({ sessionId: id })).rejects.toMatchObject({
+      code: 'research/conversation-delete-incomplete', details: { sessionId: id, nativeArchived: true },
+    })
+    expect(readFileSync(path, 'utf8')).toBe(saved)
+    expect(ctx.workspaceRegistry.archivedSessionIds).toContain(id)
+    expect((await controller.researchList()).libraryConversations).toEqual(before.libraryConversations)
+    failure.mockRestore()
+    const removed = await controller.researchDeleteLibraryConversation({ sessionId: id })
+    expect(removed.libraryConversations).toEqual([])
+  })
+
+  it('restores portable global histories and missing bindings without a Topic or paper', async () => {
+    const { controller, ctx, root } = await harness({ nativeSessions: true })
+    const session = Session.create(SessionId('global-only'), [], { version: SESSION_FORMAT_VERSION,
+      id: SessionId('global-only'), createdAt: 1, isSeeded: false, cwd: root, delegationDepth: 0 })
+    session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'A portable global question' }],
+      source: { kind: 'user' } }), { surfaceOp: 'append' })
+    const before = await controller.researchList()
+    const catalog = { ...before, revision: before.revision + 1, libraryConversations: [{ sessionId: session.id,
+      title: 'Portable research', createdAt: 1, pinned: false, archived: false }] }
+    const files = await ResearchFiles.open(join(root, 'data'), { maxNoteBytes: 4096, lockTimeoutMs: 1000 })
+    await files.withLock(() => files.write(catalog, before))
+    const path = await files.runtimePath('sessions', session.id, 'session.json')
+    mkdirSync(join(path, '..'), { recursive: true })
+    writeFileSync(path, JSON.stringify({ header: session.header, inheritedEventCount: 0, events: session.snapshotEvents() }))
+    expect(await ctx.sessionPersistence.stat(session.id)).toBeUndefined()
+    await restoreResearchSessions(ctx, files, catalog)
+    await using reader = await ctx.sessionPersistence.open(session.id, 'read')
+    expect(reader.header).toEqual(session.header)
+    expect((await reader.read()).events).toEqual(session.snapshotEvents())
+    const workspace = ctx.workspaceRegistry.list().find(item => item.path === root)!
+    expect(workspace.sessionIds).toContain(session.id)
+    const native = await ctx.sessionPersistence.stat(session.id)
+    await restoreResearchSessions(ctx, files, catalog)
+    expect((await ctx.sessionPersistence.stat(session.id))?.revision).toBe(native?.revision)
+    expect(ctx.workspaceRegistry.list()).toEqual([workspace])
+    const destination = await ResearchFiles.open(join(root, 'portable-copy'), { maxNoteBytes: 4096, lockTimeoutMs: 1000 })
+    await destination.withLock(() => files.copyTo(destination))
+    expect(readFileSync(await destination.runtimePath('sessions', session.id, 'session.json'), 'utf8'))
+      .toBe(readFileSync(path, 'utf8'))
+  })
+
+  it('refuses mismatched index versions and duplicate global ownership without replacing the stored index', async () => {
+    const { controller, root, topic } = await globalFixture()
+    await controller.researchCreateLibraryConversation({ sessionId: SessionId('paper-b') })
+    const path = join(root, 'data', 'agent-lib', 'library.json')
+    const valid = JSON.parse(readFileSync(path, 'utf8')) as { version: number; libraryConversations: readonly { sessionId: string }[] }
+    const { libraryConversations: _conversations, ...withoutGlobal } = valid
+    for (const invalid of [
+      { ...valid, version: 4 },
+      withoutGlobal,
+      { ...valid, libraryConversations: [...valid.libraryConversations, valid.libraryConversations[0]] },
+      { ...valid, libraryConversations: [{ ...valid.libraryConversations[0], sessionId: topic.sessionId }] },
+    ]) {
+      const text = JSON.stringify(invalid)
+      writeFileSync(path, text)
+      await expect(controller.researchList()).rejects.toMatchObject({ code: 'research/invalid-library' })
+      expect(readFileSync(path, 'utf8')).toBe(text)
+    }
+    writeFileSync(path, JSON.stringify(valid))
+    expect((await controller.researchList()).libraryConversations?.[0]?.sessionId).toBe('paper-b')
   })
 
   it('rejects conversation adoption of an existing history or another entity Session', async () => {

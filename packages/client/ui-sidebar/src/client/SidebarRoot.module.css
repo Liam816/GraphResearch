@@ -54,6 +54,7 @@
   height: 0;
 }
 
+
 :global([data-windows-titlebar]) .root:not(.collapsed) .brand {
   padding-left: 4px;
 }
@@ -205,17 +206,8 @@
   margin-top: -12px;
 }
 
-/* Logo row (figma pad (4,8,4,8)): expanded keeps the panel toggle at the
-   right edge; the rail gives every control the same base left anchor before
-   the shared entry translation is applied. macOS hiddenInset titlebar: the row
-   is marked `data-window-drag` in markup (SidebarRoot), so ui-web base.css's
-   single darwin rule carries the drag over its own box — below the top strip
-   (40–88px: the strip's 52px foot with the row's -12px tuck). The brand rides
-   that box (SidebarRoot renders the wordmark as a plain span there, so the
-   global interactive no-drag rule never subtracts it); the dedicated New
-   Session button below keeps the pointer and keyboard paths. Safe as a drag
-   source: it precedes the sidebar's overlay slots in document order, so their
-   no-drag still wins. */
+/* Brand navigation and collapse retain separate pointer targets; the macOS
+   top strip and unoccupied logo-row area remain window drag regions. */
 .logoRow {
   flex: none;
   display: flex;
@@ -239,10 +231,7 @@
   overflow: visible;
 }
 
-/* Brand group (figma I133:7632): the full wordmark rides the text ink
-   (figma flows: the main-screen instance is black; blue is brand
-   emphasis only). A button only in behavior (New Session shortcut): the
-   pointer cursor is the sole affordance — no hover chrome on the mark. */
+/* The brand returns to the last global conversation without creating one. */
 .brand {
   flex: 1;
   min-width: 0;
@@ -254,13 +243,15 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
-/* On macOS the brand is a window-drag surface, not a New Session button;
-   a pointer cursor would promise a click that drags the window instead. */
-:global([data-platform='darwin']) .brand {
-  cursor: default;
+.brand:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
 }
+
+
 
 /* Mark and name are independent slots; the shell owns their shared baseline,
    spacing, and height so either occupant can vary in width. */
@@ -333,27 +324,6 @@
   height: 36px;
   /* Rail hovers share the panel rows' and New Session's 12px rounding. */
   border-radius: var(--dsw-radius-md);
-}
-
-/* Rail logo swap: collapsed, the toggle rests as the whale mark (brand ink,
-   no hover circle) and hovering reveals the panel icon — the expand
-   affordance (figma sidebar-hover flow). Expanded it is a plain panel icon. */
-.collapsed .toggle .panelIcon {
-  display: none;
-}
-
-.collapsed .toggle:hover .panelIcon {
-  display: inline;
-}
-
-.collapsed .toggle:hover .railMark {
-  display: none;
-}
-
-.railMark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* Rail icons ride the primary ink (figma rail spec); expanded keeps the

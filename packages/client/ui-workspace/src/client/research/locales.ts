@@ -1,5 +1,11 @@
 /** Product and accessibility copy for the research workspace. */
 export const zh = {
+  globalAgent: '全局 Agent', libraryConversations: '全局会话', searchLibraryConversations: '搜索全局会话',
+  libraryOpenFailed: '会话暂时无法打开，原有记录已保留。请点击左上角 Logo 重试',
+  deleteConversation: '删除会话', deleteConversationWarning: '确定从全局会话列表中删除「{title}」吗？论文和文件不受影响',
+  conversationDeleted: '会话已从全局列表删除', conversationDeleteBusy: '会话仍有任务运行，请停止后重试',
+  conversationDeleteFailed: '删除未完成，请刷新会话列表后重试',
+  conversationDeleteIncomplete: '会话已停用，但删除尚未完成。请刷新会话列表后重试删除',
   paperDragHandle: '拖拽调整「{title}」的顺序', paperDragRole: '可排序论文', paperMoveUp: '上移', paperMoveDown: '下移',
   paperDragInstructions: '按空格键开始排序，用上下方向键移动，再按空格键保存；按 Escape 取消。搜索时暂停排序',
   paperDragStart: '正在移动「{title}」', paperDragBefore: '放到「{title}」前面', paperDragAfter: '放到「{title}」后面',
@@ -93,6 +99,12 @@ export const zh = {
 export type ResearchKey = keyof typeof zh
 /** English research dictionary. */
 export const en = {
+  globalAgent: 'Global Agent', libraryConversations: 'Global conversations', searchLibraryConversations: 'Search global conversations',
+  libraryOpenFailed: 'The conversation could not open. Your history is retained. Select the research logo to retry.',
+  deleteConversation: 'Delete conversation', deleteConversationWarning: 'Remove “{title}” from global conversations? Papers and files are unaffected.',
+  conversationDeleted: 'Conversation removed from global history', conversationDeleteBusy: 'This conversation has running work. Stop it and retry.',
+  conversationDeleteFailed: 'Deletion did not complete. Refresh the conversation list and retry.',
+  conversationDeleteIncomplete: 'The conversation is inactive, but deletion did not finish. Refresh the list and retry deletion.',
   paperDragHandle: 'Reorder paper: {title}', paperDragRole: 'Sortable paper', paperMoveUp: 'Move up', paperMoveDown: 'Move down',
   paperDragInstructions: 'Press Space to start sorting, use the arrow keys to move, then Space to save. Escape cancels. Clear search before sorting.',
   paperDragStart: 'Moving {title}', paperDragBefore: 'Place before {title}', paperDragAfter: 'Place after {title}',
@@ -105,7 +117,7 @@ export const en = {
   unpinConversation: 'Unpin conversation', archiveConversation: 'Archive conversation', restoreConversation: 'Restore conversation', restoreAndOpen: 'Restore and open',
   showActiveConversations: 'Show active conversations', showArchivedConversations: 'Show archived conversations', conversationArchived: 'Conversation archived; paper resources retained',
   conversationSaved: 'Conversation settings saved', conversationIsArchived: 'This conversation is archived. Restore it to view and continue chatting.',
-  conversationBackendRestart: 'The backend has not loaded paper conversations. Restart the server, then refresh this page.',
+  conversationBackendRestart: 'The backend has not loaded conversation management. Restart the server, then refresh this page.',
   conversationCreateFailed: 'Conversation creation did not complete. Refresh the library to check before retrying.',
   conversationUpdateFailed: 'The change did not complete. Your input was retained. Stop this conversation’s work, or refresh the library to check its latest state before retrying.',
   conversationOtherRunning: 'Another conversation for this paper is running. Wait or stop it before sending another question.', viewRunningConversation: 'View running conversation',

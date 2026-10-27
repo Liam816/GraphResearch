@@ -5,6 +5,7 @@ import type { ResearchInjected } from './contract.ts'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { paperConversations, paperForSession } from './conversation-records.ts'
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { ResearchAgentPane } from './Conversations.tsx'
 import type { ResearchCatalog, ResearchPaper, WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
@@ -18,14 +19,22 @@ import { paperDeleteFailure } from './DeletePaper.tsx'
 import { topicRenameFailure } from './TopicActions.tsx'
 import { topicDeleteFailure } from './DeleteTopic.tsx'
 
+interface ResearchNavigation {
+  startSession: () => boolean
+  openLibrary: () => Promise<void>
+  restoreSession: (sessionId: SessionId | undefined, signal: AbortSignal) => Promise<boolean>
+}
+
 /**
  * Register research navigation, stable reading resources, and Session-scoped conversations.
  * @param ctx - Client services and Slot registry.
  * @param navigation - existing Session navigation owner.
+ * @returns research creation and startup navigation; unsupported Hosts keep ordinary Workspace navigation.
  */
-export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
+export function applyResearch(ctx: Context, navigation: UiWorkspace): ResearchNavigation {
   const panelId = 'research' as MainPanelId
-  const rawOpen: ResearchInjected['open'] = (id) => { navigation.openSession(id); ctx.layout.selectPanel(panelId) }
+  let navigationEpoch = 0
+  const rawOpen: ResearchInjected['open'] = (id) => { ++navigationEpoch; navigation.openSession(id); ctx.layout.selectPanel(panelId) }
   const handle = createResearchViewStore()
   const instance = handle.create()
   const store: typeof handle = { ...handle, create: () => instance }
@@ -64,10 +73,119 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
     }
     return session
   }
+  const openLibraryConversation: ResearchInjected['openLibraryConversation'] = (id) => {
+    const catalog = ctx.research.state.getSnapshot().catalog
+    if (!catalog.libraryConversations?.some(item => item.sessionId === id)) {
+      throw new Error('The global conversation is not in this research library')
+    }
+    if (catalog.directory !== undefined) instance.actions.libraryConversation(catalog.directory, id)
+    rawOpen(id)
+  }
+  const libraryCreations = new Map<string, Promise<Parameters<ResearchInjected['open']>[0]>>()
+  const libraryLifetime = new AbortController()
+  ctx.effect(() => () => { libraryLifetime.abort() })
+  const allocateLibraryConversation = (): Promise<Parameters<ResearchInjected['open']>[0]> => {
+    const catalog = ctx.research.state.getSnapshot().catalog
+    if (catalog.capabilities?.libraryConversations !== true || catalog.directory === undefined) {
+      notice.set({ seq: ++noticeSeq, message: 'conversationBackendRestart', success: false })
+      return Promise.reject(new Error('Global conversation management requires an updated Host'))
+    }
+    const directory = catalog.directory
+    const existing = libraryCreations.get(directory)
+    if (existing !== undefined) return existing
+    const key = `library:${directory}`
+    const operation = (async () => {
+      const workspace = await ctx.workspaces.create({ path: directory })
+      libraryLifetime.signal.throwIfAborted()
+      const sessionId = await createSession(key, workspace.workspaceId)
+      libraryLifetime.signal.throwIfAborted()
+      await ctx.research.createLibraryConversation({ sessionId, expectedDirectory: directory })
+      pending.delete(key)
+      return sessionId
+    })().finally(() => { libraryCreations.delete(directory) })
+    libraryCreations.set(directory, operation)
+    return operation
+  }
+  const createLibraryConversation: ResearchInjected['createLibraryConversation'] = async () => {
+    ++navigationEpoch
+    const signal = AbortSignal.any([ctx.layout.beginNavigation(), libraryLifetime.signal])
+    const directory = ctx.research.state.getSnapshot().catalog.directory
+    try {
+      const id = await allocateLibraryConversation()
+      if (!signal.aborted && ctx.research.state.getSnapshot().catalog.directory === directory) openLibraryConversation(id)
+    } catch (error: unknown) {
+      if (!libraryLifetime.signal.aborted) notice.set({ seq: ++noticeSeq, message: 'conversationCreateFailed', success: false })
+      throw error
+    }
+  }
+  const openLibrary: ResearchInjected['openLibrary'] = async () => {
+    const catalog = ctx.research.state.getSnapshot().catalog
+    const saved = catalog.directory === undefined ? undefined : instance.getSnapshot().librarySessions?.[catalog.directory]
+    const archivedIds = ctx.workspaces.list.getSnapshot().archivedSessionIds
+    const entries = catalog.libraryConversations?.filter(item => !item.archived && !archivedIds.includes(item.sessionId)) ?? []
+    const sessions = ctx.sessions.list.getSnapshot().byId
+    const latest = [...entries].sort((left, right) =>
+      (sessions[right.sessionId]?.updatedAt ?? right.createdAt) - (sessions[left.sessionId]?.updatedAt ?? left.createdAt))[0]
+    const target = entries.find(item => item.sessionId === saved) ?? latest
+    if (target === undefined) await createLibraryConversation()
+    else openLibraryConversation(target.sessionId)
+  }
   let input: Context['conversation']['input'] | undefined
   const injected = (): ResearchInjected => ({
     hooks: { research: ctx.research.state, resources },
     openConversation,
+    openLibraryConversation,
+    createLibraryConversation,
+    openLibrary,
+    deleteLibraryConversation: async (request) => {
+      const directory = ctx.research.state.getSnapshot().catalog.directory
+      const current = currentSession()
+      const selected = current === request.sessionId || (current === undefined && directory !== undefined
+        && instance.getSnapshot().librarySessions?.[directory] === request.sessionId)
+      const epoch = navigationEpoch
+      let leftResearch = ctx.layout.panelInfo.getSnapshot().activePanelId !== panelId
+      const stop = ctx.layout.panelInfo.subscribe(() => {
+        const panel = ctx.layout.panelInfo.getSnapshot().activePanelId
+        if (panel !== panelId && panel !== null) leftResearch = true
+      })
+      const release = navigation.holdArchivedSelection(request.sessionId)
+      try {
+        await ctx.research.deleteLibraryConversation({ ...request, ...directory === undefined ? {} : { expectedDirectory: directory } })
+        if (directory !== undefined) instance.actions.forgetLibraryConversation(directory, request.sessionId)
+        notice.set({ seq: ++noticeSeq, message: 'conversationDeleted', success: true })
+        if (selected && !leftResearch && navigationEpoch === epoch && !libraryLifetime.signal.aborted
+          && directory === ctx.research.state.getSnapshot().catalog.directory
+          && (currentSession() === request.sessionId || currentSession() === undefined)) {
+          try { await openLibrary() }
+          catch (_error: unknown) { /* Creation reports its own failure; the confirmed deletion remains complete. */ }
+        }
+      } catch (error: unknown) {
+        const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
+        notice.set({ seq: ++noticeSeq, message: code === 'research/conversation-delete-incomplete'
+          ? 'conversationDeleteIncomplete' : 'conversationDeleteFailed', success: false })
+        try { await ctx.research.refresh() }
+        catch (refreshError: unknown) { console.error('Research refresh after conversation deletion failed:', refreshError) }
+        throw error
+      } finally { release(); stop() }
+    },
+    updateLibraryConversation: async (request) => {
+      const directory = ctx.research.state.getSnapshot().catalog.directory
+      const navigation = request.archived === true && currentSession() === request.sessionId
+        ? ctx.layout.beginNavigation() : undefined
+      try {
+        await ctx.research.updateLibraryConversation({ ...request, ...directory === undefined ? {} : { expectedDirectory: directory } })
+        if (navigation !== undefined && !navigation.aborted && !libraryLifetime.signal.aborted
+          && directory === ctx.research.state.getSnapshot().catalog.directory && currentSession() === request.sessionId) {
+          const catalog = ctx.research.state.getSnapshot().catalog
+          const next = catalog.libraryConversations?.find(item => !item.archived)
+          if (next !== undefined) openLibraryConversation(next.sessionId)
+        }
+        notice.set({ seq: ++noticeSeq, message: request.archived === true ? 'conversationArchived' : 'conversationSaved', success: true })
+      } catch (error: unknown) {
+        notice.set({ seq: ++noticeSeq, message: 'conversationUpdateFailed', success: false })
+        throw error
+      }
+    },
     insertText: (id, text) => {
       if (currentSession() !== id) return false
       const binding = ctx.sessions.binding(id)
@@ -263,6 +381,9 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
           }
         }
       }
+      for (const entry of catalog.libraryConversations ?? []) {
+        if (entry.archived) wanted.set(entry.sessionId, t('conversationIsArchived'))
+      }
       for (const [id, reason] of ownedBlocks) {
         if (!wanted.has(id) && scope.conversation.blocks.storeFor(id).getSnapshot()?.reason === reason) {
           scope.conversation.blocks.set(id, undefined)
@@ -275,6 +396,11 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
       ownedBlocks.clear(); for (const [id, reason] of wanted) ownedBlocks.set(id, reason)
       const current = currentSession(), paper = paperForSession(ctx.research.state.getSnapshot().catalog, current)
       if (paper !== undefined && current !== undefined) instance.actions.conversation(paper.id, current)
+      if (current !== undefined && catalog.directory !== undefined
+        && catalog.libraryConversations?.some(item => item.sessionId === current && !item.archived)
+        && instance.getSnapshot().librarySessions?.[catalog.directory] !== current) {
+        instance.actions.libraryConversation(catalog.directory, current)
+      }
       if (paper?.id === resourcePaper) return
       const previous = resources.getSnapshot()
       resourcePaper = paper?.id
@@ -303,23 +429,73 @@ export function applyResearch(ctx: Context, navigation: UiWorkspace): void {
       ownedBlocks.clear()
     }
   }))
-  let restored = false
-  const restore = (): void => {
-    if (restored || ctx.research.state.getSnapshot().phase !== 'ready') return
-    const catalog = ctx.research.state.getSnapshot().catalog
-    const current = Object.values(ctx.sessions.list.getSnapshot().byId).find(item => (item.retainedBy.mainView ?? 0) > 0)?.id
-    if (current === undefined) return
-    restored = true
-    if (catalog.topics.some(item => item.sessionId === current) || paperForSession(catalog, current) !== undefined) {
-      ctx.layout.selectPanel(panelId)
+  const waitForCatalog = (signal: AbortSignal): Promise<void> => new Promise((resolve) => {
+    const check = (): void => {
+      if (!signal.aborted && ctx.research.state.getSnapshot().phase === 'loading') return
+      stop()
+      signal.removeEventListener('abort', check)
+      resolve()
     }
-  }
-  ctx.effect(() => {
-    const stopCatalog = ctx.research.state.subscribe(restore)
-    const stopSessions = ctx.sessions.list.subscribe(restore)
-    restore()
-    return () => { stopSessions(); stopCatalog() }
+    const stop = ctx.research.state.subscribe(check)
+    signal.addEventListener('abort', check, { once: true })
+    check()
   })
+  return {
+    openLibrary: async () => {
+      ++navigationEpoch
+      await waitForCatalog(libraryLifetime.signal)
+      if (libraryLifetime.signal.aborted) return
+      try { await openLibrary() }
+      catch (error: unknown) {
+        notice.set({ seq: ++noticeSeq, message: 'libraryOpenFailed', success: false })
+        throw error
+      }
+    },
+    startSession: () => {
+      const catalog = ctx.research.state.getSnapshot().catalog
+      if (catalog.capabilities?.libraryConversations !== true || catalog.directory === undefined) return false
+      void createLibraryConversation().catch((error: unknown) => {
+        console.warn('Global conversation creation failed:', error)
+      })
+      return true
+    },
+    restoreSession: async (id, navigationSignal) => {
+      const signal = AbortSignal.any([navigationSignal, libraryLifetime.signal])
+      const interrupted = (): boolean => signal.aborted
+      await waitForCatalog(signal)
+      if (interrupted()) return true
+      const { catalog, phase } = ctx.research.state.getSnapshot()
+      if (phase === 'error') { ctx.layout.selectPanel(panelId); return true }
+      if (catalog.capabilities?.libraryConversations !== true || catalog.directory === undefined) return false
+      if (id !== undefined && (catalog.topics.some(item => item.sessionId === id) || paperForSession(catalog, id) !== undefined)) {
+        open(id)
+        return true
+      }
+      if (id !== undefined && catalog.libraryConversations?.some(item => item.sessionId === id)) {
+        openLibraryConversation(id)
+        return true
+      }
+      const summary = id === undefined || ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(id)
+        ? undefined : ctx.sessions.list.getSnapshot().byId[id]
+      try {
+        if (summary !== undefined && summary.origin !== 'subagent' && summary.parentId === undefined) {
+          await ctx.research.createLibraryConversation({ sessionId: summary.id, expectedDirectory: catalog.directory })
+          if (!interrupted() && ctx.research.state.getSnapshot().catalog.directory === catalog.directory) {
+            openLibraryConversation(summary.id)
+          }
+        } else if (!interrupted()) {
+          ctx.layout.selectPanel(panelId)
+          await openLibrary()
+        }
+      } catch (error: unknown) {
+        if (interrupted()) return true
+        console.error('Research conversation startup failed:', error)
+        notice.set({ seq: ++noticeSeq, message: 'libraryOpenFailed', success: false })
+        ctx.layout.selectPanel(panelId)
+      }
+      return true
+    },
+  }
 }
 
 function ResearchPanel({ renderSlot, useStore, actions }: PropsRuntime<'main'> & PropsRenderSlots<'main.research'> & PropsStore<ResearchViewStore>) {

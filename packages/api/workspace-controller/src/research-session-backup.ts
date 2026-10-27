@@ -37,6 +37,8 @@ const backupSchema = z.object({
  */
 export async function restoreResearchSessions(ctx: Context, files: ResearchFiles, catalog: ResearchCatalog): Promise<ResearchCatalog> {
   const snapshots = [
+    ...await Promise.all((catalog.libraryConversations ?? []).map(async item => ({ sessionId: item.sessionId,
+      path: await files.runtimePath('sessions', item.sessionId, 'session.json') }))),
     ...await Promise.all(catalog.topics.map(async topic => ({ sessionId: topic.sessionId,
       path: await files.runtimePath('topics', topic.id, 'session.json') }))),
     ...await Promise.all(catalog.papers.flatMap(paper => paperConversations(paper).map(async conversation => ({
@@ -63,6 +65,13 @@ export async function restoreResearchSessions(ctx: Context, files: ResearchFiles
       throw new RemoteError('research/invalid-library',
         'Cannot restore this Session snapshot; use a compatible release or repair the snapshot', { path }, { cause: error })
     }
+  }
+  for (const conversation of catalog.libraryConversations ?? []) {
+    if (ctx.workspaceRegistry.list().some(workspace => workspace.sessionIds.includes(conversation.sessionId))) continue
+    const header = ctx.sessions.get(conversation.sessionId)?.header
+      ?? (await ctx.sessionPersistence.stat(conversation.sessionId))?.header
+    const workspace = await ctx.workspaceRegistry.create(header?.cwd ?? files.directory)
+    await workspace.attachSession(conversation.sessionId)
   }
   const topics: ResearchCatalog['topics'][number][] = []
   let changed = false

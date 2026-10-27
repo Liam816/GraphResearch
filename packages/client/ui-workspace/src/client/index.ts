@@ -118,9 +118,14 @@ export function apply(ctx: Context): void {
   let toastSeq = 0
   const notify = (toast: RowToast): void => { rowToast.set({ ...toast, seq: ++toastSeq }) }
   const uiWorkspace = new UiWorkspaceService(
-    ctx, ctx.remote.directoryPicker, workspaces, sessions, viewInstance.actions, notify,
+    ctx, ctx.remote.directoryPicker, workspaces, sessions, viewInstance.actions, notify, () => researchNavigation.startSession(),
+    async (id, signal) => {
+      await Promise.resolve()
+      return researchNavigation.restoreSession(id, signal)
+    },
+    () => researchNavigation.openLibrary(),
   )
-  applyResearch(ctx, uiWorkspace)
+  const researchNavigation = applyResearch(ctx, uiWorkspace)
   ctx.slots.provideRoot({ hooks: { workspaces: workspaces.list } })
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace: dictionaries')
   const shortcutControls = createWorkspaceShortcutControls()

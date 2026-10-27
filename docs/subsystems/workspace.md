@@ -178,7 +178,7 @@ The Workspace controller also manages a research library whose Topic and paper i
 
 `ResearchFileRequest` identifies a `paperId` and paper-relative `path` (empty for its root). `ResearchDirectoryListing` returns that path and direct entries with `name`, `path`, `kind`, and optional `bytes`. `ResearchFileContent` distinguishes complete versioned UTF-8 `text`, bounded `image` previews, and `unsupported` binary or oversized files. `ResearchSaveFileRequest` adds Markdown `text` and its `expectedVersion` SHA-256; file previews and drafts do not change Session history.
 
-`ResearchConversation` records a paper-owned `sessionId`, title, pin/archive flags, creation time and optional continuation point. `ResearchCreateConversationRequest` identifies a paper and a fresh Session; `ResearchUpdateConversationRequest` adds optional title, expected title, pin and archive updates. `ResearchPaper.conversations` is optional for legacy single-Session libraries. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns admission, persistence and execution rules.
+`ResearchConversation` records a library- or paper-owned `sessionId`, title, pin/archive flags, creation time and optional continuation point. `ResearchCreateConversationRequest` identifies a paper and a fresh Session; `ResearchUpdateConversationRequest` adds optional title, expected title, pin and archive updates. `ResearchPaper.conversations` is optional for legacy single-Session libraries. Optional `ResearchCatalog.libraryConversations` indexes global conversations separately. `ResearchCreateLibraryConversationRequest` names an explicitly admitted top-level Session and optional `expectedDirectory` to reject registration after a library switch; `ResearchUpdateLibraryConversationRequest` changes title, expected title, pin and archive metadata without changing ownership. `ResearchDeleteLibraryConversationRequest` names a global conversation and optional expected library directory; it removes the index entry and archives the native journal without changing papers or files. The controller defines activity checks and partial-failure retry guarantees. The [controller reference](../../packages/api/workspace-controller/README.md#research-catalog) owns admission, persistence and execution rules.
 
 ## Agent-managed interface modules
 
@@ -497,6 +497,27 @@ Host service backing the generated `ctx.remote.workspace` namespace.
  * @returns the committed library.
  */
 @Remote('researchUpdateConversation') researchUpdateConversation(request: ResearchUpdateConversationRequest): Promise<ResearchCatalog>
+
+/**
+ * Resume and register an ordinary main Session with the selected library, retaining its existing history.
+ * @param request - fresh or existing independent main Session; registration is idempotent.
+ * @returns the library with its global conversation metadata.
+ */
+@Remote('researchCreateLibraryConversation') async researchCreateLibraryConversation(request: ResearchCreateLibraryConversationRequest): Promise<ResearchCatalog>
+
+/**
+ * Rename, pin, archive or restore one registered global conversation.
+ * @param request - main conversation metadata changes.
+ * @returns the committed library; active work and stale names refuse changes without writes.
+ */
+@Remote('researchUpdateLibraryConversation') researchUpdateLibraryConversation(request: ResearchUpdateLibraryConversationRequest): Promise<ResearchCatalog>
+
+/**
+ * Remove one global conversation from the library and archive its native history.
+ * @param request - global conversation and optional last confirmed library directory.
+ * @returns remaining metadata; paper content is retained and active work refuses deletion.
+ */
+@Remote('researchDeleteLibraryConversation') researchDeleteLibraryConversation(request: ResearchDeleteLibraryConversationRequest): Promise<ResearchCatalog>
 
 /**
  * Permanently remove one paper's directory and catalog entry, retaining its archived native Session.

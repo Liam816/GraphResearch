@@ -110,8 +110,17 @@ function researchViewDefinition() {
     init: () => ({
       expanded: {} as Record<string, boolean>, topicId: undefined as ResearchTopicId | undefined,
       papers: {} as Record<ResearchPaperId, PaperView>,
+      librarySessions: {} as Record<string, SessionId | undefined> | undefined,
     }),
     actions: {
+      libraryConversation: (draft, directory: string, sessionId: SessionId) => {
+        (draft.librarySessions ??= {})[directory] = sessionId
+      },
+      forgetLibraryConversation: (draft, directory: string, sessionId: SessionId) => {
+        if (draft.librarySessions?.[directory] === sessionId) {
+          draft.librarySessions = Object.fromEntries(Object.entries(draft.librarySessions).filter(([key]) => key !== directory))
+        }
+      },
       conversation: (draft, id: ResearchPaperId, sessionId: SessionId) => {
         (draft.papers[id] ??= defaultPaperView()).activeSession = sessionId
       },

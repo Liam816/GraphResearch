@@ -10,6 +10,7 @@ export function installEmptyResearch(ctx: Context): void {
     researchReadFile: () => Promise.reject(new Error('file previews are not used by this fixture')),
     researchSaveFile: () => Promise.reject(new Error('file edits are not used by this fixture')),
     researchReorderPapers: result, researchCreateConversation: result, researchUpdateConversation: result,
+    researchCreateLibraryConversation: result, researchUpdateLibraryConversation: result, researchDeleteLibraryConversation: result,
     researchRenameTopic: result, researchDeleteTopic: result,
     researchDeletePaper: result, researchList: result,
     researchCreateTopic: result, researchCreatePaper: result, researchSaveNote: result,

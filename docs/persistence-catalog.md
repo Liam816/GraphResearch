@@ -755,7 +755,7 @@ Source: [`packages/core/session/src/types.ts:390`](../packages/core/session/src/
 'research/translation-request': ResearchTranslationRequestRecord
 ```
 
-Source: [`packages/api/workspace-controller/src/research-translation-types.ts:80`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Source: [`packages/api/workspace-controller/src/research-translation-types.ts:96`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 <a id="researchtranslation-result--log-only"></a>
 
@@ -769,7 +769,7 @@ Source: [`packages/api/workspace-controller/src/research-translation-types.ts:80
 'research/translation-result': { readonly requestSeq: import('@deepseek-ai/dsh-session/types').SessionSeq; readonly translation: ResearchTranslation }
 ```
 
-Source: [`packages/api/workspace-controller/src/research-translation-types.ts:85`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Source: [`packages/api/workspace-controller/src/research-translation-types.ts:101`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 ### `sandbox/*`
 
@@ -4474,7 +4474,7 @@ Array of [`RequestUserInput`](#persistence-type-sha256-34781a31fba38f2732d53fbd9
 
 SHA-256: `79998beddac54f1530d47cd87029f3fbbb95d9bf56659c0bc3d5e81bfef19254`
 
-Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:47`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:49`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4492,7 +4492,7 @@ Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:4
 
 SHA-256: `27836fd07fda3ddd5c832b86f552027af335d814d4c197d4038da59e0ac41b44`
 
-Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:54`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:56`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4513,7 +4513,7 @@ Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:5
 
 SHA-256: `a41d6b2bd7f966af88bde79e01a8120e3d5cf837c553b1020979cad7d5fa5ed2`
 
-Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:23`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:25`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4536,7 +4536,7 @@ Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:2
 
 SHA-256: `dde5a81f784c23e2111dcb2db2d3c6cab971118690c17455976f2b299f789c0d`
 
-Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:36`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:38`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -4558,7 +4558,7 @@ Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:3
 
 SHA-256: `da877af1420e83bf73d3003d625b93ad3f18972704f9f4664ff4cf1246a33cc1`
 
-Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:64`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:80`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -6099,7 +6099,7 @@ Sources: [`packages/compaction/compaction/src/types.ts:24`](../packages/compacti
 
 SHA-256: `2b64b82387d5c151eb7c75e8b5eeb17d32a2828cca7a09b286656e04369fa0a8`
 
-Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:67`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:83`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | Property | Presence | Type |
 |---|---|---|
@@ -7848,7 +7848,7 @@ Sources: [`packages/core/session/src/types.ts:297`](../packages/core/session/src
 
 SHA-256: `2ebc18d4f9fda63e87ee5528008c981a5ee4d40e643a20be4a3ab842358c7a9f`
 
-Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:85`](../packages/api/workspace-controller/src/research-translation-types.ts)
+Sources: [`packages/api/workspace-controller/src/research-translation-types.ts:101`](../packages/api/workspace-controller/src/research-translation-types.ts)
 
 | Property | Presence | Type |
 |---|---|---|

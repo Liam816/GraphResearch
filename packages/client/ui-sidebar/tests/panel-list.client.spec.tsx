@@ -50,7 +50,7 @@ async function bench(collapsed = false) {
     apply(ctx: Context) {
       ctx.provide('shortcuts', { catalog: createSnapshotStore([]) } as never)
       ctx.provide('layout', layout)
-      ctx.provide('uiWorkspace', { startSession: vi.fn() } as never)
+      ctx.provide('uiWorkspace', { startSession: vi.fn(), openResearchLibrary: vi.fn(async () => {}) } as never)
       ctx.provide('locale', locale)
       ctx.effect(() => locale.register('common', { zh: commonZh, en: commonEn }), 'panel test: common locale')
       ctx.effect(() => locale.register('sidebar-panel-test', {

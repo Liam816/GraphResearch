@@ -1,0 +1,9 @@
+- dialog "Global conversations":
+  - textbox "Search global conversations"
+  - paragraph: Pinned
+  - button "Embodied research Current"
+  - button "Conversation actions for Embodied research"
+  - paragraph: Recent
+  - button "Library planning"
+  - button "Conversation actions for Library planning"
+  - button "Show archived conversations"
